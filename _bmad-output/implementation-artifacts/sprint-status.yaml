@@ -1,0 +1,87 @@
+# generated: 2026-03-25T21:46:25-03:00
+# last_updated: 2026-03-25T21:46:25-03:00
+# project: pureurban
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: "2026-03-25T21:46:25-03:00"
+last_updated: "2026-03-25T21:48:43-03:00"
+project: pureurban
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # === Epic 1: Fundação do Projeto e Infraestrutura ===
+  epic-1: in-progress
+  1-1-inicializacao-dos-projetos-e-repositorio: ready-for-dev
+  1-2-schema-prisma-e-configuracao-do-banco-de-dados: backlog
+  1-3-setup-effect-ts-e-composition-root: backlog
+  1-4-infraestrutura-compartilhada-guards-filters-pipes: backlog
+  1-5-setup-mobile-dependencias-e-configuracao-offline: backlog
+  epic-1-retrospective: optional
+
+  # === Epic 2: Identidade, Acesso e Organização ===
+  epic-2: backlog
+  2-1-cadastro-de-empresa-e-seed-inicial: backlog
+  2-2-autenticacao-login-e-refresh-token: backlog
+  2-3-cadastro-e-gestao-de-motoristas: backlog
+  2-4-cadastro-e-gestao-de-alunos: backlog
+  2-5-crud-de-rotas-de-transporte: backlog
+  2-6-vinculos-aluno-rota-e-motorista-rota: backlog
+  epic-2-retrospective: optional
+
+  # === Epic 3: Gestão de Viagens e Embarque Digital ===
+  epic-3: backlog
+  3-1-iniciar-e-encerrar-viagem: backlog
+  3-2-geracao-e-exibicao-de-qr-code-do-aluno: backlog
+  3-3-escaneamento-de-qr-code-e-check-in: backlog
+  3-4-check-in-offline-com-sincronizacao: backlog
+  3-5-lista-de-alunos-e-status-de-embarque: backlog
+  epic-3-retrospective: optional
+
+  # === Epic 4: Notificação de Ausência e Comunicação ===
+  epic-4: backlog
+  4-1-notificacao-nao-vou-voltar: backlog
+  4-2-recebimento-de-notificacao-de-ausencia-pelo-motorista: backlog
+  4-3-cancelamento-de-ausencia-e-periodo-de-seguranca: backlog
+  4-4-lembrete-automatico-de-check-in-pendente: backlog
+  4-5-avisos-gerais-do-motorista-para-alunos: backlog
+  epic-4-retrospective: optional
+
+  # === Epic 5: Localização em Tempo Real ===
+  epic-5: backlog
+  5-1-transmissao-de-localizacao-gps-pelo-motorista: backlog
+  5-2-visualizacao-do-onibus-no-mapa-em-tempo-real: backlog
+  5-3-comportamento-degradado-e-perda-de-sinal-gps: backlog
+  epic-5-retrospective: optional
