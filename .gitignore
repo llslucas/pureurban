@@ -1,6 +1,9 @@
 # compiled output
-/dist
-/build
+api/dist/
+api/build/
+mobile/dist/
+mobile/build/
+mobile/.expo/
 
 # Monorepo — node_modules por subprojeto
 api/node_modules/

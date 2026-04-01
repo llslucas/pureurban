@@ -8,6 +8,8 @@ date: '2026-03-15'
 lastStep: 8
 status: 'complete'
 completedAt: '2026-03-15T14:57:00-03:00'
+revisedAt: '2026-03-31'
+revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simplificação do offline sync em tiers, CI/CD e testes E2E incorporados ao MVP'
 ---
 
 # Architecture Decision Document — PureUrban
@@ -18,7 +20,7 @@ completedAt: '2026-03-15T14:57:00-03:00'
 
 - **Domínio:** App de gestão de transporte escolar/universitário (Expo/React Native + NestJS)
 - **Complexidade:** Média-Alta — 37 FRs em 7 categorias, 20 NFRs
-- **Recurso:** Desenvolvedor solo (Lucas) — MVP ~2 meses (maio/2026)
+- **Recurso:** 2 desenvolvedores (Lucas + 1) — MVP ~9 meses (dezembro/2026)
 - **Distribuição:** Expo Go / build de dev (sem loja), Android 8+ / iOS 13+, telas 5", dispositivos de baixo custo
 - **Natureza acadêmica (TCC):** Hexagonal Architecture + DDD + Functional Core / Imperative Shell — parte da tese, não opcional
 
@@ -38,8 +40,16 @@ completedAt: '2026-03-15T14:57:00-03:00'
 
 1. **Effect TS + NestJS coexistência** — Integrar programação funcional pura com framework OO. Composition Root como ponto de encontro.
 2. **SSE + Redis Pub/Sub para real-time** — REST → Redis → Pub/Sub → SSE → cliente. Fallback para polling.
-3. **Offline-first com sync** — Persistência local + queue de operações + resolução de conflitos (last-write-wins) em devices baratos.
+3. **Offline resiliente com sync progressivo** — Cache de leitura via TanStack Query persistido + fila de escrita offline limitada ao check-in (cenário crítico). Estratégia em tiers — ver seção dedicada.
 4. **Bounded contexts com Effect TS** — Limites dos domínios mantendo functional core testável isoladamente.
+
+### Decisões Incorporadas ao MVP (antes deferidas)
+
+| Decisão | Rationale |
+|---|---|
+| CI/CD (GitHub Actions) | 2 devs = pipeline necessária. Lint + test + build no PR |
+| Testes E2E | Prazo permite cobertura E2E com Supertest (API) e/ou Playwright |
+| Push notifications | Expo Push API é simples e agrega valor ao produto — avaliar inclusão |
 
 ### Decisões Deferidas (Pós-MVP / Fase 2)
 
@@ -47,10 +57,11 @@ completedAt: '2026-03-15T14:57:00-03:00'
 |---|---|
 | Rate limiting | Sem exposição pública |
 | Refresh token rotation | Simple refresh suficiente para protótipo |
-| CI/CD (GitHub Actions) | Dev solo, distribuição via Expo Go |
 | Monitoramento externo (OpenTelemetry) | Logger NestJS v11 suficiente |
 | Cache de listas em Redis | Overhead desnecessário no MVP |
-| Push notifications | Expo Push API — fora do escopo MVP |
+| Reconciliação bidirecional completa | Complexidade desproporcional — ver seção Offline Sync |
+| CRDT / Event Sourcing para merge sem conflitos | Trabalho futuro — mencionado na tese |
+| Sync framework dedicado (PowerSync, WatermelonDB) | Avaliar se necessário pós-MVP |
 
 ---
 
@@ -81,10 +92,16 @@ O imperative shell (NestJS) injeta um runtime do Effect já montado com todas as
 
 ### Arquitetura de Dados
 
-**Schema Prisma:**
-- Schema único (`schema.prisma`) com separação lógica por comentários
-- MVP com ~5-8 entidades não justifica multi-file schemas
-- A separação DDD se expressa no código (modules, ports, adapters), não na camada de schema
+**Schema Prisma com Multi-Schema PostgreSQL:**
+- Schema Prisma único (`schema.prisma`) com anotações `@@schema()` por bounded context
+- Schemas PostgreSQL separados por domínio: `auth`, `routing`, `boarding`, `tracking`, `trip`, `public` (shared)
+- `Company` (tenant root) e enums compartilhados ficam no schema `public`
+- Toda entidade recebe `@@schema("nome_do_contexto")` no modelo Prisma
+- Generator configurado com `schemas = ["public", "auth", "routing", "boarding", "tracking", "trip"]`
+- Fronteira física no banco reforça bounded contexts do DDD — impede JOINs acidentais entre domínios
+- Relações cross-schema são explícitas e intencionais (FKs entre domínios = decisão arquitetural)
+- Preparação para eventual extração de microserviços (`pg_dump --schema=boarding`)
+- Trade-off analysis: ver `planning-artifacts/trade-off-multi-schema.md`
 
 **Validação de Dados — Effect Schema:**
 - Mantém validação no functional core (testável sem NestJS)
@@ -122,9 +139,9 @@ O imperative shell (NestJS) injeta um runtime do Effect já montado com todas as
 - Zustand: estado da sessão, viagem ativa, modo offline, preferências
 - TanStack Query: cache de chamadas à API, suporte offline via `persistQueryClient`
 
-**Armazenamento Offline:**
+**Armazenamento Local:**
 - MMKV: tokens, preferências, estado da sessão — leitura/escrita ultra-rápida
-- expo-sqlite: lista de alunos offline, queue de check-ins pendentes — queries estruturadas
+- expo-sqlite: fila de check-ins offline pendentes — queries estruturadas (ver seção Offline Sync)
 
 **UI:** React Native Paper (Material Design) — componentes acessíveis (botões grandes, contraste alto — NFR18/NFR19).
 
@@ -226,7 +243,78 @@ class EffectEventDispatcher {
 
 ---
 
-## 5. Padrões de Implementação & Regras de Consistência
+## 5. Estratégia de Offline Sync
+
+### Problema
+
+Offline sync completo (fila de operações genérica + resolução de conflitos bidirecional + reconciliação de estado) é um problema de complexidade desproporcional. Envolve idempotência, ordenação de operações, conflitos de escrita concorrente, estado local stale, fila persistente com garantias de entrega, e UI de estado misto (synced/pending/failed). Para o PureUrban, adotamos uma estratégia progressiva em tiers.
+
+### Tier 1 — Cache de leitura offline (todos os domínios)
+
+**Tecnologia:** TanStack Query com `persistQueryClient` + MMKV
+
+**Comportamento:**
+- Todas as chamadas REST são cacheadas automaticamente pelo TanStack Query
+- `persistQueryClient` salva o cache em MMKV — sobrevive a reinicialização do app
+- Offline, o app exibe dados cacheados (lista de alunos, rota ativa, status da viagem)
+- Retry automático com backoff exponencial quando a conexão retorna (configuração nativa do TanStack Query)
+- UI exibe indicador de "dados podem estar desatualizados" quando offline
+
+**Cobertura:** ~90% dos cenários reais de uso offline (leitura de dados já carregados)
+
+### Tier 2 — Fila de escrita offline (apenas check-in)
+
+**Justificativa:** O check-in de embarque é o único cenário crítico de escrita offline — motorista em túnel ou zona rural sem sinal precisa registrar presença dos alunos sem interrupção.
+
+**Tecnologia:** expo-sqlite (fila persistente)
+
+**Schema da fila:**
+
+```sql
+CREATE TABLE offline_queue (
+  id TEXT PRIMARY KEY,          -- UUID v4 gerado no cliente (chave de idempotência)
+  operation TEXT NOT NULL,       -- 'check_in' | 'notify_not_returning' | 'cancel_absence'
+  payload TEXT NOT NULL,         -- JSON com dados da operação
+  status TEXT DEFAULT 'pending', -- 'pending' | 'sent' | 'failed'
+  created_at TEXT NOT NULL,      -- ISO 8601 — garante ordenação
+  attempts INTEGER DEFAULT 0,
+  last_error TEXT
+);
+```
+
+**Regras de processamento:**
+- Operações processadas em ordem de `created_at` (FIFO estrito)
+- Cada operação enviada com header `X-Idempotency-Key: {id}` — servidor verifica duplicidade antes de executar
+- Retry com backoff exponencial: 1s, 2s, 4s, 8s, max 30s
+- Máximo 5 tentativas por operação — após isso, status muda para `failed` e notifica o usuário
+- Limite da fila: 500 operações (proteção contra acúmulo excessivo)
+
+**Idempotência no servidor:**
+- Use case de check-in recebe `idempotencyKey` como parâmetro
+- Adapter verifica existência no banco antes de inserir: `WHERE idempotency_key = ? AND trip_id = ?`
+- Se já existe, retorna o resultado anterior sem reprocessar
+
+**Conflitos (Last-Write-Wins com regra de domínio):**
+- Check-in: motorista presente tem autoridade sobre notificação de ausência do aluno
+- Localização GPS: LWW puro (dado naturalmente substituível)
+- Resolução aplicada no use case do functional core — testável isoladamente
+
+**UI de estado:**
+- Cada check-in na lista exibe badge de sincronização: `✓ confirmado` | `⏳ pendente` | `✗ falhou`
+- Operações pendentes são visualmente distintas mas funcionais (motorista continua trabalhando)
+- Botão "retentar" para operações com status `failed`
+
+### Tier 3 — Trabalho Futuro (mencionado na tese)
+
+Itens reconhecidos como limitações do MVP, candidatos a implementação pós-TCC:
+- Reconciliação bidirecional completa (sync de estado, não apenas operações)
+- CRDT ou event sourcing para merge sem conflitos
+- Sync framework dedicado (PowerSync, WatermelonDB)
+- Offline para outros domínios além de boarding (edição de rotas, criação de viagens)
+
+---
+
+## 6. Padrões de Implementação & Regras de Consistência
 
 ### Naming
 
@@ -298,11 +386,11 @@ class EffectEventDispatcher {
 
 ---
 
-## 6. Estrutura do Projeto & Fronteiras
+## 7. Estrutura do Projeto & Fronteiras
 
 ### Repositório
 
-Monorepo de diretórios simples (sem Nx/Turborepo — adequado para dev solo):
+Monorepo de diretórios simples (sem Nx/Turborepo — adequado para equipe pequena):
 
 ```
 pureurban/
@@ -522,7 +610,7 @@ mobile/
 |---|---|---|
 | Multi-tenancy | `shared/shell/guards/tenant.guard.ts` | JWT contém `companyId` |
 | Auth/RBAC | `shared/shell/guards/roles.guard.ts` | `stores/auth.store.ts` |
-| Offline sync | N/A (resolve no sync) | `utils/offline-queue.ts` + `hooks/use-offline-sync.ts` |
+| Offline sync | Idempotência no use case (boarding) | `utils/offline-queue.ts` (Tier 2) + TanStack Query persist (Tier 1) |
 | Error handling | `shared/shell/filters/effect-exception.filter.ts` | TanStack Query `onError` + Toast |
 
 ### Mapeamento de Requisitos → Estrutura
@@ -557,50 +645,81 @@ Mobile (Aluno/Motorista)
 
 ---
 
-## 7. Regras Obrigatórias para Agentes de IA
+## 8. Regras Obrigatórias para Agentes de IA
 
 1. Todo controller DEVE ter decorators de Swagger (`@ApiTags`, `@ApiOperation`, `@ApiResponse`)
 2. Todo endpoint DEVE usar `TenantGuard` + `@Roles()` — sem exceção
 3. Toda lógica de domínio DEVE estar no functional core (Effect) — controllers e services NestJS são shells
 4. Todo programa Effect DEVE declarar seus erros no tipo — nada de `Effect<A, never, R>` com erros silenciosos
 5. Toda entidade DEVE ter `id`, `createdAt`, `updatedAt` e `companyId` (tenant)
-6. Arquivos DEVEM usar `kebab-case` com sufixo de tipo (`.use-case.ts`, `.port.ts`, `.adapter.ts`, `.module.ts`)
-7. Pastas `core/` contêm APENAS código Effect puro — zero imports de NestJS, Prisma ou Redis
-8. Pastas `shell/` são o ÚNICO lugar onde NestJS, Prisma e Redis podem ser importados
-9. Use cases DEVEM retornar `WithEvents<A>` — nunca emitir eventos diretamente no core
+6. Toda entidade DEVE ter `@@schema("contexto")` correspondente ao seu bounded context (`auth`, `routing`, `boarding`, `tracking`, `trip`) — exceção: `Company` e enums compartilhados ficam em `@@schema("public")`
+7. Arquivos DEVEM usar `kebab-case` com sufixo de tipo (`.use-case.ts`, `.port.ts`, `.adapter.ts`, `.module.ts`)
+8. Pastas `core/` contêm APENAS código Effect puro — zero imports de NestJS, Prisma ou Redis
+9. Pastas `shell/` são o ÚNICO lugar onde NestJS, Prisma e Redis podem ser importados
+10. Use cases DEVEM retornar `WithEvents<A>` — nunca emitir eventos diretamente no core
 
 ---
 
-## 8. Sequência de Implementação
+## 9. Sequência de Implementação
 
 1. Inicialização dos projetos (Expo + NestJS starters)
 2. Docker Compose (PostgreSQL + Redis)
-3. Prisma schema + migrations
-4. Effect TS setup + Composition Root (`EffectRuntimeModule`)
-5. Auth module (JWT + Guards + RBAC)
-6. Primeiro bounded context com CRUD (Rotas/Turmas)
-7. Embarque digital (QR code + offline sync)
-8. Localização em tempo real (SSE + Redis)
-9. Notificações de ausência
-10. Swagger documentation
+3. CI/CD — GitHub Actions (lint + test + build no PR)
+4. Prisma schema + migrations
+5. Effect TS setup + Composition Root (`EffectRuntimeModule`)
+6. Auth module (JWT + Guards + RBAC)
+7. Primeiro bounded context com CRUD (Rotas/Turmas)
+8. Embarque digital (QR code + offline sync Tier 1 e Tier 2)
+9. Localização em tempo real (SSE + Redis)
+10. Notificações de ausência
+11. Push notifications (Expo Push API)
+12. Testes E2E (Supertest API + Playwright mobile)
+13. Swagger documentation
 
 **Dependências entre passos:**
-- Effect Schema depende do setup Effect TS (passo 4)
-- Auth Guards dependem do JWT module (passo 5)
-- SSE depende de Redis (passo 2) + Effect runtime (passo 4)
-- Offline sync depende de MMKV + expo-sqlite (configurados no passo 1)
-- TanStack Query com persistência depende de MMKV (passo 1)
+- CI/CD (passo 3) deve estar pronto antes do segundo dev começar a contribuir
+- Effect Schema depende do setup Effect TS (passo 5)
+- Auth Guards dependem do JWT module (passo 6)
+- SSE depende de Redis (passo 2) + Effect runtime (passo 5)
+- Offline Tier 1 depende de MMKV + TanStack Query (configurados no passo 1)
+- Offline Tier 2 depende de expo-sqlite (passo 1) + idempotência no use case de check-in (passo 8)
 
 ---
 
-## 9. Gap Analysis & Prontidão
+## 10. Divisão de Trabalho (2 Desenvolvedores)
+
+A arquitetura hexagonal com bounded contexts cria uma **fronteira natural de divisão** — `core/` vs `shell/` e domínios independentes permitem trabalho paralelo com baixo acoplamento.
+
+### Estratégia de Onboarding do Dev 2
+
+- Dev 1 (Lucas) estabelece padrões nos primeiros bounded contexts (`shared/` + `auth/`)
+- Dev 2 começa pelo mobile ou por adapters no shell (NestJS puro, sem Effect)
+- Dev 2 entra gradualmente no functional core após 3-4 semanas de familiarização com Effect TS
+
+### Sugestão de Divisão
+
+| Dev 1 (Lucas — arquiteto) | Dev 2 |
+|---|---|
+| `shared/` + Effect runtime | Mobile setup + navegação |
+| `auth/` (core + shell) | Mobile telas + stores |
+| `boarding/` core | `boarding/` shell + adapters |
+| `tracking/` core + SSE | `routing/` (core + shell) |
+| `trip/` core | `trip/` shell + telas mobile |
+| CI/CD + infra | Testes E2E |
+| Offline Tier 2 (fila + idempotência) | Offline Tier 1 (TanStack persist) |
+
+> **Nota para a tese:** A divisão core/shell facilitou o trabalho paralelo — um argumento prático a favor da arquitetura hexagonal em equipes pequenas.
+
+---
+
+## 11. Gap Analysis & Prontidão
 
 **Status:** PRONTO PARA IMPLEMENTAÇÃO — Nível de confiança alto.
 
 **Gaps conhecidos:**
 - ⚠️ Schema Prisma (entidades/campos): definir na primeira história
-- ⚠️ Push notifications: fora do MVP
 - ⚠️ Deploy específico (Railway vs Render): decidir no momento do deploy
+- ⚠️ Ramp-up do Dev 2 em Effect TS: prever 3-4 semanas de curva de aprendizado
 - Nenhum gap crítico identificado
 
 **Compatibilidade verificada:**
