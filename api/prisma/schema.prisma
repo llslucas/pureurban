@@ -1,0 +1,23 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  schemas      = ["public", "auth", "routing", "boarding", "tracking", "trip"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["public", "auth", "routing", "boarding", "tracking", "trip"]
+}
+
+// ─── PUBLIC (Shared / Tenant Root) ───────────────────────────
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("companies")
+  @@schema("public")
+}
