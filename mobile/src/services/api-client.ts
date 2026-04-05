@@ -1,0 +1,92 @@
+import { tokenStorage } from '@/lib/storage'
+import { API_BASE_URL } from '@/utils/constants'
+
+type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+
+interface ApiError {
+  code: string
+  message: string
+  details?: Record<string, unknown>
+}
+
+export class ApiClientError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly status: number,
+    public readonly details?: Record<string, unknown>,
+  ) {
+    super(message)
+    this.name = 'ApiClientError'
+  }
+}
+
+const REQUEST_TIMEOUT_MS = 30_000
+
+async function parseResponseJson(response: Response): Promise<Record<string, unknown>> {
+  const text = await response.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+async function request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
+  // Interceptor de autenticação — lê token do MMKV
+  const token = tokenStorage.getAccessToken()
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      signal: controller.signal,
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+  } catch (err) {
+    clearTimeout(timeoutId)
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiClientError('REQUEST_TIMEOUT', 'A requisição excedeu o tempo limite', 0)
+    }
+    throw err
+  }
+  clearTimeout(timeoutId)
+
+  // Parse seguro — body pode não ser JSON (ex: 502 com HTML do proxy)
+  const json = await parseResponseJson(response)
+
+  // Interceptor de erros — parseia formato { error: { code, message } }
+  if (!response.ok) {
+    const error = (json as { error?: ApiError }).error
+    if (!error) {
+      throw new ApiClientError('INVALID_RESPONSE', 'Resposta inesperada do servidor', response.status)
+    }
+    throw new ApiClientError(
+      error.code ?? 'UNKNOWN_ERROR',
+      error.message ?? 'An error occurred',
+      response.status,
+      error.details,
+    )
+  }
+
+  // Backend retorna { data: ..., meta: ... } via ResponseWrapperInterceptor — extrair data
+  return (json as { data: T }).data
+}
+
+export const apiClient = {
+  get: <T>(path: string) => request<T>('GET', path),
+  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
+  delete: <T>(path: string) => request<T>('DELETE', path),
+}
