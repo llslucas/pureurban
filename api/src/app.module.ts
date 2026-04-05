@@ -5,6 +5,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaGlobalModule } from './domains/shared/shell/infra/prisma-global.module.js';
 import { EffectRuntimeModule } from './domains/shared/shell/effect-runtime/effect-runtime.module.js';
+import { SharedKernelModule } from './domains/shared/shell/shared-kernel.module.js';
 import { EffectExceptionFilter } from './domains/shared/shell/filters/effect-exception.filter.js';
 import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/response-wrapper.interceptor.js';
 
@@ -13,6 +14,7 @@ import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/
     EventEmitterModule.forRoot({ wildcard: false, maxListeners: 20 }),
     PrismaGlobalModule,
     EffectRuntimeModule,
+    SharedKernelModule,
   ],
   controllers: [AppController],
   providers: [

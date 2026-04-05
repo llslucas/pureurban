@@ -1,6 +1,6 @@
 # Story 1.4: Infraestrutura Compartilhada (Guards, Filters, Pipes)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -95,6 +95,23 @@ Para que todos os bounded contexts futuros herdem RBAC, tratamento de erros tipa
   - [x] 9.3 `cd api && npm run test:e2e` — testes E2E existentes passam com os novos globals
   - [x] 9.4 Verificar que `GET /api/v1/health/effect` retorna formato padronizado `{ data: {...}, meta: {...} }`
 
+### Review Findings
+
+- [x] [Review][Patch] Corrigir vazamento da tipagem e bypass via substring match no decorator `@Roles` [roles.guard.ts]
+- [x] [Review][Patch] Eliminar uso de `require()` em ESM no `EffectSchemaPipe`, pois quebra em runtime [effect-schema.pipe.ts]
+- [x] [Review][Patch] Corrigir lógica de detecção de SSE; headers não existem antes da execução do handler [response-wrapper.interceptor.ts]
+- [x] [Review][Patch] Mesclar `timestamp` ao `meta` existente em repostas paginadas, em vez de pular completamente [response-wrapper.interceptor.ts]
+- [x] [Review][Patch] Manter formatação de `code` e `message` padronizados ao delegar exceções padrão do NestJS (`HttpException`) [effect-exception.filter.ts]
+- [x] [Review][Patch] Lançar `ForbiddenException` tipada (AC #1) no lugar de retornar `false` na ausência de permissão/roles [roles.guard.ts]
+- [x] [Review][Patch] Corrigir formatação de erro fatal onde Schema Pipe gera `[object Object]` [effect-schema.pipe.ts]
+- [x] [Review][Patch] Corrigir mensagem imprecisa no `TenantGuard` caso `request.user` como um todo não exista [tenant.guard.ts]
+- [x] [Review][Patch] Incluir dados operacionais essenciais (HTTP Method, URL, tenantId) no erro logger 500 [effect-exception.filter.ts]
+- [x] [Review][Patch] Remover rastros de compilação como `api/dist/tsconfig.build.tsbuildinfo` da árvore git
+- [x] [Review][Patch] Proteger `EffectExceptionFilter` para não abortar o processo se chamado em contexto global não-HTTP [effect-exception.filter.ts]
+- [x] [Review][Patch] Abortar processamento do Filter se os cabeçalhos (`headersSent`) já sinalizam término no client [effect-exception.filter.ts]
+- [x] [Review][Patch] Implementar proteção no `ResponseWrapperInterceptor` para chamadas não-HTTP (contextos genéricos) [response-wrapper.interceptor.ts]
+- [x] [Review][Patch] Bloquear intercepção sobre instâncias contendo `StreamableFile` para não danificar envios binários [response-wrapper.interceptor.ts]
+- [x] [Review][Patch] Implementar e adicionar o prometido `SharedKernelModule` centralizando as exportações em conformidade (AC 7.3)
 
 ## Dev Notes
 
@@ -591,7 +608,18 @@ Gemini 2.5 Pro (Antigravity)
 - ✅ `ResponseWrapperInterceptor` protege contra double-wrap e exclui SSE endpoints
 - ✅ `app.module.ts` atualizado com `APP_FILTER` e `APP_INTERCEPTOR`
 - ✅ `npm run build` — compilação sem erros
-- ✅ `npm test` — 42/43 testes passam (1 falha pré-existente: DB test sem conexão)
+- ✅ `npm test` — 52/52 testes passam
+- ✅ `npm run test:e2e` — 2/2 testes E2E passam
+
+**Review Follow-up (2026-04-05):**
+- ✅ `RolesGuard` — validação de tipo string para role, `some()` com igualdade estrita, `ForbiddenException` em vez de `return false`
+- ✅ `TenantGuard` — mensagens de erro distintas para `user` ausente vs `companyId` ausente
+- ✅ `EffectExceptionFilter` — proteção non-HTTP, headersSent guard, HttpException com code/message padronizados, logging operacional (method/URL)
+- ✅ `EffectSchemaPipe` — fallback formatting corrigido para evitar `[object Object]`
+- ✅ `ResponseWrapperInterceptor` — SSE via Reflect.metadata, non-HTTP bypass, StreamableFile passthrough, timestamp merge em meta paginado
+- ✅ `SharedKernelModule` criado e registrado no `AppModule`
+- ✅ `api/dist/tsconfig.build.tsbuildinfo` removido do git tracking
+- ✅ Testes expandidos: 52 unit tests (12 arquivos), 2 E2E tests
 
 ### File List
 
@@ -610,8 +638,11 @@ Gemini 2.5 Pro (Antigravity)
 - `api/src/domains/shared/shell/pipes/effect-schema.pipe.spec.ts` [NEW]
 - `api/src/domains/shared/shell/interceptors/response-wrapper.interceptor.ts` [NEW]
 - `api/src/domains/shared/shell/interceptors/response-wrapper.interceptor.spec.ts` [NEW]
+- `api/src/domains/shared/shell/shared-kernel.module.ts` [NEW]
 - `api/src/app.module.ts` [MODIFIED]
+- `api/test/app.e2e-spec.ts` [MODIFIED]
 
 ## Change Log
 
 - **2026-04-05**: Implementação completa da Story 1.4 — criados shared kernel guards, filters, pipes, interceptors e decorators. AppModule atualizado com providers globais. 15 arquivos novos, 1 modificado. 15 novos testes unitários cobrindo todos os componentes.
+- **2026-04-05**: Addressed 15 code review findings — 15 items resolved. Hardened all components (non-HTTP, headersSent, StreamableFile, SSE metadata, typing, error formatting). Created SharedKernelModule. Removed dist artifact from git. Expanded tests to 52 unit + 2 E2E.
