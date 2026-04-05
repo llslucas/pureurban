@@ -35,4 +35,22 @@ describe('TenantGuard', () => {
 
     expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException)
   })
+
+  it('deve usar mensagem distinta quando user é undefined vs companyId ausente', () => {
+    const ctxNoUser = createCtx(undefined)
+    try {
+      guard.canActivate(ctxNoUser)
+    } catch (e) {
+      const resp = (e as UnauthorizedException).getResponse() as Record<string, string>
+      expect(resp.message).toContain('no user found')
+    }
+
+    const ctxNoCompany = createCtx({ id: 'user-1' })
+    try {
+      guard.canActivate(ctxNoCompany)
+    } catch (e) {
+      const resp = (e as UnauthorizedException).getResponse() as Record<string, string>
+      expect(resp.message).toContain('companyId')
+    }
+  })
 })

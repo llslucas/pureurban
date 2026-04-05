@@ -1,29 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ExecutionContext } from '@nestjs/common'
+import { ExecutionContext, ForbiddenException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { RolesGuard } from './roles.guard.js'
-import { Roles } from '../decorators/roles.decorator.js'
-
-function createMockContext(
-  userRole?: string,
-  requiredRoles?: string[],
-): ExecutionContext {
-  const mockRequest = { user: userRole ? { role: userRole } : undefined }
-  const mockHandler = {}
-
-  const reflector = new Reflector()
-  vi.spyOn(reflector, 'get').mockReturnValue(requiredRoles as string[])
-
-  const mockContext = {
-    switchToHttp: () => ({ getRequest: () => mockRequest }),
-    getHandler: () => mockHandler,
-  } as unknown as ExecutionContext
-
-  return { mockContext, reflector } as unknown as ExecutionContext & {
-    mockContext: ExecutionContext
-    reflector: Reflector
-  }
-}
 
 describe('RolesGuard', () => {
   it('deve permitir quando não há @Roles() no handler (público)', () => {
@@ -62,7 +40,7 @@ describe('RolesGuard', () => {
       getHandler: () => ({}),
     } as unknown as ExecutionContext
 
-    expect(() => guard.canActivate(ctx)).toThrow()
+    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException)
   })
 
   it('deve permitir quando um dos múltiplos roles bate', () => {
@@ -76,5 +54,31 @@ describe('RolesGuard', () => {
     } as unknown as ExecutionContext
 
     expect(guard.canActivate(ctx)).toBe(true)
+  })
+
+  it('deve lançar ForbiddenException quando user não existe', () => {
+    const reflector = new Reflector()
+    vi.spyOn(reflector, 'get').mockReturnValue(['admin'])
+    const guard = new RolesGuard(reflector)
+
+    const ctx = {
+      switchToHttp: () => ({ getRequest: () => ({}) }),
+      getHandler: () => ({}),
+    } as unknown as ExecutionContext
+
+    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException)
+  })
+
+  it('deve lançar ForbiddenException quando role não é string', () => {
+    const reflector = new Reflector()
+    vi.spyOn(reflector, 'get').mockReturnValue(['admin'])
+    const guard = new RolesGuard(reflector)
+
+    const ctx = {
+      switchToHttp: () => ({ getRequest: () => ({ user: { role: 123 } }) }),
+      getHandler: () => ({}),
+    } as unknown as ExecutionContext
+
+    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException)
   })
 })

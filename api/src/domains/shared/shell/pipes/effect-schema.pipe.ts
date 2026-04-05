@@ -23,7 +23,7 @@ export class EffectSchemaPipe<A, I> implements PipeTransform {
       if (ArrayFormatter?.formatErrorSync) {
         return ArrayFormatter.formatErrorSync(error as Parameters<typeof ArrayFormatter.formatErrorSync>[0]).map(
           (issue: { path: ReadonlyArray<PropertyKey>; message: string }) => ({
-            path: issue.path.join('.'),
+            path: issue.path.map(String).join('.'),
             message: issue.message,
           }),
         )
@@ -31,6 +31,10 @@ export class EffectSchemaPipe<A, I> implements PipeTransform {
     } catch {
       // Fallback silencioso
     }
-    return [{ path: '', message: String(error) }]
+    // Fallback: tentar extrair mensagem legível do erro
+    if (error instanceof Error) {
+      return [{ path: '', message: error.message }]
+    }
+    return [{ path: '', message: 'Validation failed' }]
   }
 }
