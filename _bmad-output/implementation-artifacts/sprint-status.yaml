@@ -62,8 +62,8 @@ development_status:
   epic-2-retrospective: optional
 
   # === Epic 3: Gestão de Viagens e Embarque Digital ===
-  epic-3: backlog
-  3-1-iniciar-e-encerrar-viagem: backlog
+  epic-3: in-progress
+  3-1-iniciar-e-encerrar-viagem: ready-for-dev
   3-2-geracao-e-exibicao-de-qr-code-do-aluno: backlog
   3-3-escaneamento-de-qr-code-e-check-in: backlog
   3-4-check-in-offline-com-sincronizacao: backlog

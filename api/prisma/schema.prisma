@@ -48,3 +48,42 @@ model User {
   @@map("users")
   @@schema("auth")
 }
+
+// ─── TRIP (Viagens) ─────────────────────────────────────────
+
+enum TripStatus {
+  ACTIVE
+  COMPLETED
+
+  @@schema("trip")
+}
+
+enum TripType {
+  OUTBOUND
+  RETURN
+
+  @@schema("trip")
+}
+
+model Trip {
+  id            String     @id @default(uuid())
+  companyId     String
+  routeId       String
+  driverId      String
+  type          TripType
+  status        TripStatus @default(ACTIVE)
+  startedAt     DateTime   @default(now())
+  endedAt       DateTime?
+  relatedTripId String?    @unique
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  relatedTrip Trip?  @relation("TripReturn", fields: [relatedTripId], references: [id])
+  returnTrip  Trip?  @relation("TripReturn")
+
+  @@index([driverId, status])
+  @@index([routeId, status])
+  @@index([companyId])
+  @@map("trips")
+  @@schema("trip")
+}

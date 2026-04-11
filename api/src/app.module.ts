@@ -10,6 +10,7 @@ import { EffectRuntimeModule } from './domains/shared/shell/effect-runtime/effec
 import { SharedKernelModule } from './domains/shared/shell/shared-kernel.module.js';
 import { EffectExceptionFilter } from './domains/shared/shell/filters/effect-exception.filter.js';
 import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/response-wrapper.interceptor.js';
+import { TripModule } from './domains/trip/shell/trip.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/
     EffectRuntimeModule,
     SharedKernelModule,
     AuthModule,
+    TripModule,
   ],
   controllers: [AppController],
   providers: [
@@ -28,4 +30,5 @@ import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/
   ],
 })
 export class AppModule {}
+
 
