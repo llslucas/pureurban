@@ -14,6 +14,7 @@ const mockUser: UserData = {
   name: 'Admin Empresa',
   role: 'ADMIN',
   companyId: 'company-1',
+  isActive: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 }

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-05-03T19:19:00-03:00"
+last_updated: "2026-05-03T21:00:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -55,7 +55,7 @@ development_status:
   epic-2: in-progress
   2-1-cadastro-de-empresa-e-seed-inicial: done
   2-2-autenticacao-login-e-refresh-token: done
-  2-3-cadastro-e-gestao-de-motoristas: backlog
+  2-3-cadastro-e-gestao-de-motoristas: done
   2-4-cadastro-e-gestao-de-alunos: backlog
   2-5-crud-de-rotas-de-transporte: backlog
   2-6-vinculos-aluno-rota-e-motorista-rota: backlog

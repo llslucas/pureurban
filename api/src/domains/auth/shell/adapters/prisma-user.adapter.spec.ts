@@ -6,7 +6,7 @@ vi.mock('../../../shared/shell/infra/prisma.service.js', () => ({
   PrismaService: class MockPrismaService {},
 }))
 
-const { PrismaUserAdapter } = await import('./prisma-user.adapter.js')
+import { PrismaUserAdapter } from './prisma-user.adapter.js'
 
 const mockUser = {
   id: 'user-1',
@@ -15,6 +15,7 @@ const mockUser = {
   name: 'Test User',
   role: 'ADMIN',
   companyId: 'company-1',
+  isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 }

@@ -38,3 +38,16 @@ export class InvalidRefreshTokenError extends Data.TaggedError('InvalidRefreshTo
       httpStatus: 401,
     })
 }
+
+export class DriverNotFoundError extends Data.TaggedError('DriverNotFoundError')<{
+  readonly code: string
+  readonly message: string
+  readonly httpStatus: number
+}> {
+  static readonly create = (id?: string) =>
+    new DriverNotFoundError({
+      code: 'DRIVER_NOT_FOUND',
+      message: id ? `Motorista ${id} não encontrado` : 'Motorista não encontrado',
+      httpStatus: 404,
+    })
+}

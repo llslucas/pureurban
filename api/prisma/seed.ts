@@ -18,6 +18,7 @@
 import { PrismaClient } from '../src/generated/prisma/client.js'
 import * as bcrypt from 'bcrypt'
 
+// @ts-ignore — seed usa conexão direta via DATABASE_URL; tipos gerados exigem `adapter` (usado em PrismaService)
 const prisma = new PrismaClient()
 
 const SALT_ROUNDS = 12

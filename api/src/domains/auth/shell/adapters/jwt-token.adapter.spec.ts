@@ -19,8 +19,8 @@ vi.mock('@nestjs/config', () => ({
   },
 }))
 
-const { JwtTokenAdapter } = await import('./jwt-token.adapter.js')
-const { InvalidRefreshTokenError } = await import('../../core/errors/auth.errors.js')
+import { JwtTokenAdapter } from './jwt-token.adapter.js'
+import { InvalidRefreshTokenError } from '../../core/errors/auth.errors.js'
 
 function makeAdapter(jwtMock: Record<string, unknown>, configMock?: Record<string, unknown>) {
   const config = configMock ?? { get: vi.fn().mockReturnValue('15m') }
