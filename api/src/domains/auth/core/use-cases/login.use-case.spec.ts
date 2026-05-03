@@ -14,6 +14,7 @@ const mockUser: UserData = {
   name: 'João Motorista',
   role: 'DRIVER',
   companyId: 'company-1',
+  isActive: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 }
@@ -128,6 +129,25 @@ describe('login', () => {
       expect((resultNoUser.left as InvalidCredentialsError).message).toBe(
         (resultWrongPw.left as InvalidCredentialsError).message,
       )
+    }
+  })
+
+  it('deve falhar com InvalidCredentialsError quando user.isActive === false', async () => {
+    const inactiveUser = { ...mockUser, isActive: false }
+    const userRepo: Partial<UserRepository> = {
+      findByEmail: vi.fn().mockReturnValue(Effect.succeed(inactiveUser)),
+    }
+    const hasher: Partial<PasswordHasher> = {
+      compare: vi.fn().mockReturnValue(Effect.succeed(true)),
+    }
+    const layer = makeLayer(userRepo, hasher, {})
+    const program = login({ email: 'motorista@empresa.com', password: 'senha123' })
+
+    const result = await Effect.runPromise(Effect.either(program.pipe(Effect.provide(layer))))
+    expect(result._tag).toBe('Left')
+    if (result._tag === 'Left') {
+      expect(result.left).toBeInstanceOf(InvalidCredentialsError)
+      expect((result.left as InvalidCredentialsError).code).toBe('INVALID_CREDENTIALS')
     }
   })
 })

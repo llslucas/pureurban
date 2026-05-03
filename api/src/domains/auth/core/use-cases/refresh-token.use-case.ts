@@ -14,7 +14,7 @@ export const refreshToken = (input: { refreshToken: string }) =>
 
     // 2. Verificar que o user ainda existe no banco
     const user = yield* userRepo.findById(payload.userId)
-    if (!user) {
+    if (!user || !user.isActive) {
       return yield* Effect.fail(InvalidRefreshTokenError.create())
     }
 

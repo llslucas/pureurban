@@ -36,6 +36,10 @@ export const login = (input: LoginInput) =>
       return yield* Effect.fail(InvalidCredentialsError.create())
     }
 
+    if (!user.isActive) {
+      return yield* Effect.fail(InvalidCredentialsError.create())
+    }
+
     // 3. Gerar tokens JWT
     const tokens = yield* tokenSvc.generateTokens({
       userId: user.id,

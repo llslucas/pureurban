@@ -3,6 +3,7 @@ import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './domains/auth/shell/auth.module.js';
+import { DriverModule } from './domains/auth/shell/driver.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaGlobalModule } from './domains/shared/shell/infra/prisma-global.module.js';
@@ -20,6 +21,7 @@ import { TripModule } from './domains/trip/shell/trip.module.js';
     EffectRuntimeModule,
     SharedKernelModule,
     AuthModule,
+    DriverModule,
     TripModule,
   ],
   controllers: [AppController],

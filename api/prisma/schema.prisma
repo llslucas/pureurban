@@ -39,12 +39,14 @@ model User {
   password  String
   name      String
   role      Role     @default(ADMIN)
+  isActive  Boolean  @default(true)
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([email])
+  @@index([companyId, role, isActive])
   @@map("users")
   @@schema("auth")
 }

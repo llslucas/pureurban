@@ -13,6 +13,7 @@ const mockUser: UserData = {
   name: 'João Motorista',
   role: 'DRIVER',
   companyId: 'company-1',
+  isActive: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 }
@@ -79,6 +80,26 @@ describe('refreshToken', () => {
 
     const layer = makeLayer(userRepo, tokenSvc)
     const program = refreshToken({ refreshToken: 'valid-but-user-deleted' })
+
+    const result = await Effect.runPromise(Effect.either(program.pipe(Effect.provide(layer))))
+    expect(result._tag).toBe('Left')
+    if (result._tag === 'Left') {
+      expect(result.left).toBeInstanceOf(InvalidRefreshTokenError)
+    }
+  })
+
+  it('deve falhar com InvalidRefreshTokenError quando usuário está inativo', async () => {
+    const tokenSvc: Partial<TokenService> = {
+      verifyToken: vi.fn().mockReturnValue(Effect.succeed(mockPayload)),
+      generateTokens: vi.fn(),
+    }
+    const inactiveUser = { ...mockUser, isActive: false }
+    const userRepo: Partial<UserRepository> = {
+      findById: vi.fn().mockReturnValue(Effect.succeed(inactiveUser)),
+    }
+
+    const layer = makeLayer(userRepo, tokenSvc)
+    const program = refreshToken({ refreshToken: 'valid-token-inactive-user' })
 
     const result = await Effect.runPromise(Effect.either(program.pipe(Effect.provide(layer))))
     expect(result._tag).toBe('Left')
