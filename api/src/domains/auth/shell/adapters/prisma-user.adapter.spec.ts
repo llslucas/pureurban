@@ -45,6 +45,27 @@ describe('PrismaUserAdapter', () => {
     expect(result).toBeNull()
   })
 
+  it('findById deve retornar user existente pelo id', async () => {
+    const prismaMock = {
+      user: { findUnique: vi.fn().mockResolvedValue(mockUser) },
+    }
+    const adapter = makeAdapter(prismaMock)
+
+    const result = await Effect.runPromise(adapter.findById('user-1'))
+    expect(result).toMatchObject({ id: 'user-1', companyId: 'company-1' })
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-1' } })
+  })
+
+  it('findById deve retornar null quando id não encontrado', async () => {
+    const prismaMock = {
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+    }
+    const adapter = makeAdapter(prismaMock)
+
+    const result = await Effect.runPromise(adapter.findById('nonexistent-id'))
+    expect(result).toBeNull()
+  })
+
   it('create deve criar Company + User em transação e retornar UserData', async () => {
     const mockCompany = { id: 'company-1' }
     const prismaMock = {
@@ -74,4 +95,3 @@ describe('PrismaUserAdapter', () => {
     })
   })
 })
-

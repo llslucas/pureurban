@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-04-10T21:57:00-03:00"
+last_updated: "2026-05-03T19:19:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -47,14 +47,14 @@ development_status:
   1-1-inicializacao-dos-projetos-e-repositorio: done
   1-2-schema-prisma-e-configuracao-do-banco-de-dados: done
   1-3-setup-effect-ts-e-composition-root: done
-  1-4-infraestrutura-compartilhada-guards-filters-pipes: review
+  1-4-infraestrutura-compartilhada-guards-filters-pipes: done
   1-5-setup-mobile-dependencias-e-configuracao-offline: done
   epic-1-retrospective: optional
 
   # === Epic 2: Identidade, Acesso e Organização ===
   epic-2: in-progress
   2-1-cadastro-de-empresa-e-seed-inicial: done
-  2-2-autenticacao-login-e-refresh-token: backlog
+  2-2-autenticacao-login-e-refresh-token: done
   2-3-cadastro-e-gestao-de-motoristas: backlog
   2-4-cadastro-e-gestao-de-alunos: backlog
   2-5-crud-de-rotas-de-transporte: backlog

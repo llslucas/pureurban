@@ -12,3 +12,29 @@ export class EmailAlreadyExistsError extends Data.TaggedError('EmailAlreadyExist
       httpStatus: 409,
     })
 }
+
+export class InvalidCredentialsError extends Data.TaggedError('InvalidCredentialsError')<{
+  readonly code: string
+  readonly message: string
+  readonly httpStatus: number
+}> {
+  static readonly create = () =>
+    new InvalidCredentialsError({
+      code: 'INVALID_CREDENTIALS',
+      message: 'Credenciais inválidas',
+      httpStatus: 401,
+    })
+}
+
+export class InvalidRefreshTokenError extends Data.TaggedError('InvalidRefreshTokenError')<{
+  readonly code: string
+  readonly message: string
+  readonly httpStatus: number
+}> {
+  static readonly create = () =>
+    new InvalidRefreshTokenError({
+      code: 'INVALID_REFRESH_TOKEN',
+      message: 'Refresh token inválido ou expirado',
+      httpStatus: 401,
+    })
+}

@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import { Effect } from 'effect'
 import type { TokenService, TokenPayload, TokenPair } from '../../core/ports/token-service.port.js'
+import { InvalidRefreshTokenError } from '../../core/errors/auth.errors.js'
 
 @Injectable()
 export class JwtTokenAdapter implements TokenService {
@@ -30,6 +31,30 @@ export class JwtTokenAdapter implements TokenService {
       })
 
       return { accessToken, refreshToken }
+    })
+  }
+
+  verifyToken(token: string): Effect.Effect<TokenPayload, InvalidRefreshTokenError> {
+    return Effect.tryPromise({
+      try: async () => {
+        const decoded = await this.jwtService.verifyAsync<{
+          sub: string
+          companyId: string
+          role: string
+        }>(token)
+
+        // Runtime validation of required claims — prevents undefined IDs from reaching Prisma
+        if (!decoded.sub || !decoded.companyId || !decoded.role) {
+          throw new Error('Missing required JWT claims')
+        }
+
+        return {
+          userId: decoded.sub,
+          companyId: decoded.companyId,
+          role: decoded.role,
+        } satisfies TokenPayload
+      },
+      catch: () => InvalidRefreshTokenError.create(),
     })
   }
 }
