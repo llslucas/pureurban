@@ -21,6 +21,7 @@ export interface CreateUserInput {
 
 export interface UserRepository {
   readonly findByEmail: (email: string) => Effect.Effect<UserData | null>
+  readonly findById: (id: string) => Effect.Effect<UserData | null>
   readonly create: (data: CreateUserInput) => Effect.Effect<UserData>
 }
 

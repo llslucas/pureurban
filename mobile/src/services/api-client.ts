@@ -1,3 +1,4 @@
+import { router } from 'expo-router'
 import { tokenStorage } from '@/lib/storage'
 import { API_BASE_URL } from '@/utils/constants'
 
@@ -23,6 +24,50 @@ export class ApiClientError extends Error {
 
 const REQUEST_TIMEOUT_MS = 30_000
 
+// Mutex simples para evitar múltiplas chamadas simultâneas de refresh
+let refreshPromise: Promise<boolean> | null = null
+
+async function attemptTokenRefresh(): Promise<boolean> {
+  // Se já há um refresh em andamento, aguardar o mesmo resultado
+  if (refreshPromise) {
+    return refreshPromise
+  }
+
+  refreshPromise = (async () => {
+    // Timeout de 15s para o fetch de refresh — evita deadlock se o servidor travar
+    const refreshController = new AbortController()
+    const refreshTimeoutId = setTimeout(() => refreshController.abort(), 15_000)
+    try {
+      const currentRefreshToken = tokenStorage.getRefreshToken()
+      if (!currentRefreshToken) return false
+
+      // Chamada direta ao endpoint sem usar o apiClient (evita recursão)
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: currentRefreshToken }),
+        signal: refreshController.signal,
+      })
+
+      if (!response.ok) return false
+
+      const json = (await response.json()) as { data: { accessToken: string; refreshToken: string } }
+      const { accessToken, refreshToken } = json.data
+
+      tokenStorage.setAccessToken(accessToken)
+      tokenStorage.setRefreshToken(refreshToken)
+      return true
+    } catch {
+      return false
+    } finally {
+      clearTimeout(refreshTimeoutId)
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
+
 async function parseResponseJson(response: Response): Promise<Record<string, unknown>> {
   const text = await response.text()
   if (!text) return {}
@@ -33,7 +78,12 @@ async function parseResponseJson(response: Response): Promise<Record<string, unk
   }
 }
 
-async function request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: HttpMethod,
+  path: string,
+  body?: unknown,
+  isRefreshRequest = false,
+): Promise<T> {
   // Interceptor de autenticação — lê token do MMKV
   const token = tokenStorage.getAccessToken()
   const headers: Record<string, string> = {
@@ -65,6 +115,22 @@ async function request<T>(method: HttpMethod, path: string, body?: unknown): Pro
 
   // Parse seguro — body pode não ser JSON (ex: 502 com HTML do proxy)
   const json = await parseResponseJson(response)
+
+  // Interceptor de refresh automático — tenta renovar tokens em 401
+  // Exceção: endpoints de auth (login, register) não devem acionar o refresh,
+  // pois um 401 nesses endpoints é uma resposta legítima de erro de credenciais.
+  const isAuthEndpoint = path.includes('/auth/login') || path.includes('/auth/register')
+  if (response.status === 401 && !isRefreshRequest && !isAuthEndpoint) {
+    const refreshed = await attemptTokenRefresh()
+    if (refreshed) {
+      // Retry com novo token — passa true para evitar loop infinito de refresh
+      return request<T>(method, path, body, true)
+    }
+    // Refresh falhou — limpar tokens e redirecionar para login
+    tokenStorage.clearTokens()
+    router.replace('/(auth)/login')
+    throw new ApiClientError('UNAUTHORIZED', 'Sessão expirada. Faça login novamente.', 401)
+  }
 
   // Interceptor de erros — parseia formato { error: { code, message } }
   if (!response.ok) {

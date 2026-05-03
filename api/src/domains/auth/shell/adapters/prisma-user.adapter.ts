@@ -12,6 +12,11 @@ export class PrismaUserAdapter implements UserRepository {
     return Effect.promise(() => (this.prisma as any).user.findUnique({ where: { email } }))
   }
 
+  findById(id: string): Effect.Effect<UserData | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return Effect.promise(() => (this.prisma as any).user.findUnique({ where: { id } }))
+  }
+
   create(data: CreateUserInput): Effect.Effect<UserData> {
     return Effect.promise(async () => {
       // Transação atômica: cria Company + User no banco
