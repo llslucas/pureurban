@@ -52,8 +52,9 @@ describe('AppController (e2e)', () => {
       });
     } catch (err: unknown) {
       // Accept 500 when DB is unavailable (pre-existing limitation)
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/health/effect');
+      const response = await request(app.getHttpServer()).get(
+        '/api/v1/health/effect',
+      );
       if (response.status === 500) {
         // DB not available — acceptable in CI/local without DB
         expect(response.body.error.code).toBe('INTERNAL_ERROR');

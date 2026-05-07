@@ -13,7 +13,12 @@ describe('AppController', () => {
         AppService,
         {
           provide: EFFECT_RUNTIME,
-          useValue: { runPromise: async () => [{ status: 'ok', database: 'connected', timestamp: '' }, []] },
+          useValue: {
+            runPromise: async () => [
+              { status: 'ok', database: 'connected', timestamp: '' },
+              [],
+            ],
+          },
         },
       ],
     }).compile();

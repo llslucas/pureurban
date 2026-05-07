@@ -4,4 +4,4 @@ export {
   ForbiddenError,
   ConflictError,
   ValidationError,
-} from './base.error.js'
+} from './base.error.js';

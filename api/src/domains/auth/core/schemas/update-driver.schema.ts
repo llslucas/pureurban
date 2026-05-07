@@ -1,8 +1,10 @@
-import { Schema } from '@effect/schema'
+import { Schema } from '@effect/schema';
 
 export const UpdateDriverInput = Schema.Struct({
   name: Schema.optional(Schema.String.pipe(Schema.minLength(2))),
-  email: Schema.optional(Schema.String.pipe(Schema.pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/))),
+  email: Schema.optional(
+    Schema.String.pipe(Schema.pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)),
+  ),
   password: Schema.optional(Schema.String.pipe(Schema.minLength(8))),
   isActive: Schema.optional(Schema.Boolean),
 }).pipe(
@@ -12,8 +14,10 @@ export const UpdateDriverInput = Schema.Struct({
       data.email !== undefined ||
       data.password !== undefined ||
       data.isActive !== undefined,
-    { message: () => 'Pelo menos um campo deve ser fornecido para atualização' },
+    {
+      message: () => 'Pelo menos um campo deve ser fornecido para atualização',
+    },
   ),
-)
+);
 
-export type UpdateDriverInput = typeof UpdateDriverInput.Type
+export type UpdateDriverInput = typeof UpdateDriverInput.Type;

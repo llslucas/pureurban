@@ -1,5 +1,5 @@
-import { IsString, IsEnum, IsOptional, IsUUID } from 'class-validator'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsString, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum TripTypeDto {
   OUTBOUND = 'OUTBOUND',
@@ -7,13 +7,19 @@ export enum TripTypeDto {
 }
 
 export class CreateTripDto {
-  @ApiProperty({ description: 'ID da rota', example: '550e8400-e29b-41d4-a716-446655440000' })
+  @ApiProperty({
+    description: 'ID da rota',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsUUID()
-  routeId!: string
+  routeId!: string;
 
-  @ApiProperty({ enum: TripTypeDto, description: 'Tipo de viagem: ida (OUTBOUND) ou volta (RETURN)' })
+  @ApiProperty({
+    enum: TripTypeDto,
+    description: 'Tipo de viagem: ida (OUTBOUND) ou volta (RETURN)',
+  })
   @IsEnum(TripTypeDto)
-  type!: TripTypeDto
+  type!: TripTypeDto;
 
   @ApiPropertyOptional({
     description: 'ID da viagem de ida (obrigatório para RETURN)',
@@ -21,7 +27,7 @@ export class CreateTripDto {
   })
   @IsOptional()
   @IsUUID()
-  relatedTripId?: string
+  relatedTripId?: string;
 }
 
 export class EndTripDto {

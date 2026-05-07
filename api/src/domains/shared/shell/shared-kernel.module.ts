@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common'
-import { RolesGuard } from './guards/roles.guard.js'
-import { TenantGuard } from './guards/tenant.guard.js'
+import { Module } from '@nestjs/common';
+import { RolesGuard } from './guards/roles.guard.js';
+import { TenantGuard } from './guards/tenant.guard.js';
 
 /**
  * SharedKernelModule — centraliza as exportações de guards, decorators e

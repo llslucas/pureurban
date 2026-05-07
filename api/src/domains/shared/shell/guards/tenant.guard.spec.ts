@@ -1,56 +1,62 @@
-import { describe, it, expect } from 'vitest'
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common'
-import { TenantGuard } from './tenant.guard.js'
+import { describe, it, expect } from 'vitest';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { TenantGuard } from './tenant.guard.js';
 
 function createCtx(user?: Record<string, unknown>) {
-  const request: Record<string, unknown> = { user }
+  const request: Record<string, unknown> = { user };
   return {
     switchToHttp: () => ({
       getRequest: () => request,
     }),
-  } as unknown as ExecutionContext & { _req: typeof request }
+  } as unknown as ExecutionContext & { _req: typeof request };
 }
 
 describe('TenantGuard', () => {
-  const guard = new TenantGuard()
+  const guard = new TenantGuard();
 
   it('deve injetar tenantId quando JWT contém companyId', () => {
-    const ctx = createCtx({ companyId: 'company-123' })
-    const req = ctx.switchToHttp().getRequest() as Record<string, unknown>
+    const ctx = createCtx({ companyId: 'company-123' });
+    const req = ctx.switchToHttp().getRequest();
 
-    const result = guard.canActivate(ctx)
+    const result = guard.canActivate(ctx);
 
-    expect(result).toBe(true)
-    expect(req.tenantId).toBe('company-123')
-  })
+    expect(result).toBe(true);
+    expect(req.tenantId).toBe('company-123');
+  });
 
   it('deve lançar UnauthorizedException quando JWT não contém companyId', () => {
-    const ctx = createCtx({ id: 'user-1', role: 'driver' })
+    const ctx = createCtx({ id: 'user-1', role: 'driver' });
 
-    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException)
-  })
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
+  });
 
   it('deve lançar UnauthorizedException quando não há user no request', () => {
-    const ctx = createCtx(undefined)
+    const ctx = createCtx(undefined);
 
-    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException)
-  })
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
+  });
 
   it('deve usar mensagem distinta quando user é undefined vs companyId ausente', () => {
-    const ctxNoUser = createCtx(undefined)
+    const ctxNoUser = createCtx(undefined);
     try {
-      guard.canActivate(ctxNoUser)
+      guard.canActivate(ctxNoUser);
     } catch (e) {
-      const resp = (e as UnauthorizedException).getResponse() as Record<string, string>
-      expect(resp.message).toContain('no user found')
+      const resp = (e as UnauthorizedException).getResponse() as Record<
+        string,
+        string
+      >;
+      expect(resp.message).toContain('no user found');
     }
 
-    const ctxNoCompany = createCtx({ id: 'user-1' })
+    const ctxNoCompany = createCtx({ id: 'user-1' });
     try {
-      guard.canActivate(ctxNoCompany)
+      guard.canActivate(ctxNoCompany);
     } catch (e) {
-      const resp = (e as UnauthorizedException).getResponse() as Record<string, string>
-      expect(resp.message).toContain('companyId')
+      const resp = (e as UnauthorizedException).getResponse() as Record<
+        string,
+        string
+      >;
+      expect(resp.message).toContain('companyId');
     }
-  })
-})
+  });
+});

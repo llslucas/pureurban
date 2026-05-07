@@ -1,13 +1,17 @@
-import { Injectable } from '@nestjs/common'
-import { Effect, pipe } from 'effect'
-import { PrismaService } from '../../../shared/shell/infra/prisma.service.js'
-import { TripRepository } from '../../core/ports/trip-repository.port.js'
-import type { TripData, CreateTripData, TripRepositoryApi } from '../../core/ports/trip-repository.port.js'
-import { TripNotFound } from '../../core/errors/trip.errors.js'
+import { Injectable } from '@nestjs/common';
+import { Effect, pipe } from 'effect';
+import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
+import { TripRepository } from '../../core/ports/trip-repository.port.js';
+import type {
+  TripData,
+  CreateTripData,
+  TripRepositoryApi,
+} from '../../core/ports/trip-repository.port.js';
+import { TripNotFound } from '../../core/errors/trip.errors.js';
 
 // Helper: mapeia erro desconhecido para TripNotFound (adapter de infra)
 const toInfraError = (msg: string) => (e: unknown) =>
-  new TripNotFound({ code: 'INFRA_ERROR', message: `${msg}: ${String(e)}` })
+  new TripNotFound({ code: 'INFRA_ERROR', message: `${msg}: ${String(e)}` });
 
 @Injectable()
 export class PrismaTripAdapter implements TripRepositoryApi {
@@ -35,19 +39,23 @@ export class PrismaTripAdapter implements TripRepositoryApi {
       }),
       Effect.map((trip) => trip as unknown as TripData),
       Effect.orDie,
-    )
+    );
   }
 
-  findById(id: string, tenantId: string): Effect.Effect<TripData, TripNotFound, never> {
-    const prisma = this.prisma
+  findById(
+    id: string,
+    tenantId: string,
+  ): Effect.Effect<TripData, TripNotFound, never> {
+    const prisma = this.prisma;
     return Effect.gen(function* () {
       const trip = yield* pipe(
         Effect.tryPromise({
-          try: () => prisma.trip.findFirst({ where: { id, companyId: tenantId } }),
+          try: () =>
+            prisma.trip.findFirst({ where: { id, companyId: tenantId } }),
           catch: toInfraError(`Erro ao buscar viagem ${id}`),
         }),
         Effect.orDie,
-      )
+      );
       if (!trip) {
         return yield* Effect.fail(
           new TripNotFound({
@@ -55,22 +63,27 @@ export class PrismaTripAdapter implements TripRepositoryApi {
             message: `Viagem com id ${id} não encontrada`,
             details: { tripId: id },
           }),
-        )
+        );
       }
-      return trip as unknown as TripData
-    })
+      return trip as unknown as TripData;
+    });
   }
 
-  update(id: string, data: Partial<TripData>, tenantId: string): Effect.Effect<TripData, TripNotFound, never> {
-    const prisma = this.prisma
+  update(
+    id: string,
+    data: Partial<TripData>,
+    tenantId: string,
+  ): Effect.Effect<TripData, TripNotFound, never> {
+    const prisma = this.prisma;
     return Effect.gen(function* () {
       const existing = yield* pipe(
         Effect.tryPromise({
-          try: () => prisma.trip.findFirst({ where: { id, companyId: tenantId } }),
+          try: () =>
+            prisma.trip.findFirst({ where: { id, companyId: tenantId } }),
           catch: toInfraError(`Erro ao buscar viagem ${id}`),
         }),
         Effect.orDie,
-      )
+      );
       if (!existing) {
         return yield* Effect.fail(
           new TripNotFound({
@@ -78,7 +91,7 @@ export class PrismaTripAdapter implements TripRepositoryApi {
             message: `Viagem com id ${id} não encontrada`,
             details: { tripId: id },
           }),
-        )
+        );
       }
       const updated = yield* pipe(
         Effect.tryPromise({
@@ -93,20 +106,25 @@ export class PrismaTripAdapter implements TripRepositoryApi {
           catch: toInfraError(`Erro ao atualizar viagem ${id}`),
         }),
         Effect.orDie,
-      )
-      return updated as unknown as TripData
-    })
+      );
+      return updated as unknown as TripData;
+    });
   }
 
-  findActiveByDriver(driverId: string, tenantId: string): Effect.Effect<TripData | null, never, never> {
+  findActiveByDriver(
+    driverId: string,
+    tenantId: string,
+  ): Effect.Effect<TripData | null, never, never> {
     return pipe(
       Effect.tryPromise({
         try: () =>
-          this.prisma.trip.findFirst({ where: { driverId, companyId: tenantId, status: 'ACTIVE' } }),
+          this.prisma.trip.findFirst({
+            where: { driverId, companyId: tenantId, status: 'ACTIVE' },
+          }),
         catch: toInfraError('Erro ao buscar viagem ativa'),
       }),
       Effect.map((trip) => (trip as unknown as TripData) ?? null),
       Effect.orDie,
-    )
+    );
   }
 }

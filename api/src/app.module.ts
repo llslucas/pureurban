@@ -4,6 +4,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './domains/auth/shell/auth.module.js';
 import { DriverModule } from './domains/auth/shell/driver.module.js';
+import { StudentModule } from './domains/auth/shell/student.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaGlobalModule } from './domains/shared/shell/infra/prisma-global.module.js';
@@ -22,6 +23,7 @@ import { TripModule } from './domains/trip/shell/trip.module.js';
     SharedKernelModule,
     AuthModule,
     DriverModule,
+    StudentModule,
     TripModule,
   ],
   controllers: [AppController],
@@ -32,5 +34,3 @@ import { TripModule } from './domains/trip/shell/trip.module.js';
   ],
 })
 export class AppModule {}
-
-

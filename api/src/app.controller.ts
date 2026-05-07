@@ -10,7 +10,8 @@ export class AppController {
 
   constructor(
     private readonly appService: AppService,
-    @Inject(EFFECT_RUNTIME) private readonly runtime: ManagedRuntime.ManagedRuntime<any, never>,
+    @Inject(EFFECT_RUNTIME)
+    private readonly runtime: ManagedRuntime.ManagedRuntime<any, never>,
   ) {}
 
   @Get()
@@ -21,14 +22,20 @@ export class AppController {
   @Get('api/v1/health/effect')
   async healthEffect() {
     try {
-      const [result, events] = await this.runtime.runPromise(healthCheckProgram)
+      const [result, events] =
+        await this.runtime.runPromise(healthCheckProgram);
       if (events.length > 0) {
-        this.logger.warn(`Health check produced ${events.length} unexpected event(s)`)
+        this.logger.warn(
+          `Health check produced ${events.length} unexpected event(s)`,
+        );
       }
-      return result
+      return result;
     } catch (error) {
-      this.logger.error('Effect health check failed', error instanceof Error ? error.stack : error)
-      throw error
+      this.logger.error(
+        'Effect health check failed',
+        error instanceof Error ? error.stack : error,
+      );
+      throw error;
     }
   }
 }

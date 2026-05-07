@@ -22,3 +22,10 @@
 - N+1 double-fetch em `updateDriver`: `findByIdAndCompanyAndRole` no use-case + `findFirst` interno do `updatePartial` no adapter (3 queries onde 1 bastaria) — padrão pre-existente, otimização futura.
 - Sem guard de empresa ativa: JWT válido de empresa desativada ainda permite criação/gestão de motoristas — gap sistêmico pré-existente, não causado por esta story.
 - `UserData` carrega campo `password` no tipo de domínio (core layer expõe hashed password no tipo de retorno dos use-cases) — constraint de design pré-existente; service faz stripping correto em todos os métodos.
+
+## Deferred from: code review of 2-4-cadastro-e-gestao-de-alunos.md (2026-05-06)
+- Session Hijacking / Lack of Invalidation on Password Change — deferred: pre-existing limitation
+- Active Session Persistence Post-Deactivation — deferred: pre-existing limitation
+- Denial of Service via Unbounded Pagination — deferred: pre-existing limitation in list-drivers
+- Denial of Service via bcrypt Hashing — deferred: rate limiting is a cross-cutting concern
+- Missing Audit Trail (No Actor Tracking) — deferred: actor tracking is not specified
