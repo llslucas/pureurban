@@ -37,7 +37,7 @@ export class PrismaTripAdapter implements TripRepositoryApi {
           }),
         catch: toInfraError('Falha ao criar viagem'),
       }),
-      Effect.map((trip) => trip as unknown as TripData),
+      Effect.map((trip) => trip as TripData),
       Effect.orDie,
     );
   }
@@ -107,7 +107,7 @@ export class PrismaTripAdapter implements TripRepositoryApi {
         }),
         Effect.orDie,
       );
-      return updated as unknown as TripData;
+      return updated as TripData;
     });
   }
 
@@ -123,7 +123,7 @@ export class PrismaTripAdapter implements TripRepositoryApi {
           }),
         catch: toInfraError('Erro ao buscar viagem ativa'),
       }),
-      Effect.map((trip) => (trip as unknown as TripData) ?? null),
+      Effect.map((trip) => (trip as TripData) ?? null),
       Effect.orDie,
     );
   }

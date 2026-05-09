@@ -13,6 +13,7 @@ import { SharedKernelModule } from './domains/shared/shell/shared-kernel.module.
 import { EffectExceptionFilter } from './domains/shared/shell/filters/effect-exception.filter.js';
 import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/response-wrapper.interceptor.js';
 import { TripModule } from './domains/trip/shell/trip.module.js';
+import { RoutingModule } from './domains/routing/shell/routing.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TripModule } from './domains/trip/shell/trip.module.js';
     DriverModule,
     StudentModule,
     TripModule,
+    RoutingModule,
   ],
   controllers: [AppController],
   providers: [
