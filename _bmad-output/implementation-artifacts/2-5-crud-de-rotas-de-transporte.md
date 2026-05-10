@@ -1,6 +1,6 @@
 # Story 2.5: CRUD de Rotas de Transporte
 
-Status: review
+Status: done
 
 ## Story
 
@@ -137,6 +137,15 @@ Para que motoristas e alunos sejam organizados por rota.
   - [x] 14.1 `npm run build` — erros pre-existentes de `generated/prisma` (não introduzidos por esta story)
   - [x] 14.2 `npm run lint` — erros de `unsafe-any` são pre-existentes (mesma causa: `generated/prisma`). Único novo erro (`unused import`) corrigido.
   - [x] 14.3 `npm test` — 14/14 testes do core passando; 53/53 regressões passando.
+
+### Review Findings
+- [x] [Review][Patch] No-op state comparison missing in update use-case [api/src/domains/routing/core/use-cases/update-route.use-case.ts] — fixed: value comparison added
+- [x] [Review][Patch] Inability to nullify an existing description via API [api/src/domains/routing/core/schemas/update-route.schema.ts] — fixed: Schema.NullOr added
+- [x] [Review][Patch] Database accepts empty-looking routes with spaces [api/src/domains/routing/core/schemas/create-route.schema.ts] — fixed: Schema.trimmed() added
+- [x] [Review][Patch] Unhandled Prisma P2003 error causing HTTP 500 [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — fixed: P2003 handler added
+- [x] [Review][Patch] Risco Moderado de DDoS com Strings Longas [api/src/domains/routing/core/schemas/create-route.schema.ts] — fixed: Schema.maxLength() added
+- [x] [Review][Defer] Unbounded memory consumption or timeout [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — deferred, pre-existing
+- [x] [Review][Defer] Dupla Busca no Banco de Dados (Anti-Pattern de Performance) [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — deferred, pre-existing
 
 ## Dev Notes
 

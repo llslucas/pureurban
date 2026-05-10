@@ -29,3 +29,7 @@
 - Denial of Service via Unbounded Pagination — deferred: pre-existing limitation in list-drivers
 - Denial of Service via bcrypt Hashing — deferred: rate limiting is a cross-cutting concern
 - Missing Audit Trail (No Actor Tracking) — deferred: actor tracking is not specified
+
+## Deferred from: code review of 2-5-crud-de-rotas-de-transporte (2026-05-10)
+- Unbounded memory consumption or timeout [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — deferred, pre-existing
+- Dupla Busca no Banco de Dados (Anti-Pattern de Performance) [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — deferred, pre-existing

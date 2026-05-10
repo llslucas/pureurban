@@ -86,6 +86,26 @@ describe('updateRoute', () => {
     expect(result.id).toBe('route-1');
   });
 
+  it('deve retornar noEvents quando valores enviados são idênticos aos existentes (true no-op)', async () => {
+    const repo: Partial<RouteRepository> = {
+      findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(mockRoute)),
+      update: vi.fn(),
+    };
+
+    // Enviar os mesmos valores que já existem — deve ser tratado como no-op
+    const [result, events] = await Effect.runPromise(
+      updateRoute({
+        id: 'route-1',
+        companyId: 'company-1',
+        data: { name: 'Rota Norte', originCity: 'Viçosa' },
+      }).pipe(Effect.provide(makeLayer(repo))),
+    );
+
+    expect(events).toHaveLength(0);
+    expect(repo.update).not.toHaveBeenCalled();
+    expect(result.name).toBe('Rota Norte');
+  });
+
   it('deve atualizar múltiplos campos simultaneamente', async () => {
     const updatedRoute = {
       ...mockRoute,

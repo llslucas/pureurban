@@ -36,8 +36,16 @@ export const updateRoute = (input: {
     if (input.data.destinationCity !== undefined)
       dataToUpdate.destinationCity = input.data.destinationCity;
 
-    // No-op: nenhum campo efetivo (pelo menos um campo é exigido pelo schema,
-    // mas o use-case trata defensivamente o path no-op sem emitir evento)
+    // Remover campos cujo valor é idêntico ao existente (true no-op)
+    for (const key of Object.keys(dataToUpdate) as Array<
+      keyof typeof dataToUpdate
+    >) {
+      if (dataToUpdate[key] === existing[key]) {
+        delete dataToUpdate[key];
+      }
+    }
+
+    // No-op: nenhum campo efetivo com valor diferente — não emite evento
     if (Object.keys(dataToUpdate).length === 0) {
       return noEvents(existing);
     }
@@ -52,3 +60,4 @@ export const updateRoute = (input: {
       },
     ]);
   });
+
