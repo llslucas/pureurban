@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { Effect, Layer } from 'effect';
 import { listRoutes } from './list-routes.use-case.js';
 import { RouteRepository } from '../ports/route-repository.port.js';
-import type { RouteData } from '../ports/route-repository.port.js';
+import type {
+  RouteData,
+  RouteRepositoryApi,
+} from '../ports/route-repository.port.js';
 
 const mockRoute: RouteData = {
   id: 'route-1',
@@ -21,13 +24,13 @@ const mockRouteOtherCompany: RouteData = {
   companyId: 'company-2',
 };
 
-function makeLayer(repo: Partial<RouteRepository>) {
-  return Layer.succeed(RouteRepository, repo as RouteRepository);
+function makeLayer(repo: Partial<RouteRepositoryApi>) {
+  return Layer.succeed(RouteRepository, repo as RouteRepositoryApi);
 }
 
 describe('listRoutes', () => {
   it('deve retornar lista de rotas da empresa sem emitir eventos', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findAllByCompany: vi.fn().mockReturnValue(Effect.succeed([mockRoute])),
     };
 
@@ -44,7 +47,7 @@ describe('listRoutes', () => {
   });
 
   it('deve retornar lista vazia quando empresa não tem rotas', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findAllByCompany: vi.fn().mockReturnValue(Effect.succeed([])),
     };
 
@@ -59,7 +62,7 @@ describe('listRoutes', () => {
 
   it('NÃO deve retornar rotas de outra empresa (filtro por companyId)', async () => {
     // Simula que o adapter filtra corretamente por companyId
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findAllByCompany: vi
         .fn()
         .mockImplementation((companyId: string) =>

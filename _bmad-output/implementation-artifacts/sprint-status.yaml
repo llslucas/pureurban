@@ -1,5 +1,5 @@
 # generated: 2026-03-25T21:46:25-03:00
-# last_updated: 2026-04-01T00:00:00-03:00
+# last_updated: 2026-05-10T19:31:00-03:00
 # project: pureurban
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-05-10T18:54:00-03:00"
+last_updated: "2026-05-10T22:05:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   2-3-cadastro-e-gestao-de-motoristas: done
   2-4-cadastro-e-gestao-de-alunos: done
   2-5-crud-de-rotas-de-transporte: done
-  2-6-vinculos-aluno-rota-e-motorista-rota: backlog
+  2-6-vinculos-aluno-rota-e-motorista-rota: done
   epic-2-retrospective: optional
 
   # === Epic 3: Gestão de Viagens e Embarque Digital ===

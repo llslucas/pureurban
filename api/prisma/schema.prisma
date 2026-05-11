@@ -50,6 +50,10 @@ model User {
   @@index([companyId, role, isActive])
   @@map("users")
   @@schema("auth")
+
+  // Vínculos de rota (cross-schema: auth → routing)
+  routeStudents RouteStudent[] @relation("StudentRoutes")
+  routeDrivers  RouteDriver[]  @relation("DriverRoutes")
 }
 
 // ─── TRIP (Viagens) ─────────────────────────────────────────
@@ -106,5 +110,43 @@ model Route {
 
   @@index([companyId])
   @@map("routes")
+  @@schema("routing")
+
+  // Relações reversas para vínculos de alunos e motoristas
+  routeStudents RouteStudent[]
+  routeDrivers  RouteDriver[]
+}
+
+// Join table: aluno ↔ rota (routing schema, FK cross-schema para auth.users)
+model RouteStudent {
+  id        String   @id @default(uuid())
+  routeId   String
+  studentId String
+  companyId String
+  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  student   User     @relation("StudentRoutes", fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([routeId, studentId])
+  @@index([companyId])
+  @@index([studentId])
+  @@map("route_students")
+  @@schema("routing")
+}
+
+// Join table: motorista ↔ rota (routing schema, FK cross-schema para auth.users)
+model RouteDriver {
+  id        String   @id @default(uuid())
+  routeId   String
+  driverId  String
+  companyId String
+  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  driver    User     @relation("DriverRoutes", fields: [driverId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([routeId, driverId])
+  @@index([companyId])
+  @@index([driverId])
+  @@map("route_drivers")
   @@schema("routing")
 }

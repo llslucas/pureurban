@@ -6,7 +6,7 @@ import { RolesGuard } from './roles.guard.js';
 describe('RolesGuard', () => {
   it('deve permitir quando não há @Roles() no handler (público)', () => {
     const reflector = new Reflector();
-    vi.spyOn(reflector, 'get').mockReturnValue(
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(
       undefined as unknown as string[],
     );
     const guard = new RolesGuard(reflector);
@@ -16,6 +16,7 @@ describe('RolesGuard', () => {
         getRequest: () => ({ user: { role: 'driver' } }),
       }),
       getHandler: () => ({}),
+      getClass: () => ({}),
     } as unknown as ExecutionContext;
 
     expect(guard.canActivate(ctx)).toBe(true);
@@ -23,12 +24,13 @@ describe('RolesGuard', () => {
 
   it('deve permitir quando role do usuário está na lista de roles requeridos', () => {
     const reflector = new Reflector();
-    vi.spyOn(reflector, 'get').mockReturnValue(['admin']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
     const guard = new RolesGuard(reflector);
 
     const ctx = {
       switchToHttp: () => ({ getRequest: () => ({ user: { role: 'admin' } }) }),
       getHandler: () => ({}),
+      getClass: () => ({}),
     } as unknown as ExecutionContext;
 
     expect(guard.canActivate(ctx)).toBe(true);
@@ -36,7 +38,7 @@ describe('RolesGuard', () => {
 
   it('deve lançar ForbiddenException quando role não bate', () => {
     const reflector = new Reflector();
-    vi.spyOn(reflector, 'get').mockReturnValue(['admin']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
     const guard = new RolesGuard(reflector);
 
     const ctx = {
@@ -44,6 +46,7 @@ describe('RolesGuard', () => {
         getRequest: () => ({ user: { role: 'driver' } }),
       }),
       getHandler: () => ({}),
+      getClass: () => ({}),
     } as unknown as ExecutionContext;
 
     expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
@@ -51,7 +54,10 @@ describe('RolesGuard', () => {
 
   it('deve permitir quando um dos múltiplos roles bate', () => {
     const reflector = new Reflector();
-    vi.spyOn(reflector, 'get').mockReturnValue(['admin', 'manager']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
+      'admin',
+      'manager',
+    ]);
     const guard = new RolesGuard(reflector);
 
     const ctx = {
@@ -59,6 +65,7 @@ describe('RolesGuard', () => {
         getRequest: () => ({ user: { role: 'manager' } }),
       }),
       getHandler: () => ({}),
+      getClass: () => ({}),
     } as unknown as ExecutionContext;
 
     expect(guard.canActivate(ctx)).toBe(true);
@@ -66,12 +73,31 @@ describe('RolesGuard', () => {
 
   it('deve lançar ForbiddenException quando user não existe', () => {
     const reflector = new Reflector();
-    vi.spyOn(reflector, 'get').mockReturnValue(['admin']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
     const guard = new RolesGuard(reflector);
 
     const ctx = {
       switchToHttp: () => ({ getRequest: () => ({}) }),
       getHandler: () => ({}),
+      getClass: () => ({}),
+    } as unknown as ExecutionContext;
+
+    expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
+  });
+
+  it('deve respeitar @Roles declarado no nível da classe (override fallback)', () => {
+    const reflector = new Reflector();
+    // getAllAndOverride retorna o primeiro valor não-undefined entre handler/class.
+    // Aqui simulamos que o handler não tem @Roles e a classe tem ['ADMIN'].
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    const guard = new RolesGuard(reflector);
+
+    const ctx = {
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { role: 'DRIVER' } }),
+      }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
     } as unknown as ExecutionContext;
 
     expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
@@ -79,12 +105,13 @@ describe('RolesGuard', () => {
 
   it('deve lançar ForbiddenException quando role não é string', () => {
     const reflector = new Reflector();
-    vi.spyOn(reflector, 'get').mockReturnValue(['admin']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
     const guard = new RolesGuard(reflector);
 
     const ctx = {
       switchToHttp: () => ({ getRequest: () => ({ user: { role: 123 } }) }),
       getHandler: () => ({}),
+      getClass: () => ({}),
     } as unknown as ExecutionContext;
 
     expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);

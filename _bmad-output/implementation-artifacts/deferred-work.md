@@ -33,3 +33,11 @@
 ## Deferred from: code review of 2-5-crud-de-rotas-de-transporte (2026-05-10)
 - Unbounded memory consumption or timeout [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — deferred, pre-existing
 - Dupla Busca no Banco de Dados (Anti-Pattern de Performance) [api/src/domains/routing/shell/adapters/prisma-route.adapter.ts] — deferred, pre-existing
+
+## Deferred from: code review of 2-6-vinculos-aluno-rota-e-motorista-rota (2026-05-10)
+- `Effect.orDie` em todos os adapters converte falhas infra recuperáveis em defects/500 sem retry/métrica — padrão pré-existente desde Story 1.3.
+- Falta outbox transacional para eventos de domínio (eventos podem ser perdidos se processo crashar entre commit e dispatch) — arquitetural, fora do escopo.
+- `Layer.merge` em `routing.module.ts` impede transações cross-aggregate (criar rota + assignar students atomicamente) — escolha arquitetural.
+- `@Get('mine')` antes de `@Get(':id')` é forçado apenas por disciplina — adicionar teste de regressão que prove resolução de `mine` quando `:id` existe.
+- `companyId` em `routeStudent.create`/`routeDriver.create` vem do parâmetro de input em vez de `route.companyId` verificado na tx — defense-in-depth.
+- `sprint-status.yaml` tem comentários de timestamp divergentes do dado YAML — gerenciamento manual; trivial.

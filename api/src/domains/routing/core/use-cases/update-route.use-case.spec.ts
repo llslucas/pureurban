@@ -3,7 +3,10 @@ import { Effect, Layer } from 'effect';
 import { updateRoute } from './update-route.use-case.js';
 import { RouteRepository } from '../ports/route-repository.port.js';
 import { RouteNotFoundError } from '../errors/routing.errors.js';
-import type { RouteData } from '../ports/route-repository.port.js';
+import type {
+  RouteData,
+  RouteRepositoryApi,
+} from '../ports/route-repository.port.js';
 import type { UpdateRouteInput } from '../schemas/update-route.schema.js';
 
 const mockRoute: RouteData = {
@@ -17,14 +20,14 @@ const mockRoute: RouteData = {
   updatedAt: new Date('2026-01-01'),
 };
 
-function makeLayer(repo: Partial<RouteRepository>) {
-  return Layer.succeed(RouteRepository, repo as RouteRepository);
+function makeLayer(repo: Partial<RouteRepositoryApi>) {
+  return Layer.succeed(RouteRepository, repo as RouteRepositoryApi);
 }
 
 describe('updateRoute', () => {
   it('deve atualizar parcialmente — apenas name — e emitir evento', async () => {
     const updatedRoute = { ...mockRoute, name: 'Nova Rota' };
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(mockRoute)),
       update: vi.fn().mockReturnValue(Effect.succeed(updatedRoute)),
     };
@@ -44,7 +47,7 @@ describe('updateRoute', () => {
   });
 
   it('deve falhar com RouteNotFoundError quando rota não existe', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(null)),
       update: vi.fn(),
     };
@@ -67,7 +70,7 @@ describe('updateRoute', () => {
   });
 
   it('deve retornar noEvents quando dataToUpdate fica vazio (no-op defensivo)', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(mockRoute)),
       update: vi.fn(),
     };
@@ -87,7 +90,7 @@ describe('updateRoute', () => {
   });
 
   it('deve retornar noEvents quando valores enviados são idênticos aos existentes (true no-op)', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(mockRoute)),
       update: vi.fn(),
     };
@@ -112,7 +115,7 @@ describe('updateRoute', () => {
       originCity: 'Nova Origem',
       destinationCity: 'Novo Destino',
     };
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(mockRoute)),
       update: vi.fn().mockReturnValue(Effect.succeed(updatedRoute)),
     };

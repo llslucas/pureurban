@@ -3,7 +3,10 @@ import { Effect, Layer } from 'effect';
 import { getRoute } from './get-route.use-case.js';
 import { RouteRepository } from '../ports/route-repository.port.js';
 import { RouteNotFoundError } from '../errors/routing.errors.js';
-import type { RouteData } from '../ports/route-repository.port.js';
+import type {
+  RouteData,
+  RouteRepositoryApi,
+} from '../ports/route-repository.port.js';
 
 const mockRoute: RouteData = {
   id: 'route-1',
@@ -16,13 +19,13 @@ const mockRoute: RouteData = {
   updatedAt: new Date('2026-01-01'),
 };
 
-function makeLayer(repo: Partial<RouteRepository>) {
-  return Layer.succeed(RouteRepository, repo as RouteRepository);
+function makeLayer(repo: Partial<RouteRepositoryApi>) {
+  return Layer.succeed(RouteRepository, repo as RouteRepositoryApi);
 }
 
 describe('getRoute', () => {
   it('deve retornar rota existente sem emitir eventos', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(mockRoute)),
     };
 
@@ -41,7 +44,7 @@ describe('getRoute', () => {
   });
 
   it('deve falhar com RouteNotFoundError quando rota não existe', async () => {
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi.fn().mockReturnValue(Effect.succeed(null)),
     };
 
@@ -63,7 +66,7 @@ describe('getRoute', () => {
 
   it('deve falhar com RouteNotFoundError para rota de outra empresa (isolamento cross-tenant)', async () => {
     // Simula que o adapter retorna null para rota de companyId diferente
-    const repo: Partial<RouteRepository> = {
+    const repo: Partial<RouteRepositoryApi> = {
       findByIdAndCompany: vi
         .fn()
         .mockImplementation((_id: string, companyId: string) =>

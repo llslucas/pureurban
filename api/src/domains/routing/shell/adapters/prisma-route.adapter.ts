@@ -12,10 +12,7 @@ import { RouteNotFoundError } from '../../core/errors/routing.errors.js';
 // Helper: mapeia erro desconhecido para string (adapter de infra)
 // Sanitiza PrismaClientKnownRequestError para não vazar detalhes internos
 const toInfraError = (msg: string) => (e: unknown) => {
-  if (
-    e instanceof Prisma.PrismaClientKnownRequestError &&
-    e.code === 'P2003'
-  ) {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
     return new Error(`${msg}: FK constraint failed`);
   }
   return new Error(`${msg}: ${String(e)}`);
