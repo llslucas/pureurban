@@ -25,7 +25,7 @@
 | Versão | Data | Autor | Descrição das Alterações |
 |---|---|---|---|
 | 1.0 | 15/03/2026 | Lucas | Criação do documento baseado no PRD (PU-PRD-001) |
-| 1.1 | 31/03/2026 | Lucas | Prazo estendido para dezembro/2026; equipe ampliada para 2 desenvolvedores; simplificação do offline sync em tiers; CI/CD e testes E2E incorporados ao MVP |
+| 1.1 | 31/03/2026 | Lucas | Equipe ampliada para 2 desenvolvedores; simplificação do offline sync em tiers; CI/CD e testes E2E incorporados ao MVP |
 | 1.2 | 10/05/2026 | Lucas | Revisão de formato e adequação para entrega formal |
 
 ---
@@ -41,10 +41,9 @@
 7. [Estrutura do Projeto e Fronteiras Arquiteturais](#7-estrutura-do-projeto-e-fronteiras-arquiteturais)
 8. [Regras Obrigatórias](#8-regras-obrigatórias)
 9. [Sequência de Implementação](#9-sequência-de-implementação)
-10. [Divisão de Trabalho](#10-divisão-de-trabalho)
-11. [Análise de Lacunas e Prontidão](#11-análise-de-lacunas-e-prontidão)
-12. [Glossário](#12-glossário)
-13. [Referências](#13-referências)
+10. [Análise de Lacunas e Prontidão](#11-análise-de-lacunas-e-prontidão)
+11. [Glossário](#12-glossário)
+12. [Referências](#13-referências)
 
 ---
 
@@ -58,7 +57,7 @@ Este documento descreve as decisões arquiteturais do PureUrban, uma plataforma 
 |---|---|
 | **Domínio** | Gestão de transporte universitário intermunicipal |
 | **Complexidade** | Média-Alta — 37 requisitos funcionais em 7 categorias, 20 requisitos não-funcionais |
-| **Equipe** | 2 desenvolvedores (Lucas + 1 colaborador) |
+| **Equipe** | 2 desenvolvedores (Lucas e Geovane) |
 | **Prazo do MVP** | Dezembro de 2026 |
 | **Distribuição** | Expo Go / build de desenvolvimento — sem publicação em lojas |
 | **Dispositivos alvo** | Android 8+ / iOS 13+, telas de 5 polegadas, dispositivos de baixo custo |
@@ -102,6 +101,12 @@ Este documento descreve as decisões arquiteturais do PureUrban, uma plataforma 
 | Reconciliação bidirecional completa de dados offline | Complexidade desproporcional — ver Seção 5 |
 | CRDT / Event Sourcing para merge sem conflitos | Trabalho futuro — mencionado na tese |
 | Framework dedicado de sync (PowerSync, WatermelonDB) | Avaliar após o MVP |
+
+### 1.6 Conformidade Normativa
+
+A descrição arquitetural deste documento segue a norma **ISO/IEC/IEEE 42010:2022** (*Systems and software engineering — Architecture description*), identificando stakeholders, concerns e viewpoints conforme tabela de rastreabilidade documentada em apêndice. A notação adotada é **ArchiMate® 3.2** (The Open Group, 2022), padrão aberto compatível com a 42010. Os atributos de qualidade (NFRs) são classificados conforme **ISO/IEC 25010:2011** (*Systems and software Quality Requirements and Evaluation — SQuaRE*). As decisões arquiteturais registradas neste documento cumprem o papel de ADRs (*Architecture Decision Records*), conforme prática recomendada pela 42010 § 5.6.
+
+Detalhamento da fundamentação teórica, mapeamento completo de stakeholders/concerns/viewpoints e referências bibliográficas estão consolidados em `docs/Fundamentacao-Teorica-TCC.md`.
 
 ---
 
@@ -791,39 +796,11 @@ A sequência abaixo reflete as dependências técnicas entre os componentes e ot
 
 ---
 
-## 10. Divisão de Trabalho
-
-### 10.1 Fundamento Arquitetural
-
-A arquitetura hexagonal com bounded contexts cria uma **fronteira natural de divisão** — `core/` versus `shell/` e domínios independentes permitem trabalho paralelo com baixo acoplamento entre os desenvolvedores.
-
-### 10.2 Estratégia de Onboarding do Desenvolvedor 2
-
-- Dev 1 (Lucas — arquiteto) estabelece os padrões nos primeiros bounded contexts (`shared/` + `auth/`).
-- Dev 2 inicia pelo mobile ou pelos adapters do shell (NestJS puro, sem Effect TS).
-- Dev 2 entra gradualmente no functional core após 3 a 4 semanas de familiarização com Effect TS.
-
-### 10.3 Sugestão de Divisão por Responsabilidade
-
-| Dev 1 — Lucas (Arquiteto) | Dev 2 |
-|---|---|
-| `shared/` + Effect runtime | Setup mobile + navegação |
-| `auth/` (core + shell) | Telas mobile + stores |
-| `boarding/` core | `boarding/` shell + adapters |
-| `tracking/` core + SSE | `routing/` (core + shell) |
-| `trip/` core | `trip/` shell + telas mobile |
-| CI/CD + infraestrutura | Testes E2E |
-| Offline Tier 2 (fila + idempotência) | Offline Tier 1 (TanStack persist) |
-
-> **Observação para a tese:** A divisão core/shell facilitou o trabalho paralelo — um argumento prático a favor da arquitetura hexagonal em equipes pequenas.
-
----
-
-## 11. Análise de Lacunas e Prontidão
+## 10. Análise de Lacunas e Prontidão
 
 **Status:** Pronto para implementação — nível de confiança alto.
 
-### 11.1 Lacunas Conhecidas
+### 10.1 Lacunas Conhecidas
 
 | Lacuna | Impacto | Quando Resolver |
 |---|---|---|
@@ -833,7 +810,7 @@ A arquitetura hexagonal com bounded contexts cria uma **fronteira natural de div
 
 **Nenhum gap crítico identificado.**
 
-### 11.2 Compatibilidade Verificada
+### 10.2 Compatibilidade Verificada
 
 | Combinação | Status |
 |---|---|
@@ -845,7 +822,7 @@ A arquitetura hexagonal com bounded contexts cria uma **fronteira natural de div
 
 ---
 
-## 12. Glossário
+## 11. Glossário
 
 | Termo                 | Definição                                                                                                       |
 | --------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -889,7 +866,7 @@ A arquitetura hexagonal com bounded contexts cria uma **fronteira natural de div
 
 ---
 
-## 13. Referências
+## 12. Referências
 
 BERNHARDT, G. **Functional Core, Imperative Shell**. Destroy All Software, 2012. Disponível em: https://www.destroyallsoftware.com/screencasts/catalog/functional-core-imperative-shell.
 
