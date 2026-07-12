@@ -1,5 +1,5 @@
 # generated: 2026-03-25T21:46:25-03:00
-# last_updated: 2026-05-10T19:31:00-03:00
+# last_updated: 2026-07-12T18:35:48-03:00
 # project: pureurban
 # project_key: NOKEY
 # tracking_system: file-system
@@ -27,15 +27,26 @@
 #   - optional: Can be completed but not required
 #   - done: Retrospective has been completed
 #
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
 # WORKFLOW NOTES:
 # ===============
 # - Epic transitions to 'in-progress' automatically when first story is created
 # - Stories can be worked in parallel if team capacity allows
-# - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+#
+# EPIC 3-5 STORY SUFFIXES (per epics.md, sprint-change-proposal 2026-07-12):
+# - X.0  = contract story (DTOs, Swagger, openapi.json, MSW handlers) — blocks both tracks
+# - X.Ya = backend story
+# - X.Yb = mobile story
+# - X.N  = integration/E2E story — the epic's demonstrable milestone
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-05-10T22:05:00-03:00"
+last_updated: "2026-07-12T18:35:48-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -43,45 +54,63 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 development_status:
   # === Epic 1: Fundação do Projeto e Infraestrutura ===
-  epic-1: in-progress
+  epic-1: done
   1-1-inicializacao-dos-projetos-e-repositorio: done
   1-2-schema-prisma-e-configuracao-do-banco-de-dados: done
   1-3-setup-effect-ts-e-composition-root: done
   1-4-infraestrutura-compartilhada-guards-filters-pipes: done
   1-5-setup-mobile-dependencias-e-configuracao-offline: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # === Epic 2: Identidade, Acesso e Organização ===
-  epic-2: in-progress
+  epic-2: done
   2-1-cadastro-de-empresa-e-seed-inicial: done
   2-2-autenticacao-login-e-refresh-token: done
   2-3-cadastro-e-gestao-de-motoristas: done
   2-4-cadastro-e-gestao-de-alunos: done
   2-5-crud-de-rotas-de-transporte: done
   2-6-vinculos-aluno-rota-e-motorista-rota: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # === Epic 3: Gestão de Viagens e Embarque Digital ===
+  # 1 story entregue (3.1, full-stack legado) + 8 stories (1 contrato, 2 backend, 4 mobile, 1 integração)
   epic-3: in-progress
-  3-1-iniciar-e-encerrar-viagem: ready-for-dev
-  3-2-geracao-e-exibicao-de-qr-code-do-aluno: backlog
-  3-3-escaneamento-de-qr-code-e-check-in: backlog
-  3-4-check-in-offline-com-sincronizacao: backlog
-  3-5-lista-de-alunos-e-status-de-embarque: backlog
+  3-0-contrato-de-api-embarque-digital: backlog
+  3-1-iniciar-e-encerrar-viagem: review
+  3-2b-geracao-e-exibicao-de-qr-code-do-aluno: backlog
+  3-3a-check-in-de-embarque: backlog
+  3-3b-escaneamento-de-qr-code: backlog
+  3-4b-check-in-offline-com-fila-de-sincronizacao: backlog
+  3-5a-lista-de-alunos-da-viagem-com-status: backlog
+  3-5b-lista-de-alunos-e-status-de-embarque: backlog
+  3-6-integracao-e-e2e-do-epico-3: backlog
   epic-3-retrospective: optional
 
   # === Epic 4: Notificação de Ausência e Comunicação ===
+  # 12 stories (1 contrato, 5 backend, 5 mobile, 1 integração)
   epic-4: backlog
-  4-1-notificacao-nao-vou-voltar: backlog
-  4-2-recebimento-de-notificacao-de-ausencia-pelo-motorista: backlog
-  4-3-cancelamento-de-ausencia-e-periodo-de-seguranca: backlog
-  4-4-lembrete-automatico-de-check-in-pendente: backlog
-  4-5-avisos-gerais-do-motorista-para-alunos: backlog
+  4-0-contrato-de-api-ausencia-e-comunicacao: backlog
+  4-1a-registro-de-ausencia-nao-vou-voltar: backlog
+  4-1b-botao-nao-vou-voltar: backlog
+  4-2a-canal-de-eventos-de-embarque-em-tempo-real-sse: backlog
+  4-2b-recebimento-de-ausencia-em-tempo-real: backlog
+  4-3a-cancelamento-de-ausencia-e-periodo-de-seguranca: backlog
+  4-3b-cancelamento-de-ausencia: backlog
+  4-4a-lembrete-automatico-de-check-in-pendente: backlog
+  4-4b-recebimento-do-lembrete-e-resposta-rapida: backlog
+  4-5a-avisos-gerais-do-motorista-broadcast: backlog
+  4-5b-envio-e-recebimento-de-avisos: backlog
+  4-6-integracao-e-e2e-do-epico-4: backlog
   epic-4-retrospective: optional
 
   # === Epic 5: Localização em Tempo Real ===
+  # 7 stories (1 contrato, 2 backend, 3 mobile, 1 integração)
   epic-5: backlog
-  5-1-transmissao-de-localizacao-gps-pelo-motorista: backlog
-  5-2-visualizacao-do-onibus-no-mapa-em-tempo-real: backlog
-  5-3-comportamento-degradado-e-perda-de-sinal-gps: backlog
+  5-0-contrato-de-api-localizacao-em-tempo-real: backlog
+  5-1a-ingestao-de-gps-redis-e-pub-sub: backlog
+  5-1b-transmissao-de-gps-durante-viagem-ativa: backlog
+  5-2a-sse-de-localizacao: backlog
+  5-2b-mapa-do-onibus-em-tempo-real: backlog
+  5-3b-comportamento-degradado-e-perda-de-sinal: backlog
+  5-4-integracao-e-e2e-do-epico-5: backlog
   epic-5-retrospective: optional

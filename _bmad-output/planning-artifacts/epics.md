@@ -1,6 +1,8 @@
 ---
 stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories', 'step-04-final-validation']
-inputDocuments: ['planning-artifacts/prd.md', 'planning-artifacts/architecture.md']
+inputDocuments: ['planning-artifacts/prd.md', 'planning-artifacts/architecture.md', 'planning-artifacts/sprint-change-proposal-2026-07-12.md']
+lastUpdated: '2026-07-12'
+revision: 'Épicos 3, 4 e 5 refatiados em trilhas backend/mobile com contrato OpenAPI-first (sprint-change-proposal-2026-07-12, aprovado). Épicos 1 e 2 e a Story 3.1 não foram alterados.'
 ---
 
 # PureUrban - Epic Breakdown
@@ -411,11 +413,61 @@ Para que o sistema saiba quem pode embarcar em qual rota e qual motorista opera 
 
 ---
 
+## Convenção de Fatiamento (Épicos 3, 4 e 5)
+
+A partir do Épico 3, as stories são fatiadas **por trilha de execução**, não como fatias verticais full-stack. A decisão está registrada no `sprint-change-proposal-2026-07-12.md` (aprovado em 12/07/2026). O objetivo é habilitar os dois desenvolvedores a trabalharem em paralelo dentro do mesmo épico, usando o contrato OpenAPI como ponto de sincronização.
+
+| Sufixo | Significado | Dono típico |
+|---|---|---|
+| `X.0` | Story de contrato — DTOs, controllers stub, decorators Swagger, `openapi.json`, tipos gerados + handlers MSW no mobile. Zero lógica. | Dev 1 (revisada pelo Dev 2) |
+| `X.Ya` | Story de **backend** — functional core (Effect) + shell (NestJS) + adapters + testes de domínio | Dev 1 |
+| `X.Yb` | Story de **mobile** — telas, stores, services, offline. Desenvolve contra handlers MSW. | Dev 2 |
+| `X.N` | Story de **integração** — mocks desligados, API real ligada, E2E do épico | Ambos |
+
+Stories sem contraparte na outra camada mantêm apenas o sufixo da camada que existe (ex.: o QR code é gerado localmente no dispositivo, então a Story 3.2b não tem par backend).
+
+**Regras que valem para todas as stories destes épicos:**
+
+- A story `X.0` é **bloqueante** para as duas trilhas do épico.
+- Nenhum endpoint aparece numa story `X.Ya` sem estar declarado no contrato da story `X.0`.
+- Tipos de API no mobile são **gerados** a partir de `api/openapi.json` — nunca escritos à mão.
+- A story `X.N` é o marco demonstrável do épico: antes dela, o épico não está entregue.
+
+> **Exceção:** a Story 3.1 foi implementada full-stack antes desta mudança e **não é refatiada**. Ela permanece como está, em `review`.
+
+---
+
 ## Epic 3: Gestão de Viagens e Embarque Digital
 
 Motorista inicia viagem, alunos fazem check-in via QR code, motorista vê lista de embarque atualizada com contagem — o fluxo principal do produto funciona end-to-end.
 
+**Composição:** 1 story entregue (3.1, full-stack) + 8 stories (1 contrato, 2 backend, 4 mobile, 1 integração).
+
+### Story 3.0: Contrato de API — Embarque Digital
+
+Como desenvolvedor,
+Quero o contrato da API de embarque acordado e versionado antes de qualquer implementação,
+Para que as trilhas de backend e mobile trabalhem em paralelo sem divergir.
+
+**Acceptance Criteria:**
+
+**Given** os endpoints de embarque ainda não existem
+**When** defino o contrato
+**Then** `POST /api/v1/boarding/check-in` está declarado com DTO de entrada, DTO de resposta e decorators Swagger completos (`@ApiTags`, `@ApiOperation`, `@ApiResponse`)
+**And** `GET /api/v1/trips/:id/students` está declarado com o shape da lista e os status possíveis (`CHECKED_IN`, `NOT_CHECKED_IN`, `NOT_RETURNING`)
+**And** o payload do QR code está especificado como schema compartilhado (`studentId`, `sessionId`, formato de codificação) — é o contrato entre a tela do aluno (3.2b) e a validação do backend (3.3a)
+**And** o header `X-Idempotency-Key` está documentado nos endpoints de escrita (pré-requisito do offline — Architecture §5, Tier 2)
+**And** os códigos de erro tipados estão declarados (`INVALID_QR_CODE`, `STUDENT_NOT_ALLOWED`, `TRIP_NOT_ACTIVE`, `DUPLICATE_CHECK_IN`)
+**And** `npm run openapi:export` gera `api/openapi.json` e o arquivo está commitado
+**And** o mobile gera `src/types/api.d.ts` a partir do `openapi.json` via `openapi-typescript`
+**And** handlers MSW para os endpoints do épico existem em `mobile/src/mocks/`, retornando respostas conformes ao contrato
+**And** os controllers retornam `501 Not Implemented` — o contrato existe, a lógica não
+
+**Camada:** Contrato · **Depende de:** — · **FRs:** habilitador (nenhum diretamente)
+
 ### Story 3.1: Iniciar e Encerrar Viagem (Backend + Mobile Motorista)
+
+> **Status: implementada** (commit `36c7409`), em `review`. Entregue no modelo full-stack anterior — **não é refatiada**. Mantida aqui na íntegra para preservar a rastreabilidade.
 
 Como motorista,
 Quero iniciar e encerrar viagens para minhas rotas,
@@ -435,7 +487,9 @@ Para que o sistema saiba quando o transporte está ativo.
 **And** apenas role `driver` pode iniciar/encerrar viagens
 **And** registro de horários de início e fim é persistido (FR14)
 
-### Story 3.2: Geração e Exibição de QR Code do Aluno
+**Camada:** Full-stack (legado) · **Depende de:** — · **FRs:** FR11, FR12, FR13, FR14
+
+### Story 3.2b: Geração e Exibição de QR Code do Aluno (Mobile Aluno)
 
 Como aluno,
 Quero ver meu QR code exclusivo no app,
@@ -445,13 +499,38 @@ Para que eu possa fazer check-in no embarque.
 
 **Given** aluno autenticado
 **When** acessa tela `(student)/qr-code.tsx`
-**Then** QR code é exibido contendo payload criptografado com `studentId` e `sessionId`
+**Then** QR code é exibido contendo o payload definido no schema compartilhado da Story 3.0 (`studentId`, `sessionId`)
 **And** QR code é estático por sessão de login (NFR8)
-**And** QR code é gerado localmente (sem chamada à API)
+**And** QR code é gerado localmente no dispositivo, sem chamada à API
 **And** tela exibe nome do aluno e rota vinculada
-**And** fluxo requer no máximo 2 toques para exibir QR code (NFR19)
+**And** fluxo requer no máximo 2 toques para exibir o QR code (NFR19)
+**And** o payload é validado contra o tipo gerado de `api.d.ts` — não há schema escrito à mão
 
-### Story 3.3: Escaneamento de QR Code e Check-in (Backend + Mobile Motorista)
+> **Nota:** não existe contraparte backend (`3.2a`) porque o QR é gerado no cliente. A validação do payload acontece na Story 3.3a, no check-in.
+
+**Camada:** Mobile · **Depende de:** 3.0 · **FRs:** FR15, FR17 · **NFRs:** NFR8, NFR19
+
+### Story 3.3a: Check-in de Embarque (Backend)
+
+Como sistema,
+Quero registrar o embarque de um aluno validando permissão e viagem ativa,
+Para que o motorista tenha controle digital de quem entrou no ônibus.
+
+**Acceptance Criteria:**
+
+**Given** viagem ativa e aluno com permissão
+**When** `POST /api/v1/boarding/check-in` recebe `studentId`, `tripId` e `X-Idempotency-Key`
+**Then** o check-in é persistido com timestamp e identificação do aluno (FR19)
+**And** o use case valida que o aluno está ativo e vinculado à rota da viagem (FR18)
+**And** QR inválido, aluno sem permissão ou viagem encerrada retornam tagged errors → HTTP com `{ error: { code, message } }` usando os códigos declarados em 3.0 (FR20)
+**And** requisição repetida com a mesma `X-Idempotency-Key` retorna o resultado anterior sem duplicar o check-in (Architecture §5 — pré-requisito da fila offline)
+**And** domain event `boarding.checked_in` é emitido via `WithEvents`
+**And** o processamento ocorre em menos de 2 segundos (NFR1)
+**And** os use cases do core são testados sem infraestrutura (< 100ms por suite)
+
+**Camada:** Backend · **Depende de:** 3.0 · **FRs:** FR18, FR19, FR20 · **NFRs:** NFR1, NFR16
+
+### Story 3.3b: Escaneamento de QR Code (Mobile Motorista)
 
 Como motorista,
 Quero escanear o QR code dos alunos para registrar embarque,
@@ -460,15 +539,17 @@ Para que eu tenha controle digital de quem entrou no ônibus.
 **Acceptance Criteria:**
 
 **Given** viagem ativa
-**When** motorista escaneia QR code válido via `(driver)/scan.tsx`
-**Then** POST `/api/v1/boarding/check-in` registra embarque com `studentId`, `tripId`, `timestamp`
-**And** sistema valida que aluno tem permissão ativa e está vinculado à rota (FR18)
-**And** QR code inválido, expirado ou de aluno sem permissão retorna erro com feedback visual claro (FR20)
-**And** check-in processado em menos de 2 segundos (NFR1)
-**And** domain event `boarding.checked_in` é emitido
-**And** câmera (`expo-camera`) abre rapidamente com área de escaneamento clara
+**When** motorista abre `(driver)/scan.tsx`
+**Then** a câmera (`expo-camera`) abre rapidamente com área de escaneamento clara
+**And** ao ler um QR válido, o app chama `POST /api/v1/boarding/check-in` **contra o handler MSW** e exibe feedback visual de sucesso
+**And** cada código de erro do contrato (`INVALID_QR_CODE`, `STUDENT_NOT_ALLOWED`, `TRIP_NOT_ACTIVE`, `DUPLICATE_CHECK_IN`) tem um feedback visual distinto e legível em movimento
+**And** o retorno visual acontece em menos de 2 segundos na percepção do usuário (NFR1)
+**And** a tela é operável com uma mão, com botões grandes e contraste alto (NFR18)
+**And** a story fecha sem que a Story 3.3a esteja pronta — a validação real é exercida na Story 3.6
 
-### Story 3.4: Check-in Offline com Sincronização
+**Camada:** Mobile · **Depende de:** 3.0 · **FRs:** FR16 · **NFRs:** NFR1, NFR18
+
+### Story 3.4b: Check-in Offline com Fila de Sincronização (Mobile Motorista)
 
 Como motorista,
 Quero registrar check-ins mesmo sem internet,
@@ -477,14 +558,39 @@ Para que trechos sem sinal não impeçam o embarque digital.
 **Acceptance Criteria:**
 
 **Given** motorista sem conexão de internet
-**When** escaneia QR code
-**Then** check-in é armazenado localmente via expo-sqlite com `syncStatus = PENDING`
-**And** quando conexão retorna, check-ins pendentes são sincronizados automaticamente via `offline-queue`
-**And** conflitos resolvidos via last-write-wins (NFR12)
-**And** interface exibe indicador "Modo Offline — dados serão sincronizados" (NFR13)
-**And** dados persistem mesmo com crash do app (NFR11)
+**When** escaneia um QR code
+**Then** o check-in é enfileirado em `expo-sqlite` conforme Architecture §5 Tier 2 — FIFO por `created_at`, limite de 500 itens
+**And** a interface exibe "Modo Offline — dados serão sincronizados" (NFR13)
+**And** cada item da fila exibe badge de estado (`✓` sincronizado, `⏳` pendente, `✗` falhou)
+**And** quando a conexão retorna, a fila é drenada automaticamente com backoff de 1s a 30s e no máximo 5 tentativas por item
+**And** cada requisição envia o header `X-Idempotency-Key` — a contraparte servidor já existe desde a Story 3.3a, então reenvios não duplicam check-ins (NFR12)
+**And** os dados persistem mesmo com crash do app (NFR11)
+**And** a falha da API não impede escanear e enfileirar novos check-ins (NFR14)
 
-### Story 3.5: Lista de Alunos e Status de Embarque (Backend + Mobile Motorista)
+> **Nota:** esta story deixou de ter parte backend. A idempotência foi puxada para a Story 3.3a, onde pertence conceitualmente — é uma propriedade do endpoint, não do offline.
+
+**Camada:** Mobile · **Depende de:** 3.3b · **FRs:** FR21 · **NFRs:** NFR11, NFR12, NFR13, NFR14
+
+### Story 3.5a: Lista de Alunos da Viagem com Status (Backend)
+
+Como sistema,
+Quero expor a lista de alunos da viagem com o status de embarque agregado,
+Para que o app do motorista saiba quem entrou e quem falta.
+
+**Acceptance Criteria:**
+
+**Given** uma viagem ativa
+**When** `GET /api/v1/trips/:id/students` é chamado por um motorista da rota
+**Then** a resposta lista todos os alunos vinculados à rota da viagem (FR22)
+**And** cada aluno traz seu status agregado: `CHECKED_IN`, `NOT_CHECKED_IN` ou `NOT_RETURNING` (FR23)
+**And** a resposta inclui a contagem resumida (`{ boarded, total }`) — não é calculada no cliente (FR25)
+**And** a query responde em menos de 1 segundo com 50+ alunos na rota (NFR4)
+**And** a lista é filtrada por `companyId` e só é acessível ao motorista atribuído à rota
+**And** o use case do core é testado sem infraestrutura (< 100ms por suite)
+
+**Camada:** Backend · **Depende de:** 3.3a · **FRs:** FR22, FR23, FR25 · **NFRs:** NFR4, NFR17
+
+### Story 3.5b: Lista de Alunos e Status de Embarque (Mobile Motorista)
 
 Como motorista,
 Quero ver a lista completa dos alunos da viagem com status de embarque,
@@ -494,12 +600,47 @@ Para que eu saiba quem entrou e quem falta.
 
 **Given** viagem ativa
 **When** motorista acessa `(driver)/student-list.tsx`
-**Then** lista exibe todos os alunos vinculados à rota com status: `embarcou`, `não embarcou`, `não vai voltar`
-**And** contagem resumida é exibida no topo (ex: "28/32 embarcados") (FR25)
-**And** lista atualiza em tempo real quando aluno faz check-in (FR23)
-**And** lista carrega em menos de 1 segundo (NFR4)
-**And** lista é acessível em modo offline via expo-sqlite (FR24)
-**And** interface otimizada para operação com uma mão — botões grandes, contraste alto (NFR18)
+**Then** a lista exibe todos os alunos com os status do contrato (`embarcou`, `não embarcou`, `não vai voltar`)
+**And** a contagem resumida aparece no topo (ex.: "28/32 embarcados") (FR25)
+**And** a lista é cacheada offline via TanStack Query `persistQueryClient` (Architecture §5, Tier 1) e continua legível sem rede (FR24)
+**And** um check-in feito na tela de scan reflete na lista sem recarregar a tela
+**And** a interface é otimizada para uma mão — botões grandes, contraste alto (NFR18)
+**And** a story é desenvolvida contra os handlers MSW da Story 3.0
+
+**Camada:** Mobile · **Depende de:** 3.0 · **FRs:** FR22, FR24, FR25 · **NFRs:** NFR18
+
+### Story 3.6: Integração e E2E do Épico 3
+
+Como desenvolvedor,
+Quero substituir os mocks pela API real e provar o fluxo end-to-end,
+Para que o épico seja considerado entregue de fato, não apenas nas duas metades.
+
+**Acceptance Criteria:**
+
+**Given** as trilhas API e Mobile do Épico 3 concluídas
+**When** desligo os handlers MSW e aponto o `api-client.ts` para a API real
+**Then** o fluxo completo funciona: motorista inicia viagem → aluno exibe QR → motorista escaneia → check-in registrado → lista atualiza com a contagem
+**And** o `openapi.json` commitado não diverge do gerado a partir do código (drift check)
+**And** teste E2E cobre o caminho feliz e a rejeição de QR inválido
+**And** teste E2E cobre o cenário offline: check-in sem rede → reconexão → sincronização sem duplicata
+**And** os tempos de resposta de NFR1 (< 2s no check-in) e NFR4 (< 1s na lista) são verificados contra a API real
+
+**Camada:** Integração · **Depende de:** 3.2b, 3.3a, 3.3b, 3.4b, 3.5a, 3.5b · **FRs:** valida FR11–FR25
+
+### Rastreabilidade FR → Story (Épico 3)
+
+| FR | Story |
+|---|---|
+| FR11, FR12, FR13, FR14 | 3.1 (entregue) |
+| FR15, FR17 | 3.2b |
+| FR16 | 3.3b |
+| FR18, FR19, FR20 | 3.3a |
+| FR21 | 3.4b |
+| FR22, FR25 | 3.5a + 3.5b |
+| FR23 | 3.5a (agregação) + 3.5b (exibição) |
+| FR24 | 3.5b |
+
+**Cobertura do épico: 15/15 FRs (FR11–FR25).**
 
 ---
 
@@ -507,7 +648,52 @@ Para que eu saiba quem entrou e quem falta.
 
 Aluno pode avisar "não vou voltar" com um toque, motorista recebe instantaneamente, sistema envia lembrete automático — o maior problema (espera indevida) é eliminado. Motorista pode enviar avisos gerais.
 
-### Story 4.1: Notificação "Não Vou Voltar" (Backend + Mobile Aluno)
+**Composição:** 12 stories (1 contrato, 5 backend, 5 mobile, 1 integração).
+
+### Story 4.0: Contrato de API — Ausência e Comunicação
+
+Como desenvolvedor,
+Quero o contrato de ausência e comunicação acordado e versionado antes da implementação,
+Para que as trilhas de backend e mobile trabalhem em paralelo sem divergir.
+
+**Acceptance Criteria:**
+
+**Given** os endpoints de ausência e comunicação ainda não existem
+**When** defino o contrato
+**Then** `POST /api/v1/boarding/not-returning` está declarado com DTO de entrada (`tripId`), DTO de resposta (incluindo `notifiedAt` e `cancellableUntil`) e decorators Swagger completos
+**And** `POST /api/v1/boarding/cancel-absence` está declarado
+**And** `POST /api/v1/boarding/broadcast` está declarado com a mensagem e a lista de avisos pré-definidos
+**And** `GET /api/v1/boarding/events` está declarado como stream SSE
+**And** o **formato dos eventos SSE** está declarado como schema compartilhado: `boarding.not_returning`, `boarding.absence_cancelled`, `boarding.broadcast` — o mobile precisa mockar esses eventos, então eles são contrato tanto quanto os endpoints REST
+**And** o endpoint de registro de push token do Expo está declarado (pré-requisito do lembrete automático da 4.4a)
+**And** os códigos de erro tipados estão declarados (`CANCELLATION_PERIOD_EXPIRED`, `ALREADY_NOT_RETURNING`, `STUDENT_NOT_ON_TRIP`, `TRIP_NOT_ACTIVE`)
+**And** o header `X-Idempotency-Key` está documentado nos endpoints de escrita
+**And** `npm run openapi:export` regenera `api/openapi.json` com os novos endpoints e o arquivo está commitado
+**And** o mobile regenera `src/types/api.d.ts` e cria handlers MSW para os endpoints REST **e** para o stream SSE
+**And** os controllers retornam `501 Not Implemented`
+
+**Camada:** Contrato · **Depende de:** Épico 3 concluído · **FRs:** habilitador
+
+### Story 4.1a: Registro de Ausência "Não Vou Voltar" (Backend)
+
+Como sistema,
+Quero registrar que um aluno não retornará na viagem de volta,
+Para que o motorista não precise esperar por ele.
+
+**Acceptance Criteria:**
+
+**Given** um aluno que fez check-in na viagem de ida
+**When** `POST /api/v1/boarding/not-returning` é chamado com `tripId`
+**Then** a ausência é persistida com `notifiedAt` (timestamp) e o status do aluno na viagem passa a `NOT_RETURNING` (FR26)
+**And** o use case valida que o aluno pertence à rota da viagem — caso contrário retorna `STUDENT_NOT_ON_TRIP`
+**And** notificar duas vezes retorna `ALREADY_NOT_RETURNING` sem duplicar o registro
+**And** domain event `boarding.not_returning` é emitido via `WithEvents`
+**And** a resposta inclui `cancellableUntil` (`notifiedAt` + 2 minutos) — o cliente não calcula essa janela
+**And** o use case do core é testado sem infraestrutura (< 100ms por suite)
+
+**Camada:** Backend · **Depende de:** 4.0 · **FRs:** FR26
+
+### Story 4.1b: Botão "Não Vou Voltar" (Mobile Aluno)
 
 Como aluno,
 Quero avisar com um toque que não retornarei no ônibus,
@@ -515,14 +701,38 @@ Para que o motorista não precise esperar por mim.
 
 **Acceptance Criteria:**
 
-**Given** aluno que fez check-in na ida
-**When** toca "Não vou voltar" na tela `(student)/home.tsx`
-**Then** POST `/api/v1/boarding/not-returning` registra ausência com `studentId`, `tripId`
-**And** fluxo requer no máximo 2 toques (NFR19) — botão proeminente na tela principal
-**And** domain event `boarding.not_returning` é emitido
-**And** sistema registra `notifiedAt` com timestamp
+**Given** aluno autenticado com viagem de retorno ativa na sua rota
+**When** acessa `(student)/home.tsx`
+**Then** o botão "Não vou voltar" é proeminente na tela principal
+**And** o fluxo completo exige no máximo 2 toques, incluindo a confirmação (NFR19)
+**And** após confirmar, a tela mostra o estado "Ausência registrada" com o countdown de cancelamento alimentado por `cancellableUntil` do contrato
+**And** os erros do contrato (`ALREADY_NOT_RETURNING`, `STUDENT_NOT_ON_TRIP`, `TRIP_NOT_ACTIVE`) têm mensagens claras ao aluno
+**And** a story é desenvolvida contra os handlers MSW da Story 4.0
 
-### Story 4.2: Recebimento de Notificação de Ausência pelo Motorista
+**Camada:** Mobile (Aluno) · **Depende de:** 4.0 · **FRs:** FR26 · **NFRs:** NFR19
+
+### Story 4.2a: Canal de Eventos de Embarque em Tempo Real — SSE (Backend)
+
+Como sistema,
+Quero publicar os eventos de embarque num canal em tempo real,
+Para que o app do motorista reflita ausências e avisos sem polling.
+
+**Acceptance Criteria:**
+
+**Given** os domain events de embarque sendo emitidos pelo core
+**When** um evento `boarding.not_returning`, `boarding.absence_cancelled` ou `boarding.broadcast` é despachado
+**Then** ele é publicado no Redis Pub/Sub pelo shell
+**And** `GET /api/v1/boarding/events` faz subscribe no canal e faz streaming SSE para o cliente, filtrado por `tripId` e `companyId`
+**And** o payload de cada evento segue exatamente o schema declarado na Story 4.0
+**And** a latência entre o registro da ausência e a entrega do evento ao cliente é menor que 3 segundos (NFR3)
+**And** a conexão SSE é encerrada elegantemente quando a viagem termina
+**And** apenas o motorista atribuído à rota consegue abrir o stream daquela viagem
+
+> **Nota de decomposição:** a Story 4.2 original misturava a infraestrutura de entrega com a experiência na tela. Esta story é só a infraestrutura; a experiência é a 4.2b.
+
+**Camada:** Backend · **Depende de:** 4.1a · **FRs:** FR27 (entrega) · **NFRs:** NFR3
+
+### Story 4.2b: Recebimento de Ausência em Tempo Real (Mobile Motorista)
 
 Como motorista,
 Quero ser notificado instantaneamente quando um aluno informa que não retornará,
@@ -530,14 +740,38 @@ Para que eu possa partir sem espera desnecessária.
 
 **Acceptance Criteria:**
 
-**Given** viagem de retorno ativa
-**When** aluno notifica "não vou voltar"
-**Then** motorista recebe atualização na lista de alunos em menos de 3 segundos (NFR3)
-**And** na `(driver)/student-list.tsx`, o status do aluno muda para `NÃO VAI VOLTAR` com destaque visual
-**And** contagem resumida atualiza automaticamente (ex: "28/32" → "28/31")
-**And** notificação de ausência aparece como alerta/toast contextual no app do motorista
+**Given** viagem de retorno ativa e a tela `(driver)/student-list.tsx` aberta
+**When** chega um evento SSE `boarding.not_returning`
+**Then** o status do aluno na lista muda para `NÃO VAI VOLTAR` com destaque visual (FR28)
+**And** a contagem resumida se ajusta automaticamente (ex.: "28/32" → "28/31")
+**And** um toast contextual anuncia a ausência sem bloquear a tela
+**And** um evento `boarding.absence_cancelled` reverte o status e a contagem
+**And** a reconexão do EventSource é automática após queda de rede, sem duplicar entradas na lista
+**And** a story é desenvolvida contra o stream SSE mockado da Story 4.0
 
-### Story 4.3: Cancelamento de Ausência e Período de Segurança
+**Camada:** Mobile (Motorista) · **Depende de:** 4.0 · **FRs:** FR27, FR28 · **NFRs:** NFR3, NFR18
+
+### Story 4.3a: Cancelamento de Ausência e Período de Segurança (Backend)
+
+Como sistema,
+Quero permitir o cancelamento da ausência dentro de uma janela de 2 minutos,
+Para que um toque acidental do aluno não vire uma decisão irreversível.
+
+**Acceptance Criteria:**
+
+**Given** um aluno que notificou "não vou voltar" há menos de 2 minutos
+**When** `POST /api/v1/boarding/cancel-absence` é chamado
+**Then** a ausência é revertida e o status do aluno volta a `NOT_CHECKED_IN` (FR29)
+**And** domain event `boarding.absence_cancelled` é emitido via `WithEvents`
+**Given** a janela de 2 minutos expirada
+**When** o aluno tenta cancelar
+**Then** o sistema retorna o tagged error `CANCELLATION_PERIOD_EXPIRED`
+**And** a regra dos 2 minutos vive no functional core, testável isoladamente com relógio injetado (< 100ms por suite)
+**And** a duração da janela é configuração do core, não um número mágico espalhado pelo código
+
+**Camada:** Backend · **Depende de:** 4.1a · **FRs:** FR29
+
+### Story 4.3b: Cancelamento de Ausência (Mobile Aluno)
 
 Como aluno,
 Quero poder cancelar minha notificação de ausência dentro de um período seguro,
@@ -545,45 +779,125 @@ Para que eu possa mudar de ideia caso tenha apertado por engano.
 
 **Acceptance Criteria:**
 
-**Given** aluno que notificou "não vou voltar"
-**When** toca "Cancelar" dentro de 2 minutos
-**Then** POST `/api/v1/boarding/cancel-absence` reverte o status
-**And** domain event `boarding.absence_cancelled` é emitido
-**And** motorista recebe atualização do status revertido na lista
-**Given** período de 2 minutos expirado
-**When** aluno tenta cancelar
-**Then** sistema retorna erro `CANCELLATION_PERIOD_EXPIRED`
-**And** confirmação push antes de consolidar a ausência (após período)
+**Given** aluno que acabou de notificar "não vou voltar"
+**When** a tela `(student)/home.tsx` está aberta
+**Then** um botão "Cancelar" é exibido com countdown regressivo alimentado por `cancellableUntil` — o cliente **exibe** a janela, não a decide
+**And** ao tocar "Cancelar" dentro da janela, o estado volta a "Retorno confirmado"
+**And** quando a janela expira, o botão desaparece e a ausência é apresentada como consolidada
+**And** o erro `CANCELLATION_PERIOD_EXPIRED` (corrida entre o toque e a expiração) é tratado com mensagem clara, sem travar a tela
+**And** a story é desenvolvida contra os handlers MSW da Story 4.0
 
-### Story 4.4: Lembrete Automático de Check-in Pendente
+**Camada:** Mobile (Aluno) · **Depende de:** 4.1b · **FRs:** FR29 · **NFRs:** NFR19
+
+### Story 4.4a: Lembrete Automático de Check-in Pendente (Backend)
+
+Como sistema,
+Quero lembrar automaticamente o aluno que embarcou na ida mas não fez check-in na volta,
+Para que o motorista não espere sem necessidade — a jornada da Ana.
+
+**Acceptance Criteria:**
+
+**Given** um aluno que fez check-in na viagem de ida e uma viagem de retorno ativa na mesma rota
+**When** passam 15 minutos do início da viagem de retorno sem check-in nem ausência registrada do aluno
+**Then** um scheduler dispara uma push notification via Expo Push: "Você vai retornar? Toque para confirmar" (FR30)
+**And** a notificação carrega os dados de ação (`tripId`, `studentId`) para permitir a resposta rápida da Story 4.4b
+**And** o lembrete é enviado no máximo uma vez por aluno por viagem
+**And** alunos que já notificaram ausência ou já fizeram check-in de retorno não recebem lembrete
+**And** o período (15 min) é configuração do core, testável com relógio injetado
+**And** o disparo do scheduler é lógica do shell; a decisão de "quem deve ser lembrado" é um use case do core, testado sem infraestrutura
+
+**Camada:** Backend · **Depende de:** 4.1a · **FRs:** FR30
+
+### Story 4.4b: Recebimento do Lembrete e Resposta Rápida (Mobile Aluno)
 
 Como aluno que embarcou na ida mas não fez check-in na volta,
 Quero receber um lembrete perguntando se vou retornar,
-Para que o motorista não precise esperar sem necessidade.
+Para que eu possa responder sem abrir o app.
 
 **Acceptance Criteria:**
 
-**Given** aluno fez check-in na ida e viagem de retorno está ativa
-**When** aluno não fez check-in de retorno após período definido (ex: 15 min após início da viagem de volta)
-**Then** sistema envia notificação push: "Você vai retornar? Toque para confirmar"
-**And** aluno pode responder "Não vou voltar" diretamente da notificação
-**And** resposta gera os mesmos efeitos da Story 4.1
-**And** jornada da Ana (edge case) é coberta
+**Given** o app do aluno com push token registrado no backend
+**When** o lembrete da Story 4.4a chega
+**Then** a notificação é exibida com a ação "Não vou voltar" respondível direto da notificação
+**And** responder pela notificação produz exatamente os mesmos efeitos do botão da Story 4.1b (mesma chamada, mesmo estado)
+**And** tocar a notificação sem responder abre `(student)/home.tsx` no estado correto
+**And** o registro do push token acontece no login e é revogado no logout
+**And** a jornada da Ana (edge case do PRD) é coberta ponta a ponta
+**And** a story é desenvolvida contra os handlers MSW da Story 4.0
 
-### Story 4.5: Avisos Gerais do Motorista para Alunos
+**Camada:** Mobile (Aluno) · **Depende de:** 4.1b · **FRs:** FR30 · **NFRs:** NFR19
 
-Como motorista,
-Quero enviar avisos para todos os alunos da minha rota,
-Para que eu possa comunicar atrasos ou mudanças.
+### Story 4.5a: Avisos Gerais do Motorista — Broadcast (Backend)
+
+Como sistema,
+Quero entregar avisos do motorista a todos os alunos da rota,
+Para que atrasos e mudanças sejam comunicados sem ligação telefônica.
 
 **Acceptance Criteria:**
 
-**Given** motorista autenticado com rota
-**When** envia aviso via POST `/api/v1/boarding/broadcast` com mensagem de texto
-**Then** aviso é persistido e entregue a todos os alunos vinculados à rota
-**And** alunos recebem aviso na tela `(student)/home.tsx` como notificação in-app
-**And** motorista pode enviar avisos pré-definidos (ex: "Atraso de 15 minutos", "Mudança de ponto") ou texto livre
-**And** apenas role `driver` pode enviar avisos
+**Given** motorista autenticado com rota atribuída
+**When** `POST /api/v1/boarding/broadcast` é chamado com uma mensagem
+**Then** o aviso é persistido com autor, rota, `tripId` e timestamp (FR36)
+**And** o evento `boarding.broadcast` é publicado e entregue a todos os alunos vinculados à rota pelo canal SSE da Story 4.2a
+**And** apenas a role `driver` pode enviar avisos (RolesGuard)
+**And** o motorista só consegue enviar avisos para rotas atribuídas a ele
+**And** a mensagem é validada via Effect Schema (não vazia, limite de tamanho) — erro de validação retorna 400 tipado
+**And** o use case do core é testado sem infraestrutura
+
+**Camada:** Backend · **Depende de:** 4.2a · **FRs:** FR36
+
+### Story 4.5b: Envio e Recebimento de Avisos (Mobile Motorista + Aluno)
+
+Como motorista, quero enviar avisos aos alunos da minha rota; como aluno, quero recebê-los,
+Para que atrasos e mudanças cheguem a todos de uma vez.
+
+**Acceptance Criteria:**
+
+**Given** motorista com viagem ativa
+**When** abre o compositor de avisos na tela do motorista
+**Then** pode escolher um aviso pré-definido (ex.: "Atraso de 15 minutos", "Mudança de ponto") ou digitar texto livre
+**And** o envio é confirmado visualmente e o fluxo cabe em poucos toques com uma mão (NFR18, NFR19)
+**Given** aluno com o app aberto
+**When** chega um evento SSE `boarding.broadcast` da sua rota
+**Then** o aviso aparece em `(student)/home.tsx` como notificação in-app (FR37)
+**And** os avisos recentes da viagem ficam acessíveis (não somem ao serem dispensados)
+**And** a story é desenvolvida contra o stream SSE mockado da Story 4.0
+
+**Camada:** Mobile (Motorista + Aluno) · **Depende de:** 4.2b · **FRs:** FR36, FR37 · **NFRs:** NFR18, NFR19
+
+### Story 4.6: Integração e E2E do Épico 4
+
+Como desenvolvedor,
+Quero substituir os mocks pela API real e provar os fluxos de ausência e comunicação end-to-end,
+Para que o épico seja considerado entregue de fato.
+
+**Acceptance Criteria:**
+
+**Given** as trilhas API e Mobile do Épico 4 concluídas
+**When** desligo os handlers MSW (REST e SSE) e aponto o app para a API real
+**Then** o fluxo completo funciona: aluno toca "não vou voltar" → motorista vê o status mudar e a contagem se ajustar em menos de 3 segundos (NFR3)
+**And** o fluxo de cancelamento funciona dentro da janela e é corretamente rejeitado fora dela
+**And** o lembrete automático dispara para um aluno que embarcou na ida e não fez check-in na volta, e a resposta pela notificação registra a ausência
+**And** um aviso enviado pelo motorista chega a todos os alunos da rota
+**And** o `openapi.json` commitado não diverge do gerado a partir do código (drift check)
+**And** teste E2E cobre: notificar ausência, cancelar dentro da janela, tentar cancelar fora da janela, receber aviso geral
+**And** a latência de NFR3 é medida contra a API real, não contra mock
+
+**Camada:** Integração · **Depende de:** 4.1a–4.5b · **FRs:** valida FR26–FR30, FR36, FR37
+
+### Rastreabilidade FR → Story (Épico 4)
+
+| FR | Story |
+|---|---|
+| FR26 | 4.1a + 4.1b |
+| FR27 | 4.2a (entrega) + 4.2b (recebimento) |
+| FR28 | 4.2b |
+| FR29 | 4.3a + 4.3b |
+| FR30 | 4.4a + 4.4b |
+| FR36 | 4.5a + 4.5b |
+| FR37 | 4.5b |
+
+**Cobertura do épico: 7/7 FRs (FR26–FR30, FR36, FR37).**
 
 ---
 
@@ -591,23 +905,90 @@ Para que eu possa comunicar atrasos ou mudanças.
 
 Aluno vê o ônibus no mapa em tempo real, motorista transmite GPS automaticamente durante viagens — ansiedade de espera no ponto eliminada.
 
-### Story 5.1: Transmissão de Localização GPS pelo Motorista
+**Composição:** 7 stories (1 contrato, 2 backend, 3 mobile, 1 integração).
 
-Como motorista,
-Quero que minha localização GPS seja transmitida automaticamente durante viagens,
-Para que alunos possam me acompanhar em tempo real.
+### Story 5.0: Contrato de API — Localização em Tempo Real
+
+Como desenvolvedor,
+Quero o contrato de rastreamento acordado e versionado antes da implementação,
+Para que as trilhas de backend e mobile trabalhem em paralelo sem divergir.
 
 **Acceptance Criteria:**
 
-**Given** viagem ativa (evento `trip.started` recebido)
-**When** app do motorista está aberto
-**Then** localização GPS é enviada via POST `/api/v1/tracking/location` a cada 5 segundos
-**And** localização é armazenada no Redis com TTL curto (sobrescrita contínua)
-**And** Redis Pub/Sub publica evento `location.updated` com coordenadas, `tripId`, `timestamp`
-**And** transmissão para automaticamente quando viagem é encerrada (evento `trip.ended`) (FR33)
-**And** GPS não é coletado fora de viagens ativas (NFR10)
+**Given** os endpoints de rastreamento ainda não existem
+**When** defino o contrato
+**Then** `POST /api/v1/tracking/location` está declarado com DTO de entrada (`tripId`, `latitude`, `longitude`, `accuracy`, `capturedAt`) e decorators Swagger completos
+**And** `GET /api/v1/tracking/trips/:id/stream` está declarado como stream SSE
+**And** `GET /api/v1/tracking/trips/:id/location` está declarado para o **último ponto conhecido** — é o estado inicial do mapa antes do primeiro evento SSE chegar (pré-requisito da Story 5.3b)
+**And** o formato do evento `location.updated` está declarado como schema compartilhado (coordenadas, `tripId`, `timestamp`)
+**And** os códigos de erro tipados estão declarados (`TRIP_NOT_ACTIVE`, `NO_LOCATION_AVAILABLE`)
+**And** `npm run openapi:export` regenera `api/openapi.json` e o arquivo está commitado
+**And** o mobile regenera `src/types/api.d.ts` e cria handlers MSW capazes de **emitir uma sequência de eventos `location.updated`** — o mock precisa simular movimento, não só uma resposta estática
+**And** os controllers retornam `501 Not Implemented`
 
-### Story 5.2: Visualização do Ônibus no Mapa em Tempo Real (Mobile Aluno)
+**Camada:** Contrato · **Depende de:** Épico 4 concluído · **FRs:** habilitador
+
+### Story 5.1a: Ingestão de GPS — Redis e Pub/Sub (Backend)
+
+Como sistema,
+Quero receber e distribuir as coordenadas do motorista,
+Para que os alunos possam acompanhar o ônibus em tempo real.
+
+**Acceptance Criteria:**
+
+**Given** uma viagem ativa
+**When** `POST /api/v1/tracking/location` recebe as coordenadas do motorista
+**Then** a posição é armazenada no Redis com TTL curto, sobrescrevendo a anterior (FR35)
+**And** o Redis Pub/Sub publica `location.updated` com coordenadas, `tripId` e `timestamp`
+**And** coordenadas enviadas para uma viagem não ativa são rejeitadas com `TRIP_NOT_ACTIVE`
+**And** `GET /api/v1/tracking/trips/:id/location` retorna o último ponto conhecido ou `NO_LOCATION_AVAILABLE`
+**And** posições **não são persistidas no PostgreSQL** — o histórico de trajeto está fora do escopo do MVP (Architecture: Redis é o único store de localização)
+**And** apenas o motorista atribuído à viagem pode enviar coordenadas
+**And** a lógica de ingestão é testada sem infraestrutura real (Redis via port do core)
+
+**Camada:** Backend · **Depende de:** 5.0 · **FRs:** FR35
+
+### Story 5.1b: Transmissão de GPS durante Viagem Ativa (Mobile Motorista)
+
+Como motorista,
+Quero que minha localização seja transmitida automaticamente durante as viagens,
+Para que os alunos possam me acompanhar sem que eu precise fazer nada.
+
+**Acceptance Criteria:**
+
+**Given** o motorista inicia uma viagem
+**When** a viagem passa a `ACTIVE`
+**Then** o app começa a capturar GPS via `expo-location` e envia a posição a cada 5 segundos (FR31)
+**And** a permissão de localização é solicitada com justificativa clara antes da primeira viagem
+**Given** a viagem é encerrada
+**When** o app recebe/observa o fim da viagem
+**Then** a captura de GPS **para automaticamente** (FR33)
+**And** o GPS não é coletado em nenhum momento fora de uma viagem ativa (NFR10) — o start/stop é amarrado ao ciclo de vida da viagem, nunca a um toque manual do motorista
+**And** perda temporária de rede não derruba a captura: as posições são descartadas (não enfileiradas — posição velha não tem valor), e o envio retoma sozinho
+**And** a story é desenvolvida contra os handlers MSW da Story 5.0
+
+**Camada:** Mobile (Motorista) · **Depende de:** 5.0 · **FRs:** FR31, FR33 · **NFRs:** NFR10
+
+### Story 5.2a: SSE de Localização (Backend)
+
+Como sistema,
+Quero fazer streaming das posições do ônibus para os alunos da rota,
+Para que o mapa deles atualize sem polling.
+
+**Acceptance Criteria:**
+
+**Given** um aluno vinculado à rota de uma viagem ativa
+**When** abre `GET /api/v1/tracking/trips/:id/stream`
+**Then** o `tracking-sse.controller.ts` faz subscribe no canal Redis Pub/Sub daquela viagem e faz streaming dos eventos `location.updated` (FR35)
+**And** o evento entregue segue exatamente o schema declarado na Story 5.0
+**And** a latência entre o `POST` do motorista e a entrega ao aluno é menor que 5 segundos (NFR2)
+**And** apenas alunos vinculados à rota conseguem abrir o stream daquela viagem (validação de permissão — FR6)
+**And** a conexão SSE é encerrada elegantemente quando a viagem termina
+**And** múltiplos alunos assistindo à mesma viagem compartilham o mesmo subscribe (não abre uma conexão Redis por cliente)
+
+**Camada:** Backend · **Depende de:** 5.1a · **FRs:** FR35 · **NFRs:** NFR2
+
+### Story 5.2b: Mapa do Ônibus em Tempo Real (Mobile Aluno)
 
 Como aluno,
 Quero ver a localização do ônibus no mapa em tempo real,
@@ -615,26 +996,90 @@ Para que eu saiba quando ele vai chegar ao meu ponto.
 
 **Acceptance Criteria:**
 
-**Given** viagem ativa para a rota do aluno
-**When** aluno acessa `(student)/track-bus.tsx`
-**Then** mapa exibe posição do ônibus atualizada via SSE (EventSource)
-**And** atualizações entregues com latência máxima de 5 segundos (NFR2)
-**And** SSE controller (`tracking-sse.controller.ts`) faz subscribe no Redis Pub/Sub e streaming para o cliente
-**And** mapa exibe rota do ônibus com marcador animado
+**Given** viagem ativa na rota do aluno
+**When** o aluno acessa `(student)/track-bus.tsx`
+**Then** o mapa carrega com o último ponto conhecido (`GET /tracking/trips/:id/location`) e depois passa a atualizar via SSE (EventSource) (FR32)
+**And** o marcador do ônibus é animado entre posições, sem "pular" a cada evento
+**And** as atualizações aparecem com latência máxima de 5 segundos na percepção do aluno (NFR2)
+**And** a tela é utilizável em dispositivo de 5" a 720p (NFR20)
+**And** a story é desenvolvida contra o stream SSE mockado da Story 5.0, que emite uma sequência de posições
 
-### Story 5.3: Comportamento Degradado e Perda de Sinal GPS
+**Camada:** Mobile (Aluno) · **Depende de:** 5.0 · **FRs:** FR32 · **NFRs:** NFR2, NFR20
+
+### Story 5.3b: Comportamento Degradado e Perda de Sinal (Mobile Aluno)
 
 Como aluno,
-Quero ver a última localização conhecida quando o GPS perde sinal,
+Quero ver a última localização conhecida quando o sinal cai,
 Para que eu tenha alguma referência mesmo em áreas sem cobertura.
 
 **Acceptance Criteria:**
 
-**Given** motorista perde sinal GPS
-**When** nenhuma atualização chega por mais de 15 segundos
-**Then** mapa exibe último ponto conhecido com indicador visual "Sem sinal GPS" (FR34)
-**And** quando sinal retorna, mapa atualiza automaticamente para posição atual
-**Given** viagem encerrada
-**When** aluno acessa o mapa
-**Then** mensagem "Nenhuma viagem ativa no momento" é exibida
-**And** SSE connection é encerrada elegantemente quando viagem termina
+**Given** o mapa aberto com o ônibus em movimento
+**When** nenhum evento `location.updated` chega por mais de 15 segundos
+**Then** o mapa mantém o último ponto conhecido com o indicador visual "Sem sinal GPS" (FR34)
+**And** quando os eventos voltam, o indicador some e o mapa atualiza para a posição atual
+**Given** a viagem encerrada
+**When** o aluno acessa o mapa
+**Then** a mensagem "Nenhuma viagem ativa no momento" é exibida
+**And** a conexão SSE é encerrada elegantemente
+**And** a reconexão do EventSource após queda de rede é automática, com backoff
+
+> **Nota de decomposição:** esta story é mobile-only. "Último ponto conhecido" e "sem sinal há 15s" são estado de cliente — o backend não precisa saber que o sinal caiu, porque a **ausência de eventos já é o sinal**.
+
+**Camada:** Mobile (Aluno) · **Depende de:** 5.2b · **FRs:** FR34 · **NFRs:** NFR13
+
+### Story 5.4: Integração e E2E do Épico 5
+
+Como desenvolvedor,
+Quero substituir os mocks pela API real e provar o rastreamento end-to-end,
+Para que o épico seja considerado entregue de fato.
+
+**Acceptance Criteria:**
+
+**Given** as trilhas API e Mobile do Épico 5 concluídas
+**When** desligo os handlers MSW e aponto o app para a API real
+**Then** o fluxo completo funciona: motorista inicia viagem → GPS começa a transmitir → aluno abre o mapa e vê o ônibus se movendo
+**And** encerrar a viagem interrompe a transmissão de GPS e encerra o stream do aluno (FR33, NFR10)
+**And** o `openapi.json` commitado não diverge do gerado a partir do código (drift check)
+**And** teste E2E cobre o caminho feliz (ônibus se movendo no mapa) e o degradado (sem eventos por 15s → "Sem sinal GPS" → recuperação)
+**And** a latência de NFR2 (< 5s) é medida contra a API real, não contra mock
+
+**Camada:** Integração · **Depende de:** 5.1a–5.3b · **FRs:** valida FR31–FR35
+
+### Rastreabilidade FR → Story (Épico 5)
+
+| FR | Story |
+|---|---|
+| FR31 | 5.1b |
+| FR32 | 5.2b |
+| FR33 | 5.1b (parada automática) + 5.4 (validação E2E) |
+| FR34 | 5.3b |
+| FR35 | 5.1a (Redis + Pub/Sub) + 5.2a (SSE) |
+
+**Cobertura do épico: 5/5 FRs (FR31–FR35).**
+
+---
+
+## Validação de Cobertura Total
+
+| Épico | FRs cobertos | Qtd |
+|---|---|---|
+| Epic 1 | Nenhum (habilitador técnico) | 0 |
+| Epic 2 | FR1–FR10 | 10 |
+| Epic 3 | FR11–FR25 | 15 |
+| Epic 4 | FR26–FR30, FR36, FR37 | 7 |
+| Epic 5 | FR31–FR35 | 5 |
+| **Total** | | **37/37** |
+
+O refatiamento dos Épicos 3, 4 e 5 em trilhas **não removeu nem realocou nenhum FR** — apenas redistribuiu FRs entre stories *dentro* do mesmo épico. O `FR Coverage Map` (FR → Épico) permanece válido e inalterado.
+
+### Contagem de Stories
+
+| Épico | Antes | Depois | Detalhe |
+|---|---|---|---|
+| Epic 1 | 5 | 5 | intocado (done) |
+| Epic 2 | 6 | 6 | intocado (done) |
+| Epic 3 | 5 | 9 | 1 entregue + 1 contrato + 2 backend + 4 mobile + 1 integração |
+| Epic 4 | 5 | 12 | 1 contrato + 5 backend + 5 mobile + 1 integração |
+| Epic 5 | 3 | 7 | 1 contrato + 2 backend + 3 mobile + 1 integração |
+| **Total** | **24** | **39** | 12 stories restantes viram 27 |
