@@ -1,5 +1,5 @@
 # generated: 2026-03-25T21:46:25-03:00
-# last_updated: 2026-07-12T18:35:48-03:00
+# last_updated: 2026-07-12T23:05:00-03:00
 # project: pureurban
 # project_key: NOKEY
 # tracking_system: file-system
@@ -46,7 +46,7 @@
 # - X.N  = integration/E2E story — the epic's demonstrable milestone
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-07-12T18:35:48-03:00"
+last_updated: "2026-07-12T23:05:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -75,7 +75,7 @@ development_status:
   # === Epic 3: Gestão de Viagens e Embarque Digital ===
   # 1 story entregue (3.1, full-stack legado) + 8 stories (1 contrato, 2 backend, 4 mobile, 1 integração)
   epic-3: in-progress
-  3-0-contrato-de-api-embarque-digital: backlog
+  3-0-contrato-de-api-embarque-digital: done
   3-1-iniciar-e-encerrar-viagem: review
   3-2b-geracao-e-exibicao-de-qr-code-do-aluno: backlog
   3-3a-check-in-de-embarque: backlog

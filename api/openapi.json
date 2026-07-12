@@ -1,0 +1,1570 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/api/v1/health/effect": {
+      "get": {
+        "operationId": "AppController_healthEffect",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Empresa e admin criados com sucesso"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "409": {
+            "description": "Email já cadastrado (EMAIL_ALREADY_EXISTS)"
+          }
+        },
+        "summary": "Registrar empresa e admin",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login realizado com sucesso"
+          },
+          "401": {
+            "description": "Credenciais inválidas (INVALID_CREDENTIALS)"
+          }
+        },
+        "summary": "Login de usuário",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens renovados com sucesso"
+          },
+          "400": {
+            "description": "Body inválido (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Refresh token inválido (INVALID_REFRESH_TOKEN)"
+          }
+        },
+        "summary": "Renovar tokens via refresh token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/drivers": {
+      "post": {
+        "operationId": "DriverController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Motorista criado com sucesso"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Email já cadastrado (EMAIL_ALREADY_EXISTS)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cadastrar motorista",
+        "tags": [
+          "drivers"
+        ]
+      },
+      "get": {
+        "operationId": "DriverController_list",
+        "parameters": [
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por status ativo/inativo",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de motoristas"
+          },
+          "400": {
+            "description": "Valor inválido para isActive"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar motoristas da empresa",
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/api/v1/drivers/{id}": {
+      "get": {
+        "operationId": "DriverController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dados do motorista"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "404": {
+            "description": "Motorista não encontrado (DRIVER_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalhar motorista",
+        "tags": [
+          "drivers"
+        ]
+      },
+      "patch": {
+        "operationId": "DriverController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefineClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Motorista atualizado"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "404": {
+            "description": "Motorista não encontrado (DRIVER_NOT_FOUND)"
+          },
+          "409": {
+            "description": "Email já cadastrado (EMAIL_ALREADY_EXISTS)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar motorista",
+        "tags": [
+          "drivers"
+        ]
+      },
+      "delete": {
+        "operationId": "DriverController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Motorista desativado"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "404": {
+            "description": "Motorista não encontrado (DRIVER_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desativar motorista (soft delete)",
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/api/v1/students": {
+      "post": {
+        "operationId": "StudentController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Aluno criado com sucesso"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "409": {
+            "description": "Email já cadastrado (EMAIL_ALREADY_EXISTS)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cadastrar aluno",
+        "tags": [
+          "students"
+        ]
+      },
+      "get": {
+        "operationId": "StudentController_list",
+        "parameters": [
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por status ativo/inativo",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de alunos"
+          },
+          "400": {
+            "description": "Valor inválido para isActive"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar alunos da empresa",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{id}": {
+      "get": {
+        "operationId": "StudentController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dados do aluno"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "404": {
+            "description": "Aluno não encontrado (STUDENT_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalhar aluno",
+        "tags": [
+          "students"
+        ]
+      },
+      "patch": {
+        "operationId": "StudentController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefineClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aluno atualizado"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "404": {
+            "description": "Aluno não encontrado (STUDENT_NOT_FOUND)"
+          },
+          "409": {
+            "description": "Email já cadastrado (EMAIL_ALREADY_EXISTS)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar aluno",
+        "tags": [
+          "students"
+        ]
+      },
+      "delete": {
+        "operationId": "StudentController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Aluno desativado"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado"
+          },
+          "404": {
+            "description": "Aluno não encontrado (STUDENT_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desativar aluno (soft delete)",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/trips": {
+      "post": {
+        "operationId": "TripController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTripDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Viagem criada com sucesso"
+          },
+          "403": {
+            "description": "Acesso negado — somente motoristas"
+          },
+          "409": {
+            "description": "Motorista já possui viagem ativa"
+          }
+        },
+        "summary": "Iniciar nova viagem (OUTBOUND ou RETURN)",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{id}/end": {
+      "patch": {
+        "operationId": "TripController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Viagem encerrada com sucesso"
+          },
+          "400": {
+            "description": "Viagem não está ativa"
+          },
+          "404": {
+            "description": "Viagem não encontrada"
+          }
+        },
+        "summary": "Encerrar viagem ativa",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/active": {
+      "get": {
+        "operationId": "TripController_getActive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Viagem ativa ou null"
+          }
+        },
+        "summary": "Obter viagem ativa do motorista",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{id}/students": {
+      "get": {
+        "description": "Contrato declarado — implementação na Story 3.5a.",
+        "operationId": "TripController_getStudents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID da viagem",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de alunos da viagem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/TripStudentsResponseDto"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado — somente motoristas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "TRIP_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "NOT_IMPLEMENTED — contrato declarado, implementação na Story 3.5a",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar alunos da viagem com status de embarque",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/routes": {
+      "post": {
+        "operationId": "RoutingController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rota criada com sucesso"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Criar rota de transporte",
+        "tags": [
+          "routes"
+        ]
+      },
+      "get": {
+        "operationId": "RoutingController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de rotas"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar rotas da empresa",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/routes/mine": {
+      "get": {
+        "operationId": "RoutingController_getMyRoutes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Rotas do usuário autenticado"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente DRIVER ou STUDENT"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar minhas rotas (motorista ou aluno)",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/routes/{id}": {
+      "get": {
+        "operationId": "RoutingController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dados da rota"
+          },
+          "400": {
+            "description": "ID inválido (não-UUID)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Rota não encontrada (ROUTE_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalhar rota",
+        "tags": [
+          "routes"
+        ]
+      },
+      "patch": {
+        "operationId": "RoutingController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefineClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rota atualizada"
+          },
+          "400": {
+            "description": "Dados inválidos ou body vazio (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Rota não encontrada (ROUTE_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar rota (parcial)",
+        "tags": [
+          "routes"
+        ]
+      },
+      "delete": {
+        "operationId": "RoutingController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Rota deletada"
+          },
+          "400": {
+            "description": "ID inválido (não-UUID)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Rota não encontrada (ROUTE_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletar rota (hard delete)",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/routes/{routeId}/students": {
+      "post": {
+        "operationId": "RoutingController_assignStudent",
+        "parameters": [
+          {
+            "name": "routeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Aluno vinculado com sucesso"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Rota ou aluno não encontrado"
+          },
+          "409": {
+            "description": "Vínculo já existe (ASSIGNMENT_ALREADY_EXISTS)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincular aluno a rota",
+        "tags": [
+          "routes"
+        ]
+      },
+      "get": {
+        "operationId": "RoutingController_listRouteStudents",
+        "parameters": [
+          {
+            "name": "routeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de alunos da rota"
+          },
+          "400": {
+            "description": "ID inválido (não-UUID)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar alunos vinculados à rota",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/routes/{routeId}/students/{studentId}": {
+      "delete": {
+        "operationId": "RoutingController_unassignStudent",
+        "parameters": [
+          {
+            "name": "routeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Vínculo removido"
+          },
+          "400": {
+            "description": "ID inválido (não-UUID)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Vínculo não encontrado (ASSIGNMENT_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desvincular aluno da rota",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/routes/{routeId}/drivers": {
+      "post": {
+        "operationId": "RoutingController_assignDriver",
+        "parameters": [
+          {
+            "name": "routeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TypeLiteralClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Motorista vinculado com sucesso"
+          },
+          "400": {
+            "description": "Dados inválidos (VALIDATION_ERROR)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Rota ou motorista não encontrado"
+          },
+          "409": {
+            "description": "Vínculo já existe (ASSIGNMENT_ALREADY_EXISTS)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincular motorista a rota",
+        "tags": [
+          "routes"
+        ]
+      },
+      "get": {
+        "operationId": "RoutingController_listRouteDrivers",
+        "parameters": [
+          {
+            "name": "routeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de motoristas da rota"
+          },
+          "400": {
+            "description": "ID inválido (não-UUID)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar motoristas vinculados à rota",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/routes/{routeId}/drivers/{driverId}": {
+      "delete": {
+        "operationId": "RoutingController_unassignDriver",
+        "parameters": [
+          {
+            "name": "routeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "driverId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Vínculo removido"
+          },
+          "400": {
+            "description": "ID inválido (não-UUID)"
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Acesso negado — somente ADMIN"
+          },
+          "404": {
+            "description": "Vínculo não encontrado (ASSIGNMENT_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desvincular motorista da rota",
+        "tags": [
+          "routes"
+        ]
+      }
+    },
+    "/api/v1/boarding/check-in": {
+      "post": {
+        "description": "Contrato declarado — implementação na Story 3.3a. Idempotência: mesma X-Idempotency-Key retorna o resultado anterior com 201, sem duplicar.",
+        "operationId": "BoardingController_checkIn",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2). Mesma key reenviada retorna o mesmo resultado sem duplicar o check-in.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Check-in registrado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CheckInResponseDto"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_QR_CODE — studentId ou tripId ausente/malformado. O QR bruto nunca trafega (o app do motorista decodifica e envia campos estruturados), então este erro é validação de shape do body, não do QR em si. MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "STUDENT_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE | DUPLICATE_CHECK_IN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "NOT_IMPLEMENTED — contrato declarado, implementação na Story 3.3a",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar check-in de embarque de um aluno",
+        "tags": [
+          "boarding"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "PureUrban",
+    "description": "PureUrban Official API Documentation",
+    "version": "0.2",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "TypeLiteralClass": {
+        "type": "object",
+        "properties": {}
+      },
+      "RefineClass": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateTripDto": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "type": "string",
+            "description": "ID da rota",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "OUTBOUND",
+              "RETURN"
+            ],
+            "description": "Tipo de viagem: ida (OUTBOUND) ou volta (RETURN)"
+          },
+          "relatedTripId": {
+            "type": "string",
+            "description": "ID da viagem de ida (obrigatório para RETURN)",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          }
+        },
+        "required": [
+          "routeId",
+          "type"
+        ]
+      },
+      "TripStudentItemDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nome do aluno",
+            "example": "Maria Silva"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CHECKED_IN",
+              "NOT_CHECKED_IN",
+              "NOT_RETURNING"
+            ],
+            "description": "Status de embarque do aluno na viagem",
+            "example": "NOT_CHECKED_IN"
+          },
+          "checkedInAt": {
+            "type": "string",
+            "description": "Data e hora do check-in (ISO 8601 UTC), null se ainda não embarcou",
+            "example": "2026-07-12T21:10:00.000Z",
+            "nullable": true
+          }
+        },
+        "required": [
+          "studentId",
+          "name",
+          "status",
+          "checkedInAt"
+        ]
+      },
+      "BoardingSummaryDto": {
+        "type": "object",
+        "properties": {
+          "boarded": {
+            "type": "number",
+            "description": "Quantidade de alunos já embarcados",
+            "example": 12
+          },
+          "total": {
+            "type": "number",
+            "description": "Quantidade total de alunos na viagem",
+            "example": 20
+          }
+        },
+        "required": [
+          "boarded",
+          "total"
+        ]
+      },
+      "TripStudentsResponseDto": {
+        "type": "object",
+        "properties": {
+          "students": {
+            "description": "Lista de alunos da viagem com status de embarque",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripStudentItemDto"
+            }
+          },
+          "summary": {
+            "description": "Resumo agregado de embarque — sempre calculado no servidor",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardingSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "students",
+          "summary"
+        ]
+      },
+      "ErrorBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Código de erro tipado",
+            "example": "TRIP_NOT_ACTIVE"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem legível descrevendo o erro",
+            "example": "A viagem não está ativa"
+          },
+          "details": {
+            "type": "object",
+            "description": "Detalhes adicionais do erro (opcional)"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBodyDto"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "QrCodePayloadDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno dono do QR code",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "UUID v4 gerado no cliente a cada login e persistido em MMKV — torna o QR estático por sessão (NFR8). O backend trata como opaco no MVP.",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440003"
+          }
+        },
+        "description": "Payload do QR code exibido na tela do aluno (Story 3.2b) e decodificado pelo app do motorista (Story 3.3b). Codificação: string JSON compacta em UTF-8, gravada direto no QR, SEM base64 — QR menor para leitura mais rápida em movimento (NFR1). Não aparece em nenhum request/response HTTP: registrado no OpenAPI via @ApiExtraModels.",
+        "required": [
+          "studentId",
+          "sessionId"
+        ]
+      },
+      "CheckInResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID do registro de check-in",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440002"
+          },
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno que fez check-in",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que o check-in ocorreu",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "checkedInAt": {
+            "type": "string",
+            "description": "Data e hora do check-in (ISO 8601 UTC)",
+            "example": "2026-07-12T21:10:00.000Z"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status do check-in",
+            "enum": [
+              "CHECKED_IN"
+            ],
+            "example": "CHECKED_IN"
+          }
+        },
+        "required": [
+          "id",
+          "studentId",
+          "tripId",
+          "checkedInAt",
+          "status"
+        ]
+      },
+      "CheckInRequestDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno decodificado do QR code",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem ativa em que o check-in ocorre",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          }
+        },
+        "required": [
+          "studentId",
+          "tripId"
+        ]
+      }
+    }
+  }
+}

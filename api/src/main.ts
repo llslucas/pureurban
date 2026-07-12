@@ -1,19 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
+import { createOpenApiDocument } from './swagger.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const config = new DocumentBuilder()
-    .setTitle('PureUrban')
-    .setDescription('PureUrban Official API Documentation')
-    .setVersion('0.2')
-    .build();
-
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-
-  SwaggerModule.setup('api', app, documentFactory);
+  SwaggerModule.setup('api', app, () => createOpenApiDocument(app));
 
   await app.listen(process.env.PORT ?? 3000);
 }

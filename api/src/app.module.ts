@@ -14,6 +14,7 @@ import { EffectExceptionFilter } from './domains/shared/shell/filters/effect-exc
 import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/response-wrapper.interceptor.js';
 import { TripModule } from './domains/trip/shell/trip.module.js';
 import { RoutingModule } from './domains/routing/shell/routing.module.js';
+import { BoardingModule } from './domains/boarding/shell/boarding.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { RoutingModule } from './domains/routing/shell/routing.module.js';
     StudentModule,
     TripModule,
     RoutingModule,
+    BoardingModule,
   ],
   controllers: [AppController],
   providers: [

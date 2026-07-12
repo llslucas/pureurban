@@ -22,7 +22,8 @@
     "test:pw:api": "npx playwright test --project=api",
     "test:pw:e2e": "npx playwright test --project=e2e",
     "test:pw:headed": "npx playwright test --headed",
-    "test:pw:debug": "npx playwright test --debug"
+    "test:pw:debug": "npx playwright test --debug",
+    "openapi:export": "nest build && node dist/scripts/export-openapi.js"
   },
   "dependencies": {
     "@effect/schema": "^0.75.5",
