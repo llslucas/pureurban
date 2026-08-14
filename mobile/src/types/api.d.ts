@@ -367,7 +367,7 @@ export interface paths {
         put?: never;
         /**
          * Registrar check-in de embarque de um aluno
-         * @description Contrato declarado — implementação na Story 3.3a. Idempotência: mesma X-Idempotency-Key retorna o resultado anterior com 201, sem duplicar.
+         * @description Idempotência: mesma X-Idempotency-Key retorna o resultado anterior com 201, sem duplicar.
          */
         post: operations["BoardingController_checkIn"];
         delete?: never;
@@ -516,6 +516,11 @@ export interface components {
              * @example 550e8400-e29b-41d4-a716-446655440001
              */
             tripId: string;
+            /**
+             * @description Momento real do embarque (ISO 8601 UTC), informado pela fila offline quando o check-in ocorreu sem sinal. Ausente ⇒ o servidor carimba o horário de processamento. Rejeitado com INVALID_QR_CODE se estiver no futuro (além da tolerância de relógio) ou mais de 24h no passado.
+             * @example 2026-08-14T07:05:00.000Z
+             */
+            occurredAt?: string;
         };
     };
     responses: never;
@@ -1864,7 +1869,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description INVALID_QR_CODE — studentId ou tripId ausente/malformado. O QR bruto nunca trafega (o app do motorista decodifica e envia campos estruturados), então este erro é validação de shape do body, não do QR em si. MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). */
+            /** @description INVALID_QR_CODE — studentId ou tripId ausente/malformado, ou occurredAt fora da janela aceita (no futuro além da tolerância de relógio, ou mais de 24h no passado). O QR bruto nunca trafega (o app do motorista decodifica e envia campos estruturados), então este erro é validação de shape do body, não do QR em si. MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). INVALID_IDEMPOTENCY_KEY — header presente mas acima do limite de tamanho. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1882,7 +1887,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description STUDENT_NOT_ALLOWED */
+            /** @description STUDENT_NOT_ALLOWED — aluno inexistente, inativo, de outra empresa ou não vinculado à rota da viagem. DRIVER_NOT_ASSIGNED — motorista autenticado não é o responsável por esta viagem. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1891,17 +1896,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description TRIP_NOT_ACTIVE | DUPLICATE_CHECK_IN */
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. DUPLICATE_CHECK_IN — aluno já embarcou nesta viagem (key diferente). IDEMPOTENCY_KEY_CONFLICT — key já usada para um aluno ou viagem diferente do enviado. */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description NOT_IMPLEMENTED — contrato declarado, implementação na Story 3.3a */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };

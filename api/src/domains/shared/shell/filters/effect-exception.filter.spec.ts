@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ArgumentsHost, HttpException } from '@nestjs/common';
+import { Effect, Data } from 'effect';
 import { EffectExceptionFilter } from './effect-exception.filter.js';
 
 function createMockHost(
@@ -135,6 +136,43 @@ describe('EffectExceptionFilter', () => {
     filter.catch(new Error('late error'), host);
 
     expect(statusFn).not.toHaveBeenCalled();
+  });
+
+  it('deve desembrulhar um FiberFailure (rejeição real do ManagedRuntime.runPromise) para o status HTTP correto', async () => {
+    // Prova de consumo real: ManagedRuntime.runPromise (usado por todo *.service.ts
+    // via EffectEventDispatcher) rejeita com FiberFailure, não com o tagged error em
+    // si. Sem o unwrap em unwrapFiberFailure, este caso caía no branch 500 genérico.
+    class SomeTaggedError extends Data.TaggedError('SomeTaggedError')<{
+      readonly code: string;
+      readonly message: string;
+      readonly httpStatus: number;
+    }> {}
+
+    const fiberFailure = await Effect.runPromise(
+      Effect.fail(
+        new SomeTaggedError({
+          code: 'SOME_ERROR',
+          message: 'Algo deu errado',
+          httpStatus: 422,
+        }),
+      ),
+    ).catch((e: unknown) => e);
+
+    const responses: Array<{ status: number; body: unknown }> = [];
+    const host = createMockHost({
+      status: (code: number) => ({
+        json: (body: unknown) => {
+          responses.push({ status: code, body });
+        },
+      }),
+    });
+
+    filter.catch(fiberFailure, host);
+
+    expect(responses[0].status).toBe(422);
+    expect(responses[0].body).toEqual({
+      error: { code: 'SOME_ERROR', message: 'Algo deu errado' },
+    });
   });
 
   it('deve preservar code personalizado de HttpException', () => {

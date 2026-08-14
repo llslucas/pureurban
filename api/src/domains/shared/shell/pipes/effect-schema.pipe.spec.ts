@@ -45,4 +45,19 @@ describe('EffectSchemaPipe', () => {
       expect(body.details.issues).toBeDefined();
     }
   });
+
+  it('deve usar o errorCode customizado no body da exceção quando fornecido', () => {
+    const pipe = new EffectSchemaPipe(NameSchema, 'INVALID_QR_CODE');
+
+    try {
+      pipe.transform({ name: 'Lucas' } as Parameters<typeof pipe.transform>[0]);
+      expect.fail('Deveria ter lançado BadRequestException');
+    } catch (e) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      const body = (e as BadRequestException).getResponse() as {
+        code: string;
+      };
+      expect(body.code).toBe('INVALID_QR_CODE');
+    }
+  });
 });
