@@ -16,6 +16,12 @@ type TripStudentsSuccess =
 // IDs de viagem conhecidos pelo mock. Qualquer outro id → 404 TRIP_NOT_FOUND.
 export const MOCK_ACTIVE_TRIP_ID = '770e8400-e29b-41d4-a716-446655440100'
 export const MOCK_INACTIVE_TRIP_ID = '770e8400-e29b-41d4-a716-446655440101'
+// Viagem ativa de OUTRO motorista: o mock não tem noção de autenticação, então
+// este sentinela é o único jeito de a trilha mobile exercitar DRIVER_NOT_ASSIGNED.
+export const MOCK_OTHER_DRIVER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440102'
+
+// Espelha MAX_KEY_LENGTH do @IdempotencyKey() da API.
+const MAX_IDEMPOTENCY_KEY_LENGTH = 200
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -39,6 +45,9 @@ export function resetBoardingMocks(): void {
   rosters = new Map([
     [MOCK_ACTIVE_TRIP_ID, initialRoster()],
     [MOCK_INACTIVE_TRIP_ID, initialRoster()],
+    // Existe como viagem para que o 403 venha da checagem de motorista, e não
+    // de um 409 TRIP_NOT_ACTIVE por roster ausente.
+    [MOCK_OTHER_DRIVER_TRIP_ID, initialRoster()],
   ])
   idempotentSuccesses = new Map()
 }
@@ -74,14 +83,19 @@ export const boardingHandlers = [
       )
     }
 
-    // Só SUCESSOS são replayados. Cachear erros pinaria um TRIP_NOT_ACTIVE
-    // transitório naquela key para sempre — e a fila offline reenvia com a MESMA
-    // key, então o item nunca conseguiria sair da fila.
-    const cached = idempotentSuccesses.get(idempotencyKey)
-    if (cached) {
-      return HttpResponse.json(cached, { status: 201 })
+    if (idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+      return errorResponse(
+        400,
+        'INVALID_IDEMPOTENCY_KEY',
+        `Header X-Idempotency-Key excede ${MAX_IDEMPOTENCY_KEY_LENGTH} caracteres`,
+      )
     }
 
+    // A validação de shape vem ANTES do replay: sem um body válido não há
+    // studentId/tripId para comparar com o que foi armazenado, e devolver o
+    // registro anterior às cegas reportaria embarque de outro aluno como
+    // sucesso. É a ordem que a API implementa (o pipe do @Body roda antes do
+    // service) — o mock seguia a ordem inversa e divergia do contrato real.
     const body = (await request.json().catch(() => null)) as CheckInRequest | null
     if (
       !body ||
@@ -94,6 +108,48 @@ export const boardingHandlers = [
         400,
         'INVALID_QR_CODE',
         'studentId ou tripId ausente ou malformado',
+      )
+    }
+
+    if (body.occurredAt !== undefined) {
+      const parsed = Date.parse(body.occurredAt)
+      const age = Date.now() - parsed
+      // Espelha a janela do use case: 5min de tolerância de relógio, 24h de idade.
+      if (Number.isNaN(parsed) || age < -5 * 60 * 1000 || age > 24 * 60 * 60 * 1000) {
+        return errorResponse(
+          400,
+          'INVALID_QR_CODE',
+          'occurredAt ausente da janela aceita',
+        )
+      }
+    }
+
+    // Só SUCESSOS são replayados. Cachear erros pinaria um TRIP_NOT_ACTIVE
+    // transitório naquela key para sempre — e a fila offline reenvia com a MESMA
+    // key, então o item nunca conseguiria sair da fila.
+    const cached = idempotentSuccesses.get(idempotencyKey)
+    if (cached) {
+      // Mesma key para um par [aluno, viagem] diferente é reuso indevido, não
+      // replay. Devolver o registro armazenado marcaria como embarcado um aluno
+      // que nunca embarcou.
+      if (
+        cached.data.studentId !== body.studentId ||
+        cached.data.tripId !== body.tripId
+      ) {
+        return errorResponse(
+          409,
+          'IDEMPOTENCY_KEY_CONFLICT',
+          'X-Idempotency-Key já usada para um aluno ou viagem diferente do enviado',
+        )
+      }
+      return HttpResponse.json(cached, { status: 201 })
+    }
+
+    if (body.tripId === MOCK_OTHER_DRIVER_TRIP_ID) {
+      return errorResponse(
+        403,
+        'DRIVER_NOT_ASSIGNED',
+        'Motorista não é o responsável por esta viagem',
       )
     }
 
@@ -129,15 +185,17 @@ export const boardingHandlers = [
     }
 
     const now = new Date().toISOString()
+    // occurredAt (fila offline) vence o horário de processamento quando presente.
+    const checkedInAt = body.occurredAt ?? now
     student.status = 'CHECKED_IN'
-    student.checkedInAt = now
+    student.checkedInAt = checkedInAt
 
     const success: CheckInSuccess = {
       data: {
         id: mockUuid(),
         studentId: body.studentId,
         tripId: body.tripId,
-        checkedInAt: now,
+        checkedInAt,
         status: 'CHECKED_IN',
       },
       meta: { timestamp: now },

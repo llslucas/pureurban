@@ -150,3 +150,26 @@ model RouteDriver {
   @@map("route_drivers")
   @@schema("routing")
 }
+
+// ─── BOARDING (Embarque Digital) ────────────────────────────
+
+model BoardingRecord {
+  id             String   @id @default(uuid())
+  companyId      String
+  tripId         String
+  studentId      String
+  // Motorista autenticado que registrou o embarque — trilha de auditoria.
+  // Sem FK: cross-schema (auth.users), mesmo padrão de Trip.driverId.
+  recordedBy     String
+  idempotencyKey String
+  checkedInAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Os dois @@unique são prefixo-à-esquerda suficiente para as consultas por
+  // tripId e por companyId — @@index separados seriam redundantes.
+  @@unique([companyId, idempotencyKey], name: "boarding_idempotency")
+  @@unique([tripId, studentId], name: "boarding_one_per_student_per_trip")
+  @@map("boarding_records")
+  @@schema("boarding")
+}

@@ -3,14 +3,17 @@ import { Schema, ArrayFormatter } from '@effect/schema';
 
 @Injectable()
 export class EffectSchemaPipe<A, I> implements PipeTransform {
-  constructor(private readonly schema: Schema.Schema<A, I>) {}
+  constructor(
+    private readonly schema: Schema.Schema<A, I>,
+    private readonly errorCode: string = 'VALIDATION_ERROR',
+  ) {}
 
   transform(value: I): A {
     const result = Schema.decodeUnknownEither(this.schema)(value);
     if (result._tag === 'Left') {
       const issues = this.formatIssues(result.left);
       throw new BadRequestException({
-        code: 'VALIDATION_ERROR',
+        code: this.errorCode,
         message: 'Validation failed',
         details: { issues },
       });

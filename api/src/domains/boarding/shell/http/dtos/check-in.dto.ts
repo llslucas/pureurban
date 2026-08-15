@@ -1,5 +1,5 @@
-import { IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsUUID, IsOptional, IsISO8601 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CheckInRequestDto {
   @ApiProperty({
@@ -17,6 +17,15 @@ export class CheckInRequestDto {
   })
   @IsUUID()
   tripId!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Momento real do embarque (ISO 8601 UTC), informado pela fila offline quando o check-in ocorreu sem sinal. Ausente ⇒ o servidor carimba o horário de processamento. Rejeitado com INVALID_QR_CODE se estiver no futuro (além da tolerância de relógio) ou mais de 24h no passado.',
+    example: '2026-08-14T07:05:00.000Z',
+  })
+  @IsOptional()
+  @IsISO8601()
+  occurredAt?: string;
 }
 
 export class CheckInResponseDto {
