@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Effect, pipe } from 'effect';
 import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
-import { TripRepository } from '../../core/ports/trip-repository.port.js';
 import type {
   TripData,
   CreateTripData,
@@ -58,10 +57,14 @@ export class PrismaTripAdapter implements TripRepositoryApi {
       );
       if (!trip) {
         return yield* Effect.fail(
+          // Sem `details`: o tripId já está no path e na mensagem, e o corpo
+          // precisa ser `{ error: { code, message } }` puro para bater com o
+          // mock MSW na comparação corpo-a-corpo da 3.6 — o tipo gerado do
+          // mobile declara `details` como `Record<string, never>`, então o mock
+          // é estruturalmente incapaz de reproduzir o campo.
           new TripNotFound({
             code: 'TRIP_NOT_FOUND',
             message: `Viagem com id ${id} não encontrada`,
-            details: { tripId: id },
           }),
         );
       }
@@ -86,10 +89,14 @@ export class PrismaTripAdapter implements TripRepositoryApi {
       );
       if (!existing) {
         return yield* Effect.fail(
+          // Sem `details`: o tripId já está no path e na mensagem, e o corpo
+          // precisa ser `{ error: { code, message } }` puro para bater com o
+          // mock MSW na comparação corpo-a-corpo da 3.6 — o tipo gerado do
+          // mobile declara `details` como `Record<string, never>`, então o mock
+          // é estruturalmente incapaz de reproduzir o campo.
           new TripNotFound({
             code: 'TRIP_NOT_FOUND',
             message: `Viagem com id ${id} não encontrada`,
-            details: { tripId: id },
           }),
         );
       }

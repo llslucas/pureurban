@@ -7,7 +7,6 @@ import {
   Param,
   Req,
   UseGuards,
-  NotImplementedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +18,7 @@ import {
 import { TripService } from '../trip.service.js';
 import { CreateTripDto } from './dtos/create-trip.dto.js';
 import { TripStudentsResponseDto } from './dtos/trip-students.dto.js';
+import { JwtAuthGuard } from '../../../auth/shell/guards/jwt-auth.guard.js';
 import { TenantGuard } from '../../../shared/shell/guards/tenant.guard.js';
 import { RolesGuard } from '../../../shared/shell/guards/roles.guard.js';
 import { Roles } from '../../../shared/shell/decorators/roles.decorator.js';
@@ -26,13 +26,11 @@ import { TenantId } from '../../../shared/shell/decorators/tenant-id.decorator.j
 import { ApiDataResponse } from '../../../shared/shell/decorators/api-data-response.decorator.js';
 import { ErrorResponseDto } from '../../../shared/shell/http/error-response.dto.js';
 
-// TODO: habilitar JwtAuthGuard quando Epic 2 (Auth) estiver pronto
-// import { JwtAuthGuard } from '../../../shared/shell/guards/jwt-auth.guard.js'
-
 @ApiTags('trips')
+@ApiBearerAuth()
 @Controller('api/v1/trips')
-@UseGuards(TenantGuard, RolesGuard)
-@Roles(['driver'])
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@Roles(['DRIVER'])
 export class TripController {
   constructor(private readonly tripService: TripService) {}
 
@@ -41,8 +39,20 @@ export class TripController {
   @ApiResponse({ status: 201, description: 'Viagem criada com sucesso' })
   @ApiResponse({ status: 409, description: 'Motorista já possui viagem ativa' })
   @ApiResponse({
+    status: 400,
+    description: 'Payload inválido',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
     status: 403,
-    description: 'Acesso negado — somente motoristas',
+    description:
+      'FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não está vinculado a esta rota)',
+    type: ErrorResponseDto,
   })
   async create(
     @TenantId() tenantId: string,
@@ -64,6 +74,16 @@ export class TripController {
   @ApiResponse({ status: 200, description: 'Viagem encerrada com sucesso' })
   @ApiResponse({ status: 404, description: 'Viagem não encontrada' })
   @ApiResponse({ status: 400, description: 'Viagem não está ativa' })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN — somente motoristas',
+    type: ErrorResponseDto,
+  })
   async end(
     @Param('id') id: string,
     @TenantId() tenantId: string,
@@ -76,6 +96,16 @@ export class TripController {
   @Get('active')
   @ApiOperation({ summary: 'Obter viagem ativa do motorista' })
   @ApiResponse({ status: 200, description: 'Viagem ativa ou null' })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN — somente motoristas',
+    type: ErrorResponseDto,
+  })
   async getActive(
     @TenantId() tenantId: string,
     @Req() req: Request & { user: { userId: string } },
@@ -87,15 +117,15 @@ export class TripController {
   // ATENÇÃO: declarada depois de @Get('active') na ordem do arquivo —
   // disciplina de resolução de rotas literais antes de rotas :id (lição da 2.6)
   @Get(':id/students')
-  // @ApiBearerAuth() a nível de método: o contrato precisa declarar a auth deste
-  // endpoint (Bearer JWT, role DRIVER) sem tocar nos guards da classe, que são
-  // escopo da review da Story 3.1.
-  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Listar alunos da viagem com status de embarque',
-    description: 'Contrato declarado — implementação na Story 3.5a.',
   })
-  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'ID da viagem' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    format: 'uuid',
+    description: 'ID da viagem',
+  })
   @ApiDataResponse(TripStudentsResponseDto, 200, 'Lista de alunos da viagem')
   @ApiResponse({
     status: 401,
@@ -104,7 +134,8 @@ export class TripController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Acesso negado — somente motoristas',
+    description:
+      'FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não é o responsável pela viagem)',
     type: ErrorResponseDto,
   })
   @ApiResponse({
@@ -112,16 +143,11 @@ export class TripController {
     description: 'TRIP_NOT_FOUND',
     type: ErrorResponseDto,
   })
-  @ApiResponse({
-    status: 501,
-    description:
-      'NOT_IMPLEMENTED — contrato declarado, implementação na Story 3.5a',
-    type: ErrorResponseDto,
-  })
-  getStudents(): never {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 3.0 — implementação na Story 3.5a',
-    });
+  async getStudents(
+    @Param('id') id: string,
+    @TenantId() tenantId: string,
+    @Req() req: Request & { user: { userId: string } },
+  ) {
+    return this.tripService.getTripStudents(id, req.user.userId, tenantId);
   }
 }

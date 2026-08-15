@@ -18,6 +18,8 @@ export const MOCK_ACTIVE_TRIP_ID = '770e8400-e29b-41d4-a716-446655440100'
 export const MOCK_INACTIVE_TRIP_ID = '770e8400-e29b-41d4-a716-446655440101'
 // Viagem ativa de OUTRO motorista: o mock não tem noção de autenticação, então
 // este sentinela é o único jeito de a trilha mobile exercitar DRIVER_NOT_ASSIGNED.
+// Não tem entrada em `rosters`: os dois handlers respondem 403 antes de olhar o
+// roster, então um roster aqui seria estado inalcançável.
 export const MOCK_OTHER_DRIVER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440102'
 
 // Espelha MAX_KEY_LENGTH do @IdempotencyKey() da API.
@@ -45,9 +47,6 @@ export function resetBoardingMocks(): void {
   rosters = new Map([
     [MOCK_ACTIVE_TRIP_ID, initialRoster()],
     [MOCK_INACTIVE_TRIP_ID, initialRoster()],
-    // Existe como viagem para que o 403 venha da checagem de motorista, e não
-    // de um 409 TRIP_NOT_ACTIVE por roster ausente.
-    [MOCK_OTHER_DRIVER_TRIP_ID, initialRoster()],
   ])
   idempotentSuccesses = new Map()
 }
@@ -207,12 +206,29 @@ export const boardingHandlers = [
 
   http.get('*/api/v1/trips/:id/students', ({ params }) => {
     const tripId = params.id as string
+
+    if (tripId === MOCK_OTHER_DRIVER_TRIP_ID) {
+      return errorResponse(
+        403,
+        'DRIVER_NOT_ASSIGNED',
+        'Motorista não é o responsável por esta viagem',
+      )
+    }
+
     const roster = rosters.get(tripId)
 
     // Antes o :id era ignorado: toda viagem devolvia o mesmo roster e o
     // 404 TRIP_NOT_FOUND declarado no contrato era inalcançável.
+    //
+    // Mensagem idêntica à da API (`TripRepository.findById`): a 3.6 compara
+    // corpo com corpo, e o corpo é `{ error: { code, message } }` puro nos dois
+    // lados — sem `details`.
     if (!roster) {
-      return errorResponse(404, 'TRIP_NOT_FOUND', 'Viagem não encontrada')
+      return errorResponse(
+        404,
+        'TRIP_NOT_FOUND',
+        `Viagem com id ${tripId} não encontrada`,
+      )
     }
 
     const success: TripStudentsSuccess = {
