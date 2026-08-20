@@ -547,13 +547,45 @@
           "201": {
             "description": "Viagem criada com sucesso"
           },
+          "400": {
+            "description": "Payload inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
-            "description": "Acesso negado — somente motoristas"
+            "description": "FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não está vinculado a esta rota)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "409": {
             "description": "Motorista já possui viagem ativa"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Iniciar nova viagem (OUTBOUND ou RETURN)",
         "tags": [
           "trips"
@@ -580,10 +612,35 @@
           "400": {
             "description": "Viagem não está ativa"
           },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN — somente motoristas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Viagem não encontrada"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Encerrar viagem ativa",
         "tags": [
           "trips"
@@ -597,8 +654,33 @@
         "responses": {
           "200": {
             "description": "Viagem ativa ou null"
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN — somente motoristas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Obter viagem ativa do motorista",
         "tags": [
           "trips"
@@ -607,7 +689,6 @@
     },
     "/api/v1/trips/{id}/students": {
       "get": {
-        "description": "Contrato declarado — implementação na Story 3.5a.",
         "operationId": "TripController_getStudents",
         "parameters": [
           {
@@ -660,7 +741,7 @@
             }
           },
           "403": {
-            "description": "Acesso negado — somente motoristas",
+            "description": "FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não é o responsável pela viagem)",
             "content": {
               "application/json": {
                 "schema": {
@@ -671,16 +752,6 @@
           },
           "404": {
             "description": "TRIP_NOT_FOUND",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "NOT_IMPLEMENTED — contrato declarado, implementação na Story 3.5a",
             "content": {
               "application/json": {
                 "schema": {
@@ -1355,6 +1426,40 @@
           "type"
         ]
       },
+      "ErrorBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Código de erro tipado",
+            "example": "TRIP_NOT_ACTIVE"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem legível descrevendo o erro",
+            "example": "A viagem não está ativa"
+          },
+          "details": {
+            "type": "object",
+            "description": "Detalhes adicionais do erro (opcional)"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBodyDto"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
       "TripStudentItemDto": {
         "type": "object",
         "properties": {
@@ -1433,40 +1538,6 @@
         "required": [
           "students",
           "summary"
-        ]
-      },
-      "ErrorBodyDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "Código de erro tipado",
-            "example": "TRIP_NOT_ACTIVE"
-          },
-          "message": {
-            "type": "string",
-            "description": "Mensagem legível descrevendo o erro",
-            "example": "A viagem não está ativa"
-          },
-          "details": {
-            "type": "object",
-            "description": "Detalhes adicionais do erro (opcional)"
-          }
-        },
-        "required": [
-          "code",
-          "message"
-        ]
-      },
-      "ErrorResponseDto": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "$ref": "#/components/schemas/ErrorBodyDto"
-          }
-        },
-        "required": [
-          "error"
         ]
       },
       "QrCodePayloadDto": {

@@ -219,10 +219,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Listar alunos da viagem com status de embarque
-         * @description Contrato declarado — implementação na Story 3.5a.
-         */
+        /** Listar alunos da viagem com status de embarque */
         get: operations["TripController_getStudents"];
         put?: never;
         post?: never;
@@ -399,6 +396,23 @@ export interface components {
              */
             relatedTripId?: string;
         };
+        ErrorBodyDto: {
+            /**
+             * @description Código de erro tipado
+             * @example TRIP_NOT_ACTIVE
+             */
+            code: string;
+            /**
+             * @description Mensagem legível descrevendo o erro
+             * @example A viagem não está ativa
+             */
+            message: string;
+            /** @description Detalhes adicionais do erro (opcional) */
+            details?: Record<string, never>;
+        };
+        ErrorResponseDto: {
+            error: components["schemas"]["ErrorBodyDto"];
+        };
         TripStudentItemDto: {
             /**
              * @description ID do aluno
@@ -439,23 +453,6 @@ export interface components {
             students: components["schemas"]["TripStudentItemDto"][];
             /** @description Resumo agregado de embarque — sempre calculado no servidor */
             summary: components["schemas"]["BoardingSummaryDto"];
-        };
-        ErrorBodyDto: {
-            /**
-             * @description Código de erro tipado
-             * @example TRIP_NOT_ACTIVE
-             */
-            code: string;
-            /**
-             * @description Mensagem legível descrevendo o erro
-             * @example A viagem não está ativa
-             */
-            message: string;
-            /** @description Detalhes adicionais do erro (opcional) */
-            details?: Record<string, never>;
-        };
-        ErrorResponseDto: {
-            error: components["schemas"]["ErrorBodyDto"];
         };
         /** @description Payload do QR code exibido na tela do aluno (Story 3.2b) e decodificado pelo app do motorista (Story 3.3b). Codificação: string JSON compacta em UTF-8, gravada direto no QR, SEM base64 — QR menor para leitura mais rápida em movimento (NFR1). Não aparece em nenhum request/response HTTP: registrado no OpenAPI via @ApiExtraModels. */
         QrCodePayloadDto: {
@@ -1152,12 +1149,32 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Acesso negado — somente motoristas */
+            /** @description Payload inválido */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não está vinculado a esta rota) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
             };
             /** @description Motorista já possui viagem ativa */
             409: {
@@ -1193,6 +1210,24 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN — somente motoristas */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
             /** @description Viagem não encontrada */
             404: {
                 headers: {
@@ -1217,6 +1252,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN — somente motoristas */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
             };
         };
     };
@@ -1256,7 +1309,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description Acesso negado — somente motoristas */
+            /** @description FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não é o responsável pela viagem) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1267,15 +1320,6 @@ export interface operations {
             };
             /** @description TRIP_NOT_FOUND */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description NOT_IMPLEMENTED — contrato declarado, implementação na Story 3.5a */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
