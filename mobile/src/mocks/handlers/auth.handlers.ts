@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/types/api'
 import type { AuthTokens, AuthUser } from '@/services/auth.service'
-import { setMockSessionEmail } from './routes.handlers'
+import { setMockSessionEmail } from './session'
 
 type ErrorResponse = components['schemas']['ErrorResponseDto']
 
@@ -44,6 +44,28 @@ const MOCK_USERS: Record<string, AuthUser> = {
     id: '550e8400-e29b-41d4-a716-446655440001',
     name: 'Carlos Ferreira',
     email: 'motorista@pureurban.com',
+    role: 'DRIVER',
+  },
+  // Sentinelas de estado da tela de scan — ver `trip.handlers.ts`. Cada um
+  // torna alcançável um ramo que, com um único motorista mock, seria código
+  // morto em desenvolvimento: a tela sem viagem, a viagem de outro motorista
+  // (403 DRIVER_NOT_ASSIGNED) e a viagem já encerrada (409 TRIP_NOT_ACTIVE).
+  'motorista-sem-viagem@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440002',
+    name: 'Fernanda Rocha',
+    email: 'motorista-sem-viagem@pureurban.com',
+    role: 'DRIVER',
+  },
+  'motorista-outra-viagem@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440003',
+    name: 'Gustavo Pinto',
+    email: 'motorista-outra-viagem@pureurban.com',
+    role: 'DRIVER',
+  },
+  'motorista-viagem-encerrada@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440004',
+    name: 'Helena Braga',
+    email: 'motorista-viagem-encerrada@pureurban.com',
     role: 'DRIVER',
   },
 }
