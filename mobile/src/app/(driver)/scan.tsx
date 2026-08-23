@@ -196,6 +196,12 @@ export default function ScanScreen() {
   // de âmbar um embarque que acabou de dar certo. Só é limpo quando OUTRO QR
   // aparece — é o gate do Bloqueador 3 aplicado à porta da auto-retomada.
   const lastSuccessStudentId = useRef<string | null>(null)
+  // Um check-in em voo por vez. `handleScan` já é protegido por `isBusy`, mas
+  // "Tentar novamente" não era: dois toques no mesmo lote de render disparavam
+  // dois POSTs, o segundo voltava como replay 201 e o contador somava o mesmo
+  // aluno duas vezes — além de sobrescrever `resumeTimer.current` e deixar o
+  // `setTimeout` anterior órfão, sobrevivendo ao `clearTimeout` do `resume()`.
+  const isSubmitting = useRef(false)
 
   const {
     data: activeTrip,
@@ -240,6 +246,8 @@ export default function ScanScreen() {
   }, [])
 
   const submit = useCallback(async (attempt: Attempt) => {
+    if (isSubmitting.current) return
+    isSubmitting.current = true
     // `checking` é definido pelo chamador ANTES do await — ver `handleScan`.
     try {
       await boardingService.checkIn(
@@ -270,6 +278,8 @@ export default function ScanScreen() {
       }
       const described = describeFailure(error)
       setResult({ kind: 'failure', ...described })
+    } finally {
+      isSubmitting.current = false
     }
   }, [])
 
