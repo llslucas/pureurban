@@ -178,7 +178,7 @@ function describeFailure(error: unknown): {
 }
 
 export default function ScanScreen() {
-  const { user } = useAuthStore()
+  const { user, logout } = useAuthStore()
   const [permission, requestPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
   const [boardedCount, setBoardedCount] = useState(0)
@@ -336,8 +336,15 @@ export default function ScanScreen() {
       <Blocked
         title="Acesso restrito"
         detail="Apenas motoristas podem registrar embarques."
-        actionLabel="Voltar"
-        onAction={() => router.replace('/(auth)/login')}
+        actionLabel="Entrar novamente"
+        onAction={() => {
+          // `logout()` ANTES do replace, como em `(student)/qr-code.tsx`
+          // (Task 7.11). Só navegar deixaria `isAuthenticated` true: o aluno
+          // ficaria estacionado num formulário de login com a sessão viva, e o
+          // shell continuaria montado atrás.
+          logout()
+          router.replace('/(auth)/login')
+        }}
       />
     )
   }
