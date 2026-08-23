@@ -116,20 +116,31 @@ function describeFailure(error: unknown): {
           canRetry: false,
         }
       case 'REQUEST_TIMEOUT':
+        // Linha 15 da tabela dá um rótulo único para os dois gatilhos (rede
+        // caída e timeout). O detalhe distingue; o título, não.
         return {
           code: 'REQUEST_TIMEOUT',
           tone: 'offline',
-          title: 'Sem resposta',
+          title: 'Sem conexão',
           detail: 'O servidor demorou demais. Tente novamente.',
           canRetry: true,
         }
-      // MISSING_IDEMPOTENCY_KEY, INVALID_IDEMPOTENCY_KEY e
-      // IDEMPOTENCY_KEY_CONFLICT só acontecem por bug do cliente. Não há ação
-      // útil para o motorista além de repetir a leitura, e reenviar a mesma
-      // chave não ajudaria — por isso `canRetry: false`.
+      // Estado 14 da tabela. A AC #3 nomeia IDEMPOTENCY_KEY_CONFLICT entre os
+      // códigos que precisam de feedback DISTINTO, então ele não pode dividir a
+      // mensagem com os dois códigos abaixo. O texto é o da tabela.
+      case 'IDEMPOTENCY_KEY_CONFLICT':
+        return {
+          code: error.code,
+          tone: 'error',
+          title: 'Erro ao registrar',
+          detail: 'Tente novamente.',
+          canRetry: false,
+        }
+      // MISSING_IDEMPOTENCY_KEY e INVALID_IDEMPOTENCY_KEY só acontecem por bug
+      // do cliente. Não há ação útil para o motorista além de repetir a leitura,
+      // e reenviar a mesma chave não ajudaria — por isso `canRetry: false`.
       case 'MISSING_IDEMPOTENCY_KEY':
       case 'INVALID_IDEMPOTENCY_KEY':
-      case 'IDEMPOTENCY_KEY_CONFLICT':
         return {
           code: error.code,
           tone: 'error',
