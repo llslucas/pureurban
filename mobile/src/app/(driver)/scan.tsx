@@ -146,6 +146,12 @@ export default function ScanScreen() {
   // entre a primeira leitura e esse render, a câmera continua entregando frames
   // e `handleScan` seria chamado de novo. Este ref fecha na mesma instrução.
   const isBusy = useRef(false)
+  // Aluno do último check-in bem-sucedido. A auto-retomada do estado 7 devolve a
+  // câmera a `idle` com o QR do aluno provavelmente ainda enquadrado; reler ali
+  // geraria chave NOVA e o servidor responderia 409 DUPLICATE_CHECK_IN, pintando
+  // de âmbar um embarque que acabou de dar certo. Só é limpo quando OUTRO QR
+  // aparece — é o gate do Bloqueador 3 aplicado à porta da auto-retomada.
+  const lastSuccessStudentId = useRef<string | null>(null)
 
   const { data: activeTrip, status: tripStatus } = useQuery<Trip | null>({
     // MESMA query key de `(driver)/trip.tsx`. Duas keys para o mesmo endpoint
@@ -180,6 +186,7 @@ export default function ScanScreen() {
         { studentId: attempt.studentId, tripId: attempt.tripId },
         attempt.idempotencyKey,
       )
+      lastSuccessStudentId.current = attempt.studentId
       setBoardedCount((n) => n + 1)
       setResult({
         kind: 'success',
@@ -223,6 +230,15 @@ export default function ScanScreen() {
         })
         return
       }
+
+      // Releitura do aluno que acabou de embarcar: ignora em silêncio, sem
+      // overlay e sem tocar a rede, até que outro QR entre no enquadramento.
+      if (payload.studentId === lastSuccessStudentId.current) {
+        isBusy.current = false
+        setResult({ kind: 'idle' })
+        return
+      }
+      lastSuccessStudentId.current = null
 
       if (!activeTrip || activeTrip.status !== 'ACTIVE') {
         setResult({
