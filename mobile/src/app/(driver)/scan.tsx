@@ -153,7 +153,11 @@ export default function ScanScreen() {
   // aparece — é o gate do Bloqueador 3 aplicado à porta da auto-retomada.
   const lastSuccessStudentId = useRef<string | null>(null)
 
-  const { data: activeTrip, status: tripStatus } = useQuery<Trip | null>({
+  const {
+    data: activeTrip,
+    status: tripStatus,
+    refetch: refetchTrip,
+  } = useQuery<Trip | null>({
     // MESMA query key de `(driver)/trip.tsx`. Duas keys para o mesmo endpoint
     // foi finding de review na 3.2b: o cache duplica e as telas divergem.
     queryKey: ['activeTrip'],
@@ -314,6 +318,23 @@ export default function ScanScreen() {
   // nunca ter buscado. Finding literal do review da 3.2b.
   if (tripStatus === 'pending') {
     return <Loading label="Carregando viagem..." />
+  }
+
+  // Erro NÃO é vazio. Sem esta guarda a query que terminou em `error` cai no
+  // estado 4 e a tela afirma "Nenhuma viagem ativa" sem nunca ter conseguido
+  // buscar — o finding (b) da 3.2b e a ação #4 da retro do Épico 2, alcançados
+  // pela outra porta. Vale especialmente sem rede: o `onlineManager` nunca foi
+  // ligado ao NetInfo (defer da 3.2b), então a query não pausa — ela queima o
+  // `retry` ladder e falha.
+  if (tripStatus === 'error') {
+    return (
+      <Blocked
+        title="Não foi possível carregar a viagem"
+        detail="Verifique sua conexão e tente novamente."
+        actionLabel="Tentar novamente"
+        onAction={() => void refetchTrip()}
+      />
+    )
   }
 
   // Estado 4.
