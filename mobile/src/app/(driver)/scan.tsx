@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto'
 import { router } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Linking, StyleSheet, View } from 'react-native'
+import { AppState, Linking, StyleSheet, View } from 'react-native'
 import { ActivityIndicator, Button, Text } from 'react-native-paper'
 import { useQuery } from '@tanstack/react-query'
 import { useCameraPermissions } from 'expo-camera'
@@ -179,7 +179,7 @@ function describeFailure(error: unknown): {
 
 export default function ScanScreen() {
   const { user, logout } = useAuthStore()
-  const [permission, requestPermission] = useCameraPermissions()
+  const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
   const [boardedCount, setBoardedCount] = useState(0)
   const lastAttempt = useRef<Attempt | null>(null)
@@ -208,6 +208,18 @@ export default function ScanScreen() {
     staleTime: 10_000,
     retry: 2,
   })
+
+  // O estado 2 manda o motorista às configurações do sistema, mas
+  // `useCameraPermissions` não reavalia sozinho quando o app volta ao primeiro
+  // plano: sem isto, quem concede a permissão lá fora e retorna continua vendo
+  // "Câmera bloqueada" — a afordância que a tabela prescreve terminaria em beco
+  // sem saída.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void getPermission()
+    })
+    return () => subscription.remove()
+  }, [getPermission])
 
   // Sair da tela com o timer vivo faria `setState` em componente desmontado.
   useEffect(() => {
