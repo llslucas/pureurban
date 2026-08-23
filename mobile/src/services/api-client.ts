@@ -84,10 +84,15 @@ async function request<T>(
   path: string,
   body?: unknown,
   isRefreshRequest = false,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
-  // Interceptor de autenticação — lê token do MMKV
+  // Interceptor de autenticação — lê token do MMKV.
+  // Os headers da chamada entram PRIMEIRO e os do cliente por cima: assim um
+  // `extraHeaders` com 'Authorization' (erro de digitação, cópia de exemplo)
+  // não consegue derrubar a autenticação e transformar a requisição num 401.
   const token = tokenStorage.getAccessToken()
   const headers: Record<string, string> = {
+    ...extraHeaders,
     'Content-Type': 'application/json',
   }
   if (token) {
@@ -124,8 +129,12 @@ async function request<T>(
   if (response.status === 401 && !isRefreshRequest && !isAuthEndpoint) {
     const refreshed = await attemptTokenRefresh()
     if (refreshed) {
-      // Retry com novo token — passa true para evitar loop infinito de refresh
-      return request<T>(method, path, body, true)
+      // Retry com novo token — passa true para evitar loop infinito de refresh.
+      // `extraHeaders` DEVE ser repassado: sem isso o retry pós-refresh perde o
+      // 'X-Idempotency-Key', que o contrato declara obrigatório, e o check-in
+      // volta 400 MISSING_IDEMPOTENCY_KEY. Só acontece quando o access token
+      // expira no meio do embarque, ou seja, no ônibus e nunca em teste.
+      return request<T>(method, path, body, true, extraHeaders)
     }
     // Refresh falhou — encerrar a sessão por inteiro. Limpar só os tokens deixava
     // `auth.user` e `qr.sessionId` no MMKV e `isAuthenticated` true na store, então
@@ -156,7 +165,12 @@ async function request<T>(
 
 export const apiClient = {
   get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
-  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
+  // `headers` só existe nos verbos de escrita: 'X-Idempotency-Key' é uma
+  // propriedade do endpoint de escrita (Architecture §5, Tier 2), e ampliar a
+  // superfície onde ninguém consome seria código morto.
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
+    request<T>('POST', path, body, false, headers),
+  patch: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
+    request<T>('PATCH', path, body, false, headers),
   delete: <T>(path: string) => request<T>('DELETE', path),
 }
