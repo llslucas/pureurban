@@ -7,6 +7,8 @@ interface QrScannerProps {
   onScan: (raw: string) => void
   /** Enquanto true, nenhuma leitura é reportada. Ver comentário do gate abaixo. */
   isPaused: boolean
+  /** A câmera não pôde ser montada. Quem decide o que mostrar é a tela. */
+  onMountError: (message: string) => void
 }
 
 // Proporção da menor dimensão da tela ocupada pela janela de escaneamento.
@@ -27,7 +29,7 @@ function Corner({ style }: { style: object }) {
  *
  * Assume permissão já concedida: a decisão de pedir/negar permissão é da tela.
  */
-export function QrScanner({ onScan, isPaused }: QrScannerProps) {
+export function QrScanner({ onScan, isPaused, onMountError }: QrScannerProps) {
   const { width, height } = useWindowDimensions()
   const windowSize = Math.min(width, height) * WINDOW_RATIO
 
@@ -57,6 +59,10 @@ export function QrScanner({ onScan, isPaused }: QrScannerProps) {
         // os seguintes 409 DUPLICATE_CHECK_IN, pintando de vermelho um embarque
         // que deu certo.
         onBarcodeScanned={isPaused ? undefined : handleScan}
+        // Sem isto, uma câmera que falha ao montar (hardware ocupado, emulador
+        // sem câmera, erro de driver) deixa a tela preta com a moldura para
+        // sempre: `onBarcodeScanned` nunca dispara e nada explica o que houve.
+        onMountError={(event) => onMountError(event.message)}
       />
 
       {/* Máscara escura com a janela recortada: dá ao motorista um alvo óbvio

@@ -182,6 +182,7 @@ export default function ScanScreen() {
   const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
   const [boardedCount, setBoardedCount] = useState(0)
+  const [cameraError, setCameraError] = useState<string | null>(null)
   const lastAttempt = useRef<Attempt | null>(null)
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Segunda metade do gate do Bloqueador 3. O `isPaused` passado ao QrScanner é
@@ -421,6 +422,19 @@ export default function ScanScreen() {
     )
   }
 
+  // A câmera não montou: sem esta guarda a tela fica preta com a moldura e nada
+  // acontece nunca, porque `onBarcodeScanned` não dispara.
+  if (cameraError) {
+    return (
+      <Blocked
+        title="Não foi possível abrir a câmera"
+        detail={cameraError}
+        actionLabel="Tentar novamente"
+        onAction={() => setCameraError(null)}
+      />
+    )
+  }
+
   // ---- Estado 5 em diante: câmera na tela ----
 
   const isPaused = result.kind !== 'idle'
@@ -432,7 +446,7 @@ export default function ScanScreen() {
 
   return (
     <View style={styles.container}>
-      <QrScanner onScan={handleScan} isPaused={isPaused} />
+      <QrScanner onScan={handleScan} isPaused={isPaused} onMountError={setCameraError} />
 
       <View style={styles.counterBar} pointerEvents="none">
         <Text variant="titleMedium" style={styles.counterText}>
