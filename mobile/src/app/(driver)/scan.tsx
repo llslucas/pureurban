@@ -319,15 +319,14 @@ export default function ScanScreen() {
       }
       lastSuccessStudentId.current = null
 
+      // Invariante, não estado da tabela: o caminho de render devolve `Blocked`
+      // (estado 4) antes de o `QrScanner` montar, então aqui `activeTrip` é
+      // sempre ACTIVE. A guarda existe para estreitar o tipo — antes ela
+      // carregava uma segunda cópia do texto do estado 12, que nenhum teste ou
+      // roteiro manual conseguia exercitar e que ia divergir da primeira.
       if (!activeTrip || activeTrip.status !== 'ACTIVE') {
-        setResult({
-          kind: 'failure',
-          code: 'TRIP_NOT_ACTIVE',
-          tone: 'error',
-          title: 'Viagem não está ativa',
-          detail: 'Inicie uma viagem antes de registrar embarques.',
-          canRetry: false,
-        })
+        isBusy.current = false
+        setResult({ kind: 'idle' })
         return
       }
 
