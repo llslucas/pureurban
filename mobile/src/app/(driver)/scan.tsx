@@ -614,6 +614,8 @@ const styles = StyleSheet.create({
   },
   counterText: {
     color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 24,
     textAlign: 'center',
     fontWeight: '700',
   },
@@ -637,10 +639,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+  // NFR18 / Task 7.10: >= 18sp e em negrito. `titleMedium` do MD3 resolve para
+  // 16sp com peso 500, e a opacidade reduzida piorava ainda mais a leitura em
+  // movimento — é esta linha que carrega o "por quê" do resultado.
   overlayDetail: {
     color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: 'bold',
     textAlign: 'center',
-    opacity: 0.92,
   },
   // NFR18: alvo de toque de 56dp, alinhado ao precedente de `(driver)/trip.tsx`.
   action: {
