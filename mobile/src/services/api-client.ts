@@ -1,5 +1,6 @@
 import { router } from 'expo-router'
 import { tokenStorage } from '@/lib/storage'
+import { useAuthStore } from '@/stores/auth.store'
 import { API_BASE_URL } from '@/utils/constants'
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
@@ -126,8 +127,11 @@ async function request<T>(
       // Retry com novo token — passa true para evitar loop infinito de refresh
       return request<T>(method, path, body, true)
     }
-    // Refresh falhou — limpar tokens e redirecionar para login
-    tokenStorage.clearTokens()
+    // Refresh falhou — encerrar a sessão por inteiro. Limpar só os tokens deixava
+    // `auth.user` e `qr.sessionId` no MMKV e `isAuthenticated` true na store, então
+    // a tela de QR continuava renderizando um código de sessão que o backend já
+    // rejeitou. logout() é o único escritor que zera as três fontes de verdade.
+    useAuthStore.getState().logout()
     router.replace('/(auth)/login')
     throw new ApiClientError('UNAUTHORIZED', 'Sessão expirada. Faça login novamente.', 401)
   }

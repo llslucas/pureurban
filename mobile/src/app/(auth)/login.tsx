@@ -33,20 +33,27 @@ export default function LoginScreen() {
       tokenStorage.setAccessToken(result.accessToken)
       tokenStorage.setRefreshToken(result.refreshToken)
 
+      // Role é validada ANTES de autenticar: chamar login() primeiro deixava a
+      // sessão persistida (user + sessionId no MMKV, isAuthenticated true) numa
+      // role sem destino, parada na própria tela de login e sem redirect.
+      const destination =
+        result.user.role === 'DRIVER'
+          ? '/(driver)/trip'
+          : result.user.role === 'STUDENT'
+            ? '/(student)/home'
+            : result.user.role === 'ADMIN'
+              ? '/(admin)/home'
+              : null
+
+      if (!destination) {
+        tokenStorage.clearTokens()
+        setErrorMessage('Perfil de usuário não suportado neste aplicativo.')
+        return
+      }
+
       // Atualizar estado global de autenticação
       login(result.user)
-
-      // Navegar conforme role do usuário
-      if (result.user.role === 'DRIVER') {
-        router.replace('/(driver)/')
-      } else if (result.user.role === 'STUDENT') {
-        router.replace('/(student)/')
-      } else if (result.user.role === 'ADMIN') {
-        router.replace('/(admin)/home')
-      } else {
-        // Role desconhecida — redireciona para login com mensagem
-        setErrorMessage('Perfil de usuário não suportado neste aplicativo.')
-      }
+      router.replace(destination)
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMessage(err.message)
