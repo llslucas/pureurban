@@ -76,8 +76,12 @@ export const tripHandlers = [
     // vir ANTES de NO_TRIP_EMAIL — com a ordem invertida, o
     // `motorista-sem-viagem@` iniciava uma viagem, via o card via `setQueryData`
     // e o perdia no primeiro refetch. O login chama `resetTripMocks()`, então as
-    // sentinelas continuam alcançáveis a cada troca de conta.
-    if (currentTrip) {
+    // sentinelas continuam alcançáveis a cada troca de conta. Filtra por
+    // `ACTIVE` porque `PATCH /trips/:id/end` deixa a viagem encerrada em
+    // `currentTrip`: servir uma viagem COMPLETED daqui seria um shape que a API
+    // real não produz — `findActiveByDriver` faz
+    // `findFirst({ where: { …, status: 'ACTIVE' } })`.
+    if (currentTrip?.status === 'ACTIVE') {
       return envelope<Trip | null>(currentTrip)
     }
 
