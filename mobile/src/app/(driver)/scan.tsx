@@ -458,83 +458,93 @@ export default function ScanScreen() {
 
       {result.kind === 'checking' ? (
         <View style={[styles.overlay, { backgroundColor: '#263238' }]}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text variant="headlineSmall" style={styles.overlayTitle}>
-            Verificando...
-          </Text>
+          <View style={styles.overlayMessage}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text variant="headlineSmall" style={styles.overlayTitle}>
+              Verificando...
+            </Text>
+          </View>
         </View>
       ) : result.kind === 'success' ? (
         <View style={[styles.overlay, { backgroundColor: TONE_COLOR.success }]}>
-          <Text style={styles.icon}>✓</Text>
-          <Text variant="headlineSmall" style={styles.overlayTitle}>
-            {result.title}
-          </Text>
-          <Text variant="titleMedium" style={styles.overlayDetail}>
-            {result.detail}
-          </Text>
-          <Button
-            mode="contained"
-            buttonColor="#FFFFFF"
-            textColor={TONE_COLOR.success}
-            onPress={resume}
-            style={styles.action}
-            contentStyle={styles.actionContent}
-            labelStyle={styles.actionLabel}
-          >
-            Escanear próximo
-          </Button>
+          <View style={styles.overlayMessage}>
+            <Text style={styles.icon}>✓</Text>
+            <Text variant="headlineSmall" style={styles.overlayTitle}>
+              {result.title}
+            </Text>
+            <Text variant="titleMedium" style={styles.overlayDetail}>
+              {result.detail}
+            </Text>
+          </View>
+          <View style={styles.overlayActions}>
+            <Button
+              mode="contained"
+              buttonColor="#FFFFFF"
+              textColor={TONE_COLOR.success}
+              onPress={resume}
+              style={styles.action}
+              contentStyle={styles.actionContent}
+              labelStyle={styles.actionLabel}
+            >
+              Escanear próximo
+            </Button>
+          </View>
         </View>
       ) : result.kind === 'failure' ? (
         <View style={[styles.overlay, { backgroundColor: TONE_COLOR[result.tone] }]}>
-          <Text style={styles.icon}>{result.tone === 'warn' ? '!' : '✕'}</Text>
-          <Text variant="headlineSmall" style={styles.overlayTitle}>
-            {result.title}
-          </Text>
-          <Text variant="titleMedium" style={styles.overlayDetail}>
-            {result.detail}
-          </Text>
-          {result.canRetry ? (
+          <View style={styles.overlayMessage}>
+            <Text style={styles.icon}>{result.tone === 'warn' ? '!' : '✕'}</Text>
+            <Text variant="headlineSmall" style={styles.overlayTitle}>
+              {result.title}
+            </Text>
+            <Text variant="titleMedium" style={styles.overlayDetail}>
+              {result.detail}
+            </Text>
+          </View>
+          <View style={styles.overlayActions}>
+            {result.canRetry ? (
+              <Button
+                mode="contained"
+                buttonColor="#FFFFFF"
+                textColor={TONE_COLOR[result.tone]}
+                onPress={handleRetry}
+                style={styles.action}
+                contentStyle={styles.actionContent}
+                labelStyle={styles.actionLabel}
+              >
+                Tentar novamente
+              </Button>
+            ) : null}
+            {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
+                afordância: sem ela o motorista lê "Inicie uma viagem antes de
+                registrar embarques" sem nenhum caminho até lá. */}
+            {result.code === 'TRIP_NOT_ACTIVE' ? (
+              <Button
+                mode="contained"
+                buttonColor="#FFFFFF"
+                textColor={TONE_COLOR[result.tone]}
+                onPress={() => router.navigate('/(driver)/trip')}
+                style={styles.action}
+                contentStyle={styles.actionContent}
+                labelStyle={styles.actionLabel}
+              >
+                Ir para Viagem
+              </Button>
+            ) : null}
+            {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema
+                (primária #208AEF) e ficam ilegíveis sobre vermelho ou âmbar. */}
             <Button
-              mode="contained"
-              buttonColor="#FFFFFF"
-              textColor={TONE_COLOR[result.tone]}
-              onPress={handleRetry}
+              mode={hasPrimaryAction ? 'text' : 'contained'}
+              buttonColor={hasPrimaryAction ? undefined : '#FFFFFF'}
+              textColor={hasPrimaryAction ? '#FFFFFF' : TONE_COLOR[result.tone]}
+              onPress={resume}
               style={styles.action}
               contentStyle={styles.actionContent}
               labelStyle={styles.actionLabel}
             >
-              Tentar novamente
+              Escanear próximo
             </Button>
-          ) : null}
-          {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
-              afordância: sem ela o motorista lê "Inicie uma viagem antes de
-              registrar embarques" sem nenhum caminho até lá. */}
-          {result.code === 'TRIP_NOT_ACTIVE' ? (
-            <Button
-              mode="contained"
-              buttonColor="#FFFFFF"
-              textColor={TONE_COLOR[result.tone]}
-              onPress={() => router.navigate('/(driver)/trip')}
-              style={styles.action}
-              contentStyle={styles.actionContent}
-              labelStyle={styles.actionLabel}
-            >
-              Ir para Viagem
-            </Button>
-          ) : null}
-          {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema
-              (primária #208AEF) e ficam ilegíveis sobre vermelho ou âmbar. */}
-          <Button
-            mode={hasPrimaryAction ? 'text' : 'contained'}
-            buttonColor={hasPrimaryAction ? undefined : '#FFFFFF'}
-            textColor={hasPrimaryAction ? '#FFFFFF' : TONE_COLOR[result.tone]}
-            onPress={resume}
-            style={styles.action}
-            contentStyle={styles.actionContent}
-            labelStyle={styles.actionLabel}
-          >
-            Escanear próximo
-          </Button>
+          </View>
         </View>
       ) : null}
     </View>
@@ -623,10 +633,22 @@ const styles = StyleSheet.create({
   // tem tempo de procurar um snackbar no rodapé (NFR18).
   overlay: {
     ...StyleSheet.absoluteFillObject,
+    paddingHorizontal: 24,
+  },
+  // Mensagem ocupa o espaço livre e fica centrada; as ações são empurradas para
+  // a metade inferior. Com tudo numa pilha `justifyContent: 'center'`, os botões
+  // caíam no meio da tela, fora do alcance do polegar de quem segura o aparelho
+  // com uma mão só (NFR18 / Task 7.10).
+  overlayMessage: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    paddingHorizontal: 24,
+  },
+  overlayActions: {
+    alignSelf: 'stretch',
+    gap: 12,
+    paddingBottom: 32,
   },
   icon: {
     fontSize: 72,
