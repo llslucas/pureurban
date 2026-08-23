@@ -35,7 +35,13 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O PureUrban usa a câmera para escanear o QR code dos alunos no embarque."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
