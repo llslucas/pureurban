@@ -26,7 +26,17 @@ type ScanResult =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'success'; title: string; detail: string }
-  | { kind: 'failure'; tone: Tone; title: string; detail: string; canRetry: boolean }
+  | {
+      kind: 'failure'
+      // `code` é preservado no estado, e não só traduzido em texto: sem ele o
+      // código da falha não é recuperável para log nem para a fila da 3.4b
+      // (Task 7.3). 'NETWORK_ERROR' é o sintético do fetch cru.
+      code: string
+      tone: Tone
+      title: string
+      detail: string
+      canRetry: boolean
+    }
 
 // A última tentativa, guardada para o botão "Tentar novamente" reenviar com a
 // MESMA chave de idempotência. Chave nova para o mesmo aluno faria o servidor
@@ -54,13 +64,20 @@ const TONE_COLOR: Record<Tone, string> = {
  * que a AC #3 lista, e a Story 3.3a pode acrescentar outros. Sem ele, um código
  * novo vira overlay em branco — o motorista não saberia se embarcou ou não.
  */
-function describeFailure(error: unknown): { tone: Tone; title: string; detail: string; canRetry: boolean } {
+function describeFailure(error: unknown): {
+  code: string
+  tone: Tone
+  title: string
+  detail: string
+  canRetry: boolean
+} {
   if (error instanceof ApiClientError) {
     switch (error.code) {
       case 'DUPLICATE_CHECK_IN':
         // Âmbar, não vermelho: o aluno ESTÁ no ônibus, o objetivo do motorista
         // foi atingido. Pintar de vermelho ensina o motorista a ignorar vermelho.
         return {
+          code: 'DUPLICATE_CHECK_IN',
           tone: 'warn',
           title: 'Já embarcou',
           detail: 'Este aluno já fez check-in nesta viagem.',
@@ -68,6 +85,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
         }
       case 'STUDENT_NOT_ALLOWED':
         return {
+          code: 'STUDENT_NOT_ALLOWED',
           tone: 'error',
           title: 'Aluno não autorizado',
           detail: 'Este aluno não está vinculado à rota desta viagem.',
@@ -75,6 +93,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
         }
       case 'TRIP_NOT_ACTIVE':
         return {
+          code: 'TRIP_NOT_ACTIVE',
           tone: 'error',
           title: 'Viagem não está ativa',
           detail: 'Inicie uma viagem antes de registrar embarques.',
@@ -82,6 +101,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
         }
       case 'DRIVER_NOT_ASSIGNED':
         return {
+          code: 'DRIVER_NOT_ASSIGNED',
           tone: 'error',
           title: 'Viagem de outro motorista',
           detail: 'Você não é o responsável por esta viagem.',
@@ -89,6 +109,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
         }
       case 'INVALID_QR_CODE':
         return {
+          code: 'INVALID_QR_CODE',
           tone: 'error',
           title: 'QR code inválido',
           detail: 'Peça ao aluno para abrir o QR code no app novamente.',
@@ -96,6 +117,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
         }
       case 'REQUEST_TIMEOUT':
         return {
+          code: 'REQUEST_TIMEOUT',
           tone: 'offline',
           title: 'Sem resposta',
           detail: 'O servidor demorou demais. Tente novamente.',
@@ -109,6 +131,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
       case 'INVALID_IDEMPOTENCY_KEY':
       case 'IDEMPOTENCY_KEY_CONFLICT':
         return {
+          code: error.code,
           tone: 'error',
           title: 'Erro ao registrar',
           detail: 'Não foi possível registrar o embarque. Escaneie novamente.',
@@ -116,6 +139,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
         }
       default:
         return {
+          code: error.code,
           tone: 'error',
           title: 'Erro ao registrar',
           detail: error.message,
@@ -127,6 +151,7 @@ function describeFailure(error: unknown): { tone: Tone; title: string; detail: s
   // Falha crua do fetch (sem rede, DNS, servidor fora do ar). A fila offline é a
   // Story 3.4b — aqui o motorista reenvia manualmente, com a mesma chave.
   return {
+    code: 'NETWORK_ERROR',
     tone: 'offline',
     title: 'Sem conexão',
     detail: 'Não foi possível falar com o servidor. Tente novamente.',
@@ -227,6 +252,7 @@ export default function ScanScreen() {
         // contrato é explícito em que o QR bruto nunca trafega.
         setResult({
           kind: 'failure',
+          code: 'INVALID_QR_CODE',
           tone: 'error',
           title: 'QR code inválido',
           detail: 'Este código não é um QR code de aluno do PureUrban.',
@@ -247,6 +273,7 @@ export default function ScanScreen() {
       if (!activeTrip || activeTrip.status !== 'ACTIVE') {
         setResult({
           kind: 'failure',
+          code: 'TRIP_NOT_ACTIVE',
           tone: 'error',
           title: 'Viagem não está ativa',
           detail: 'Inicie uma viagem antes de registrar embarques.',
