@@ -142,8 +142,15 @@ function describeFailure(error: unknown): {
           code: error.code,
           tone: 'error',
           title: 'Erro ao registrar',
-          detail: error.message,
-          canRetry: true,
+          // A linha 16 da tabela manda exibir a `message` da API. O fallback só
+          // cobre o envelope sem mensagem — `api-client` preenche com um texto
+          // em inglês nesse caso, e o motorista não deve ver isso.
+          detail: error.message || 'Não foi possível registrar o embarque.',
+          // Só 5xx e falhas de transporte (`status: 0`) valem retry. Um 4xx não
+          // enumerado — `TRIP_NOT_FOUND`, por exemplo — é determinístico:
+          // reenviar com a MESMA chave só reproduz o mesmo erro, e a linha 16 da
+          // tabela não prevê botão de retry.
+          canRetry: error.status >= 500 || error.status === 0,
         }
     }
   }
