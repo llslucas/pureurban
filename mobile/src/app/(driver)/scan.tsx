@@ -183,6 +183,10 @@ export default function ScanScreen() {
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
   const [boardedCount, setBoardedCount] = useState(0)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  // Falha ao abrir o pedido de permissão ou as configurações do sistema. Antes
+  // as duas promises eram descartadas com `void`: a rejeição ficava sem
+  // tratamento e o botão simplesmente parecia morto.
+  const [actionError, setActionError] = useState<string | null>(null)
   const lastAttempt = useRef<Attempt | null>(null)
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Segunda metade do gate do Bloqueador 3. O `isPaused` passado ao QrScanner é
@@ -383,14 +387,30 @@ export default function ScanScreen() {
         title="Permissão da câmera"
         detail="O PureUrban precisa da câmera para ler o QR code dos alunos."
         actionLabel="Permitir acesso à câmera"
-        onAction={() => void requestPermission()}
+        note={actionError}
+        onAction={() => {
+          setActionError(null)
+          requestPermission().catch(() =>
+            setActionError(
+              'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
+            ),
+          )
+        }}
       />
     ) : (
       <Blocked
         title="Câmera bloqueada"
         detail="A permissão foi negada. Libere o acesso à câmera nas configurações do sistema."
         actionLabel="Abrir configurações"
-        onAction={() => void Linking.openSettings()}
+        note={actionError}
+        onAction={() => {
+          setActionError(null)
+          Linking.openSettings().catch(() =>
+            setActionError(
+              'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
+            ),
+          )
+        }}
       />
     )
   }
@@ -576,11 +596,14 @@ function Blocked({
   detail,
   actionLabel,
   onAction,
+  note,
 }: {
   title: string
   detail: string
   actionLabel: string
   onAction: () => void
+  /** Mensagem extra quando a própria ação do botão falha. */
+  note?: string | null
 }) {
   return (
     <View style={styles.centered}>
@@ -590,6 +613,11 @@ function Blocked({
       <Text variant="bodyLarge" style={styles.centeredText}>
         {detail}
       </Text>
+      {note ? (
+        <Text variant="bodyLarge" style={styles.centeredNote}>
+          {note}
+        </Text>
+      ) : null}
       <Button
         mode="contained"
         onPress={onAction}
@@ -621,6 +649,11 @@ const styles = StyleSheet.create({
   centeredText: {
     textAlign: 'center',
     opacity: 0.75,
+  },
+  centeredNote: {
+    textAlign: 'center',
+    color: '#B3261E',
+    fontWeight: 'bold',
   },
   counterBar: {
     position: 'absolute',
