@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 import type { components } from '@/types/api'
 import type { AuthTokens, AuthUser } from '@/services/auth.service'
 import { setMockSessionEmail } from './session'
+import { resetTripMocks } from './trip.handlers'
 
 type ErrorResponse = components['schemas']['ErrorResponseDto']
 
@@ -114,6 +115,12 @@ export const authHandlers = [
     }
 
     setMockSessionEmail(user.email)
+    // Sem isto o `currentTrip` do mock de viagem sobrevive à troca de conta e
+    // mascara as sentinelas de motorista: bastava um "Iniciar Viagem" para que
+    // todo login seguinte recebesse a viagem padrão, tornando os estados 12 e 13
+    // da Tabela de Verdade inalcançáveis pelo resto da sessão do app.
+    // (`trip.handlers` não importa daqui, então não há ciclo.)
+    resetTripMocks()
 
     return HttpResponse.json(
       { data: mintTokensFor(user), meta: { timestamp: new Date().toISOString() } },

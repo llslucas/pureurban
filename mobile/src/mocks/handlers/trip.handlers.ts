@@ -71,16 +71,20 @@ export const tripHandlers = [
   http.get('*/api/v1/trips/active', () => {
     const email = getMockSessionEmail()
 
+    // Uma viagem já iniciada nesta sessão vence a sentinela: senão o motorista
+    // que toca "Iniciar Viagem" veria a tela voltar ao estado anterior. Precisa
+    // vir ANTES de NO_TRIP_EMAIL — com a ordem invertida, o
+    // `motorista-sem-viagem@` iniciava uma viagem, via o card via `setQueryData`
+    // e o perdia no primeiro refetch. O login chama `resetTripMocks()`, então as
+    // sentinelas continuam alcançáveis a cada troca de conta.
+    if (currentTrip) {
+      return envelope<Trip | null>(currentTrip)
+    }
+
     if (email === NO_TRIP_EMAIL) {
       // `null` e não 404: o contrato descreve a resposta como "Viagem ativa ou
       // null", e `tripService.getActiveTrip` tipa o retorno como `Trip | null`.
       return envelope<Trip | null>(null)
-    }
-
-    // Uma viagem já iniciada nesta sessão vence a sentinela: senão o motorista
-    // que toca "Iniciar Viagem" veria a tela voltar ao estado anterior.
-    if (currentTrip) {
-      return envelope<Trip | null>(currentTrip)
     }
 
     if (email === OTHER_DRIVER_EMAIL) {
