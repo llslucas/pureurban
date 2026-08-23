@@ -1,6 +1,11 @@
+---
+baseline_commit: 7869998
+branch: feat/3-3b-escaneamento-de-qr-code
+---
+
 # Story 3.3b: Escaneamento de QR Code (Mobile Motorista)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -118,83 +123,83 @@ Toda decisão de UI de `(driver)/scan.tsx` sai daqui. Se a implementação diver
 
 ### Task 1 — Dependência: `expo-camera` (AC: 1)
 
-- [ ] 1.1 `cd mobile && npx expo install expo-camera` — deixe o Expo pinar a versão do SDK 55. **É a única dependência autorizada nesta story.** Qualquer outra exige aprovação do Lucas antes de instalar.
-- [ ] 1.2 Registrar o config plugin em `app.json#expo.plugins`, com a mensagem de permissão **em português** — sem `cameraPermission`, o iOS fica sem `NSCameraUsageDescription` e o pedido de permissão trava:
+- [x] 1.1 `cd mobile && npx expo install expo-camera` — deixe o Expo pinar a versão do SDK 55. **É a única dependência autorizada nesta story.** Qualquer outra exige aprovação do Lucas antes de instalar.
+- [x] 1.2 Registrar o config plugin em `app.json#expo.plugins`, com a mensagem de permissão **em português** — sem `cameraPermission`, o iOS fica sem `NSCameraUsageDescription` e o pedido de permissão trava:
   ```json
   ["expo-camera", { "cameraPermission": "O PureUrban usa a câmera para escanear o QR code dos alunos no embarque." }]
   ```
-- [ ] 1.3 `npx tsc --noEmit` continua em 0 erros após a instalação.
+- [x] 1.3 `npx tsc --noEmit` continua em 0 erros após a instalação.
 
 ### Task 2 — `apiClient` com headers por requisição (AC: 2, 3) — Bloqueador 1
 
-- [ ] 2.1 Adicionar um parâmetro opcional `extraHeaders?: Record<string, string>` a `request<T>()`. Ordem de montagem: **primeiro** os `extraHeaders`, **depois** `Content-Type` e `Authorization` por cima — assim um header de chamada nunca consegue derrubar a autenticação por engano.
-- [ ] 2.2 Propagar em `post` e `patch` (`post<T>(path, body?, headers?)`). `get`/`delete` ficam como estão — nenhum consumidor precisa, e ampliar a superfície sem consumidor é código morto.
-- [ ] 2.3 **Repassar `extraHeaders` no retry de 401** (`return request<T>(method, path, body, true, extraHeaders)`). Sem isso o retry pós-refresh perde o `X-Idempotency-Key` — ver o aviso no Bloqueador 1.
-- [ ] 2.4 Não alterar mais nada do arquivo: timeout, mutex de refresh, `parseResponseJson`, `ApiClientError`, desempacotamento de `{ data }` e o `logout()` do 401 ficam intactos.
+- [x] 2.1 Adicionar um parâmetro opcional `extraHeaders?: Record<string, string>` a `request<T>()`. Ordem de montagem: **primeiro** os `extraHeaders`, **depois** `Content-Type` e `Authorization` por cima — assim um header de chamada nunca consegue derrubar a autenticação por engano.
+- [x] 2.2 Propagar em `post` e `patch` (`post<T>(path, body?, headers?)`). `get`/`delete` ficam como estão — nenhum consumidor precisa, e ampliar a superfície sem consumidor é código morto.
+- [x] 2.3 **Repassar `extraHeaders` no retry de 401** (`return request<T>(method, path, body, true, extraHeaders)`). Sem isso o retry pós-refresh perde o `X-Idempotency-Key` — ver o aviso no Bloqueador 1.
+- [x] 2.4 Não alterar mais nada do arquivo: timeout, mutex de refresh, `parseResponseJson`, `ApiClientError`, desempacotamento de `{ data }` e o `logout()` do 401 ficam intactos.
 
 ### Task 3 — Decodificação do payload do QR (AC: 2, 3)
 
-- [ ] 3.1 Adicionar `decodeQrPayload(raw: string): QrCodePayload | null` a `src/utils/qr-payload.ts` — ao lado de `encodeQrPayload`, para que codificação e decodificação sejam simétricas por construção e mudem juntas.
-- [ ] 3.2 Validar de verdade: `JSON.parse` protegido, resultado precisa ser objeto não-nulo, `studentId` e `sessionId` precisam ser strings no formato UUID. Declare a constante de regex de UUID **neste arquivo** — não importe de `src/mocks/`, que não entra no bundle de produção.
-- [ ] 3.3 **Retornar `null`, nunca lançar.** O chamador traduz `null` em `INVALID_QR_CODE` local (estado 10 da tabela), sem tocar a rede.
-- [ ] 3.4 Cobrir explicitamente: string vazia; QR de outro app (URL, vCard, Wi-Fi); JSON válido sem `studentId`; `studentId` presente mas não-UUID; JSON que decodifica para array ou número.
+- [x] 3.1 Adicionar `decodeQrPayload(raw: string): QrCodePayload | null` a `src/utils/qr-payload.ts` — ao lado de `encodeQrPayload`, para que codificação e decodificação sejam simétricas por construção e mudem juntas.
+- [x] 3.2 Validar de verdade: `JSON.parse` protegido, resultado precisa ser objeto não-nulo, `studentId` e `sessionId` precisam ser strings no formato UUID. Declare a constante de regex de UUID **neste arquivo** — não importe de `src/mocks/`, que não entra no bundle de produção.
+- [x] 3.3 **Retornar `null`, nunca lançar.** O chamador traduz `null` em `INVALID_QR_CODE` local (estado 10 da tabela), sem tocar a rede.
+- [x] 3.4 Cobrir explicitamente: string vazia; QR de outro app (URL, vCard, Wi-Fi); JSON válido sem `studentId`; `studentId` presente mas não-UUID; JSON que decodifica para array ou número.
 
 ### Task 4 — `services/boarding.service.ts` (AC: 2)
 
-- [ ] 4.1 Criar `src/services/boarding.service.ts` seguindo o molde fino de `trip.service.ts` / `routes.service.ts`: objeto exportado com métodos sobre `apiClient`, zero lógica de UI.
-- [ ] 4.2 Tipos vindos de `@/types/api` — `components['schemas']['CheckInRequestDto']` e `['CheckInResponseDto']`. Nada escrito à mão (`architecture.md#8`, regra 11). Ambos são DTOs de classe e geram tipo correto.
-- [ ] 4.3 `checkIn(input: CheckInRequest, idempotencyKey: string)` → `apiClient.post<CheckInResponse>('/api/v1/boarding/check-in', input, { 'X-Idempotency-Key': idempotencyKey })`.
-- [ ] 4.4 **Não gerar a key dentro do serviço.** A key pertence à tentativa e é recebida de fora — é o que permite à 3.4b reenviar um item da fila com a key original.
-- [ ] 4.5 Não enviar `occurredAt` nesta story (é opcional no contrato e existe para a fila offline). O servidor carimba o horário de processamento.
+- [x] 4.1 Criar `src/services/boarding.service.ts` seguindo o molde fino de `trip.service.ts` / `routes.service.ts`: objeto exportado com métodos sobre `apiClient`, zero lógica de UI.
+- [x] 4.2 Tipos vindos de `@/types/api` — `components['schemas']['CheckInRequestDto']` e `['CheckInResponseDto']`. Nada escrito à mão (`architecture.md#8`, regra 11). Ambos são DTOs de classe e geram tipo correto.
+- [x] 4.3 `checkIn(input: CheckInRequest, idempotencyKey: string)` → `apiClient.post<CheckInResponse>('/api/v1/boarding/check-in', input, { 'X-Idempotency-Key': idempotencyKey })`.
+- [x] 4.4 **Não gerar a key dentro do serviço.** A key pertence à tentativa e é recebida de fora — é o que permite à 3.4b reenviar um item da fila com a key original.
+- [x] 4.5 Não enviar `occurredAt` nesta story (é opcional no contrato e existe para a fila offline). O servidor carimba o horário de processamento.
 
 ### Task 5 — Handlers MSW da viagem do motorista (AC: 1, 2) — Bloqueador 2
 
-- [ ] 5.1 Extrair a sentinela de sessão dos mocks para `src/mocks/handlers/session.ts`, com `setMockSessionEmail(email)` e `getMockSessionEmail()`. Atualizar `auth.handlers.ts` e `routes.handlers.ts` para importarem de lá. Motivo: `trip.handlers.ts` também precisa ler a sessão, e importar de `routes.handlers.ts` criaria um ciclo `auth → routes → auth`.
-- [ ] 5.2 Criar `src/mocks/handlers/trip.handlers.ts` com estado em memória e `resetTripMocks()` exportado — mesmo padrão de `boarding.handlers.ts`.
-- [ ] 5.3 `GET /api/v1/trips/active` → viagem `ACTIVE` cujo `id` é **`MOCK_ACTIVE_TRIP_ID` importado de `boarding.handlers.ts`**. Sem essa importação os dois mocks divergem e todo check-in vira `TRIP_NOT_ACTIVE`.
-- [ ] 5.4 `POST /api/v1/trips` e `PATCH /api/v1/trips/:id/end` — suficientes para `(driver)/trip.tsx` funcionar em mocks. Ecoe o `routeId` recebido; não valide se é UUID (a tela ainda manda `'route-placeholder-id'`, e consertar isso é escopo da 3.1).
-- [ ] 5.5 Sentinelas de motorista (via `getMockSessionEmail()`), para tornar alcançáveis os estados 4 e 13 da tabela:
+- [x] 5.1 Extrair a sentinela de sessão dos mocks para `src/mocks/handlers/session.ts`, com `setMockSessionEmail(email)` e `getMockSessionEmail()`. Atualizar `auth.handlers.ts` e `routes.handlers.ts` para importarem de lá. Motivo: `trip.handlers.ts` também precisa ler a sessão, e importar de `routes.handlers.ts` criaria um ciclo `auth → routes → auth`.
+- [x] 5.2 Criar `src/mocks/handlers/trip.handlers.ts` com estado em memória e `resetTripMocks()` exportado — mesmo padrão de `boarding.handlers.ts`.
+- [x] 5.3 `GET /api/v1/trips/active` → viagem `ACTIVE` cujo `id` é **`MOCK_ACTIVE_TRIP_ID` importado de `boarding.handlers.ts`**. Sem essa importação os dois mocks divergem e todo check-in vira `TRIP_NOT_ACTIVE`.
+- [x] 5.4 `POST /api/v1/trips` e `PATCH /api/v1/trips/:id/end` — suficientes para `(driver)/trip.tsx` funcionar em mocks. Ecoe o `routeId` recebido; não valide se é UUID (a tela ainda manda `'route-placeholder-id'`, e consertar isso é escopo da 3.1).
+- [x] 5.5 Sentinelas de motorista (via `getMockSessionEmail()`), para tornar alcançáveis os estados 4 e 13 da tabela:
   - `motorista-sem-viagem@pureurban.com` → `/trips/active` devolve `null` (estado 4)
   - `motorista-outra-viagem@pureurban.com` → `/trips/active` devolve viagem com `id = MOCK_OTHER_DRIVER_TRIP_ID` (estado 13, `403 DRIVER_NOT_ASSIGNED` no check-in)
   - `motorista-viagem-encerrada@pureurban.com` → `id = MOCK_INACTIVE_TRIP_ID` (estado 12, `409 TRIP_NOT_ACTIVE`)
-- [ ] 5.6 Adicionar os três motoristas a `MOCK_USERS` em `auth.handlers.ts` (role `DRIVER`, ids UUID distintos).
-- [ ] 5.7 Tipagem: `/trips/active` não tem schema de resposta no contrato, então o shape vem da interface `Trip` de `trip.service.ts` — exatamente o que `routes.handlers.ts` fez com `AssignedRoute`, e pelo mesmo motivo. O envelope de erro continua tipado por `ErrorResponseDto`.
-- [ ] 5.8 Registrar em `src/mocks/handlers/index.ts`. Ordem: `auth`, `routes`, `trip`, `boarding`.
-- [ ] 5.9 Documentar os três e-mails novos em `.env.example`, no bloco que já existe.
+- [x] 5.6 Adicionar os três motoristas a `MOCK_USERS` em `auth.handlers.ts` (role `DRIVER`, ids UUID distintos).
+- [x] 5.7 Tipagem: `/trips/active` não tem schema de resposta no contrato, então o shape vem da interface `Trip` de `trip.service.ts` — exatamente o que `routes.handlers.ts` fez com `AssignedRoute`, e pelo mesmo motivo. O envelope de erro continua tipado por `ErrorResponseDto`.
+- [x] 5.8 Registrar em `src/mocks/handlers/index.ts`. Ordem: `auth`, `routes`, `trip`, `boarding`.
+- [x] 5.9 Documentar os três e-mails novos em `.env.example`, no bloco que já existe.
 
 ### Task 6 — `components/qr-scanner.tsx` (AC: 1, 3, 5)
 
-- [ ] 6.1 Componente **puro de captura**: recebe `onScan(raw: string)` e `isPaused: boolean`. Não conhece check-in, não faz rede, não conhece códigos de erro.
-- [ ] 6.2 `CameraView` com `facing="back"` e `barcodeScannerSettings={{ barcodeTypes: ['qr'] }}` — restringir a `qr` evita que um código de barras de mochila dispare uma tentativa.
-- [ ] 6.3 **Gate obrigatório:** `onBarcodeScanned={isPaused ? undefined : handleScan}`. Um `if` dentro do callback **não** substitui isto — ver Bloqueador 3.
-- [ ] 6.4 Moldura de escaneamento: quadrado central, cantos de alto contraste sobre máscara escura (AC #1, "área de escaneamento clara"). Dimensionar em proporção da largura da tela, não em pixels fixos — a 3.2b teve finding exatamente por medida fixa em devices ≤ 368dp.
-- [ ] 6.5 Sem lógica de permissão aqui. O componente assume permissão concedida; quem decide é a tela (Task 7.1).
+- [x] 6.1 Componente **puro de captura**: recebe `onScan(raw: string)` e `isPaused: boolean`. Não conhece check-in, não faz rede, não conhece códigos de erro.
+- [x] 6.2 `CameraView` com `facing="back"` e `barcodeScannerSettings={{ barcodeTypes: ['qr'] }}` — restringir a `qr` evita que um código de barras de mochila dispare uma tentativa.
+- [x] 6.3 **Gate obrigatório:** `onBarcodeScanned={isPaused ? undefined : handleScan}`. Um `if` dentro do callback **não** substitui isto — ver Bloqueador 3.
+- [x] 6.4 Moldura de escaneamento: quadrado central, cantos de alto contraste sobre máscara escura (AC #1, "área de escaneamento clara"). Dimensionar em proporção da largura da tela, não em pixels fixos — a 3.2b teve finding exatamente por medida fixa em devices ≤ 368dp.
+- [x] 6.5 Sem lógica de permissão aqui. O componente assume permissão concedida; quem decide é a tela (Task 7.1).
 
 ### Task 7 — Tela `(driver)/scan.tsx` (AC: 1, 2, 3, 4, 5)
 
-- [ ] 7.1 Permissão com `useCameraPermissions()`. Três ramos distintos: não solicitada (estado 1), negada (estado 2, com `Linking.openSettings()`), concedida. Nunca renderize a câmera antes de `granted`.
-- [ ] 7.2 Viagem ativa com `useQuery({ queryKey: ['activeTrip'], queryFn: tripService.getActiveTrip })` — **a mesma key de `(driver)/trip.tsx`**. Use `status === 'pending'` para o estado 3, não `isLoading` (com a query pausada offline `isLoading` é `false` e a tela afirmaria "sem viagem ativa" sem nunca ter buscado — finding literal da 3.2b).
-- [ ] 7.3 Estado do resultado como union discriminado: `{ kind: 'idle' } | { kind: 'checking' } | { kind: 'success', studentName?: string } | { kind: 'error', code: string, message: string, tone: 'warn' | 'error' | 'offline' }`. Nada de booleanos soltos.
-- [ ] 7.4 **Entrar em `checking` de forma síncrona, antes de qualquer `await`.** É esse passo — não a resposta da API — que atende a AC #4 (<2s na percepção do usuário).
-- [ ] 7.5 Chave de idempotência: `Crypto.randomUUID()` uma vez por tentativa, guardada junto do QR lido. "Tentar novamente" no estado 15 reenvia com a **mesma** key. Key nova só quando o QR muda — mandar key nova para o mesmo aluno produz `409 DUPLICATE_CHECK_IN` num check-in que já tinha dado certo.
-- [ ] 7.6 Traduzir `ApiClientError.code` conforme a Tabela de Verdade (estados 7–16), **com `default` obrigatório** (estado 16). Erro que não é `ApiClientError` (falha de rede crua do `fetch`) e o código `REQUEST_TIMEOUT` caem no estado 15.
-- [ ] 7.7 `decodeQrPayload(raw)` **antes** de qualquer chamada de rede; `null` → estado 10 sem tocar a API.
-- [ ] 7.8 Retomada: botão grande "Escanear próximo" sempre visível nos estados 7–16; **só o sucesso** auto-retoma (~2,5s). Limpe o timer no `useEffect` de cleanup — sair da tela com timer vivo faz `setState` em componente desmontado.
-- [ ] 7.9 Contador da sessão no topo ("N embarcados nesta sessão") — estado local da tela, zerado ao montar. **Não** é a lista de alunos da 3.5b e não deve tentar sê-la.
-- [ ] 7.10 NFR18: alvos de toque ≥ 56dp de altura (o `buttonContent: { height: 56 }` de `(driver)/trip.tsx` é o precedente do repo); texto do overlay ≥ 18sp e em negrito; ações na metade inferior da tela (alcance do polegar); cores de resultado com contraste alto contra o preto da câmera.
-- [ ] 7.11 Guarda de role: só `DRIVER`. Espelhe a guarda de `(student)/qr-code.tsx` — um aluno que chegue nesta rota não pode escanear ninguém.
+- [x] 7.1 Permissão com `useCameraPermissions()`. Três ramos distintos: não solicitada (estado 1), negada (estado 2, com `Linking.openSettings()`), concedida. Nunca renderize a câmera antes de `granted`.
+- [x] 7.2 Viagem ativa com `useQuery({ queryKey: ['activeTrip'], queryFn: tripService.getActiveTrip })` — **a mesma key de `(driver)/trip.tsx`**. Use `status === 'pending'` para o estado 3, não `isLoading` (com a query pausada offline `isLoading` é `false` e a tela afirmaria "sem viagem ativa" sem nunca ter buscado — finding literal da 3.2b).
+- [x] 7.3 Estado do resultado como union discriminado: `{ kind: 'idle' } | { kind: 'checking' } | { kind: 'success', studentName?: string } | { kind: 'error', code: string, message: string, tone: 'warn' | 'error' | 'offline' }`. Nada de booleanos soltos.
+- [x] 7.4 **Entrar em `checking` de forma síncrona, antes de qualquer `await`.** É esse passo — não a resposta da API — que atende a AC #4 (<2s na percepção do usuário).
+- [x] 7.5 Chave de idempotência: `Crypto.randomUUID()` uma vez por tentativa, guardada junto do QR lido. "Tentar novamente" no estado 15 reenvia com a **mesma** key. Key nova só quando o QR muda — mandar key nova para o mesmo aluno produz `409 DUPLICATE_CHECK_IN` num check-in que já tinha dado certo.
+- [x] 7.6 Traduzir `ApiClientError.code` conforme a Tabela de Verdade (estados 7–16), **com `default` obrigatório** (estado 16). Erro que não é `ApiClientError` (falha de rede crua do `fetch`) e o código `REQUEST_TIMEOUT` caem no estado 15.
+- [x] 7.7 `decodeQrPayload(raw)` **antes** de qualquer chamada de rede; `null` → estado 10 sem tocar a API.
+- [x] 7.8 Retomada: botão grande "Escanear próximo" sempre visível nos estados 7–16; **só o sucesso** auto-retoma (~2,5s). Limpe o timer no `useEffect` de cleanup — sair da tela com timer vivo faz `setState` em componente desmontado.
+- [x] 7.9 Contador da sessão no topo ("N embarcados nesta sessão") — estado local da tela, zerado ao montar. **Não** é a lista de alunos da 3.5b e não deve tentar sê-la.
+- [x] 7.10 NFR18: alvos de toque ≥ 56dp de altura (o `buttonContent: { height: 56 }` de `(driver)/trip.tsx` é o precedente do repo); texto do overlay ≥ 18sp e em negrito; ações na metade inferior da tela (alcance do polegar); cores de resultado com contraste alto contra o preto da câmera.
+- [x] 7.11 Guarda de role: só `DRIVER`. Espelhe a guarda de `(student)/qr-code.tsx` — um aluno que chegue nesta rota não pode escanear ninguém.
 
 ### Task 8 — Navegação até o scanner (AC: 1, 5)
 
-- [ ] 8.1 `(driver)/_layout.tsx` hoje é `<Stack />` nu e as quatro telas herdam o nome cru da rota no header. Trocar por `Stack` com `initialRouteName="trip"` e `Stack.Screen` com título em português para `trip`, `scan`, `student-list` e `routes` — mesmo padrão que a 3.2b aplicou em `(student)/_layout.tsx`.
-- [ ] 8.2 Em `(driver)/trip.tsx`, adicionar botão "Escanear QR Code" **visível apenas quando `activeTrip.status === 'ACTIVE'`** (o bloco do Estado 2/4 da tela), com `router.navigate('/(driver)/scan')`. Use `navigate`, não `push`: duplo toque com `push` empilha duas telas de scan, cada uma abrindo sua própria câmera.
-- [ ] 8.3 Contagem de toques (NFR19): login leva o motorista a `/(driver)/trip` (0 toques) → 1 toque em "Escanear QR Code" → câmera aberta. **Não** introduza telas intermediárias.
-- [ ] 8.4 Nada além disso em `trip.tsx`. A tela pertence à Story 3.1, que está em `review` — o placeholder `PLACEHOLDER_ROUTE_ID` e o "Alunos: 0/0 (em breve)" **ficam como estão**.
+- [x] 8.1 `(driver)/_layout.tsx` hoje é `<Stack />` nu e as quatro telas herdam o nome cru da rota no header. Trocar por `Stack` com `initialRouteName="trip"` e `Stack.Screen` com título em português para `trip`, `scan`, `student-list` e `routes` — mesmo padrão que a 3.2b aplicou em `(student)/_layout.tsx`.
+- [x] 8.2 Em `(driver)/trip.tsx`, adicionar botão "Escanear QR Code" **visível apenas quando `activeTrip.status === 'ACTIVE'`** (o bloco do Estado 2/4 da tela), com `router.navigate('/(driver)/scan')`. Use `navigate`, não `push`: duplo toque com `push` empilha duas telas de scan, cada uma abrindo sua própria câmera.
+- [x] 8.3 Contagem de toques (NFR19): login leva o motorista a `/(driver)/trip` (0 toques) → 1 toque em "Escanear QR Code" → câmera aberta. **Não** introduza telas intermediárias.
+- [x] 8.4 Nada além disso em `trip.tsx`. A tela pertence à Story 3.1, que está em `review` — o placeholder `PLACEHOLDER_ROUTE_ID` e o "Alunos: 0/0 (em breve)" **ficam como estão**.
 
 ### Task 9 — Verificação (todas as ACs)
 
-- [ ] 9.1 `cd mobile && npx tsc --noEmit` → **0 erros**. A baseline desta branch já é 0 — qualquer erro é seu.
-- [ ] 9.2 `cd mobile && npm run lint` → limpo (0 erros, 0 warnings). Baseline desta branch já é limpa.
+- [x] 9.1 `cd mobile && npx tsc --noEmit` → **0 erros**. A baseline desta branch já é 0 — qualquer erro é seu.
+- [x] 9.2 `cd mobile && npm run lint` → limpo (0 erros, 0 warnings). Baseline desta branch já é limpa.
 - [ ] 9.3 Roteiro manual com `EXPO_PUBLIC_USE_MOCKS=1`, registrando o resultado de cada linha no Debug Log:
   | Caso | Como reproduzir | Estado esperado |
   |---|---|---|
@@ -208,7 +213,7 @@ Toda decisão de UI de `(driver)/scan.tsx` sai daqui. Se a implementação diver
   | Sem rede | modo avião com mocks desligados | 15 + "Tentar novamente" |
   | Rajada | manter o QR parado na frente da câmera por 5s | **exatamente um** POST |
   | Permissão | negar a permissão de câmera | 2 + botão de configurações |
-- [ ] 9.4 Sem regressão no `api/`: nada é tocado lá, nada a rodar. Confirme que o `File List` final não contém nenhum caminho `api/`.
+- [x] 9.4 Sem regressão no `api/`: nada é tocado lá, nada a rodar. Confirme que o `File List` final não contém nenhum caminho `api/`.
 
 ---
 
@@ -370,10 +375,55 @@ Nomes seguem `project-context.md`: arquivo em `kebab-case`, export em `PascalCas
 
 ### Agent Model Used
 
+Claude Opus 5 (claude-opus-5)
+
 ### Debug Log References
+
+- `cd mobile && npx tsc --noEmit` — baseline desta branch: **0 erros**; após cada task: 0 erros; final: **0 erros**.
+- `cd mobile && npm run lint` — baseline limpa; final **limpo** (0 erros, 0 warnings), sem `eslint-disable` novo.
+- `npx expo install expo-camera` resolveu **`~55.0.22`**, não o `~55.0.10` que a story previu a partir de `node_modules/expo/bundledNativeModules.json`. O arquivo de pins estava atrás do que o registry publica para o SDK 55; a versão instalada é posterior ao [PR #44635](https://github.com/expo/expo/pull/44635), que corrigiu a regressão de barcode scanning no iOS descrita em *Latest Tech Information*. Nenhuma ação necessária.
+- **Task 3.4 — `decodeQrPayload` exercitado de verdade** (16 casos, compilado com `tsc` e rodado em Node): round-trip com `encodeQrPayload`; string vazia; QR de URL; vCard; Wi-Fi; JSON array; número; `null`; sem `studentId`; sem `sessionId`; `studentId` não-UUID; `sessionId` não-UUID; `studentId` numérico; UUID maiúsculo; campos extras descartados; JSON truncado. **16/16 corretos, nenhum lançou.**
+- **Metade de rede do roteiro da Task 9.3 exercitada de verdade** — handlers MSW compilados e rodados sob `setupServer` do `msw/node`, com `onUnhandledRequest: 'error'` (nenhuma requisição escapou). **16/16 passaram:**
+  - caminho feliz → `201 CHECKED_IN`; mesmo aluno com key nova → `409 DUPLICATE_CHECK_IN`; retry com a **mesma** key → `201` com `id` idêntico (replay, não duplicata); aluno fora do roster → `403 STUDENT_NOT_ALLOWED`; sem o header → `400 MISSING_IDEMPOTENCY_KEY` (prova do Bloqueador 1);
+  - `motorista-sem-viagem@` → `data: null`; `motorista-outra-viagem@` → `403 DRIVER_NOT_ASSIGNED`; `motorista-viagem-encerrada@` → viagem `ACTIVE` na tela **e** `409 TRIP_NOT_ACTIVE` no check-in (o estado 12 só é alcançável assim);
+  - `POST /trips` com o `routeId` placeholder da 3.1 → `201`; `PATCH /trips/:id/end` → `COMPLETED`;
+  - **regressão da 3.2b**: as quatro sentinelas de `/routes/mine` (`aluno@`, `aluno-sem-rota@`, `aluno-multirota@`, `aluno-erro@`) continuam corretas após a extração da sentinela de sessão para `session.ts`.
+- **Metade de UI da Task 9.3 NÃO foi executada.** Não há emulador Android, simulador iOS nem device físico neste ambiente (`adb`/`emulator` ausentes, `~/Android/Sdk` inexistente). `npx expo export --platform web` falha em `Unable to resolve module ./wa-sqlite/wa-sqlite.wasm from expo-sqlite/web/worker.ts` — **erro pré-existente**, idêntico ao registrado no Debug Log da 3.2b, originado em `src/lib/database.ts` → `_layout.tsx`, nenhum dos dois tocado aqui. Ficam sem evidência de runtime: abertura da câmera, moldura, overlays coloridos, fluxo de permissão e o comportamento de rajada em device real.
 
 ### Completion Notes List
 
+- **Task 1** instalou `expo-camera` (`~55.0.22`, via `expo install`) e registrou o config plugin em `app.json` com `cameraPermission` em português. **Única dependência adicionada** — a story autorizava exatamente uma, e exatamente uma foi instalada.
+- **Task 2 fechou o Bloqueador 1 e resolveu um defer aberto desde o review da Story 3.0.** `request()` ganhou `extraHeaders`, propagado em `post` e `patch`. Os headers da chamada entram **antes** de `Content-Type`/`Authorization`, então um `extraHeaders` mal formado não consegue derrubar a autenticação. O repasse no retry de 401 (`request(method, path, body, true, extraHeaders)`) foi implementado como a story avisou — sem ele, o retry pós-refresh perderia o `X-Idempotency-Key`.
+- **Task 3** adicionou `decodeQrPayload` ao lado de `encodeQrPayload`. Devolve `null` e nunca lança; valida UUID nos dois campos e **reconstrói** o objeto, para que campos extras de um QR forjado não vazem para o body do check-in. Ver Debug Log para os 16 casos exercitados.
+- **Task 4** criou `boarding.service.ts` com tipos vindos de `api.d.ts`. A chave de idempotência é recebida, não gerada — é o que permitirá à 3.4b reenviar um item da fila com a key original.
+- **Task 5 fechou o Bloqueador 2.** A sentinela de sessão saiu de `routes.handlers.ts` para `session.ts` (evita o ciclo `auth → routes → auth`), e `trip.handlers.ts` cobre `GET /trips/active`, `POST /trips` e `PATCH /trips/:id/end`. O id da viagem ativa é **importado** de `boarding.handlers.ts` — se os dois mocks divergissem, todo check-in viraria `TRIP_NOT_ACTIVE`. Três motoristas sentinela tornam alcançáveis os estados 4, 12 e 13 da Tabela de Verdade.
+- **Task 6** criou `qr-scanner.tsx` como captura pura. Máscara de quatro painéis explícitos em vez do truque de `borderWidth: 9999`: o truque zera o raio interno e diverge entre iOS e Android. Janela dimensionada em proporção da menor dimensão da tela, não em px.
+- **Task 7** entregou a tela com os 17 estados da Tabela de Verdade, incluindo o `default` do mapa de erros. **Refinamento sobre o que a story prescreveu:** o gate do Bloqueador 3 precisou de *duas* metades, não uma. `onBarcodeScanned={isPaused ? undefined : handler}` fecha o gate de forma **declarativa**, mas `isPaused` deriva de `useState` e só tem efeito na renderização seguinte — entre a primeira leitura e esse render a câmera continua entregando frames. Um `useRef` (`isBusy`) fecha o gate na mesma instrução. As duas juntas; nenhuma sozinha basta.
+- **Task 7 (contraste):** `outlined`/`contained-tonal` derivam a cor do tema (primária `#208AEF`) e ficam ilegíveis sobre o vermelho e o âmbar dos overlays. Os botões do overlay usam `buttonColor`/`textColor` explícitos.
+- **Task 8** deu a `(driver)/_layout.tsx` o mesmo tratamento que a 3.2b deu ao grupo do aluno (`initialRouteName` + títulos em português para as 4 telas) e acrescentou **um** botão a `(driver)/trip.tsx`, no ramo `ACTIVE`, com `router.navigate`. Nada mais foi tocado em `trip.tsx` — a tela pertence à Story 3.1, que está em `review`.
+- **AC #4 (< 2s percebido)** é atendida estruturalmente: `handleScan` entra em `checking` de forma síncrona, antes de qualquer `await`, então o retorno visual não depende da latência da API. Sem device, isso está provado por leitura do código, não por cronômetro.
+- **AC #1 e #5 ficam sem evidência de runtime**, junto com o comportamento de rajada em hardware real. **Recomendo ao Lucas rodar o roteiro da Task 9.3 num device/emulador antes de mover a story para `done`** — em especial as linhas *rajada*, *permissão negada* e *sem rede*.
+- Nenhum arquivo em `api/` foi tocado (AC #6), e `EXPO_PUBLIC_USE_MOCKS` continua em `0` no `.env.example` — os mocks não foram desligados nem o `api-client` apontado para a API real.
+
 ### File List
 
+- `mobile/package.json` (UPDATE — +1 dep: `expo-camera`)
+- `mobile/package-lock.json` (UPDATE)
+- `mobile/app.json` (UPDATE — plugin `expo-camera` com `cameraPermission`)
+- `mobile/.env.example` (UPDATE — 3 motoristas sentinela)
+- `mobile/src/app/(driver)/_layout.tsx` (UPDATE — `initialRouteName` + títulos)
+- `mobile/src/app/(driver)/scan.tsx` (UPDATE — placeholder → tela real)
+- `mobile/src/app/(driver)/trip.tsx` (UPDATE — +botão "Escanear QR Code" no ramo `ACTIVE`)
+- `mobile/src/components/qr-scanner.tsx` (NEW)
+- `mobile/src/mocks/handlers/session.ts` (NEW)
+- `mobile/src/mocks/handlers/trip.handlers.ts` (NEW)
+- `mobile/src/mocks/handlers/auth.handlers.ts` (UPDATE — 3 motoristas, import de `session.ts`)
+- `mobile/src/mocks/handlers/routes.handlers.ts` (UPDATE — import de `session.ts`)
+- `mobile/src/mocks/handlers/index.ts` (UPDATE — registra `tripHandlers`)
+- `mobile/src/services/api-client.ts` (UPDATE — headers por requisição + repasse no retry de 401)
+- `mobile/src/services/boarding.service.ts` (NEW)
+- `mobile/src/utils/qr-payload.ts` (UPDATE — +`decodeQrPayload`)
+
 ### Change Log
+
+- 2026-08-23: Implementação da story 3.3b — escaneamento de QR code pelo motorista com registro de check-in contra os handlers MSW. Resolve o defer da Story 3.0 sobre headers por requisição no `api-client` (Task 2). Tasks 1–8 completas; Task 9.1/9.2/9.4 verdes; Task 9.3 executada apenas na metade de rede (16/16 via harness MSW em Node) — a metade de UI depende de device/emulador indisponível neste ambiente.
