@@ -93,7 +93,11 @@ const styles = StyleSheet.create({
   },
   maskMiddleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // SEM `alignItems: 'center'`: com `center`, os dois painéis que ladeiam a
+    // janela não têm altura própria (só `flex: 1`, que aqui governa a largura)
+    // e calculam 0dp — as laterais da faixa central ficavam sem escurecer, e a
+    // "moldura" virava uma fenda horizontal de ponta a ponta. O `stretch`
+    // padrão faz os painéis acompanharem a altura da janela.
     justifyContent: 'center',
   },
   window: {
