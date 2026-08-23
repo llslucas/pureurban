@@ -2,22 +2,7 @@ import React from 'react'
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native'
 import { Text, Card, ActivityIndicator, Snackbar, Divider, Button } from 'react-native-paper'
 import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '@/services/api-client'
-
-// Dados de rota atribuída ao motorista (sem companyId — stripping no backend)
-export interface AssignedRoute {
-  id: string
-  name: string
-  description: string | null
-  originCity: string
-  destinationCity: string
-  createdAt: string
-  updatedAt: string
-}
-
-// Busca as rotas atribuídas ao motorista autenticado (FR10)
-const fetchMyRoutes = (): Promise<AssignedRoute[]> =>
-  apiClient.get<AssignedRoute[]>('/api/v1/routes/mine')
+import { routesService, type AssignedRoute } from '@/services/routes.service'
 
 function RouteCard({ route }: { route: AssignedRoute }) {
   return (
@@ -59,8 +44,8 @@ export default function DriverRoutesScreen() {
     refetch,
     errorUpdatedAt,
   } = useQuery<AssignedRoute[]>({
-    queryKey: ['my-routes'],
-    queryFn: fetchMyRoutes,
+    queryKey: ['routes', 'mine'],
+    queryFn: routesService.getMyRoutes,
     staleTime: 30_000,
     retry: 2,
   })
