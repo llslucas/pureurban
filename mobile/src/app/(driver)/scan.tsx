@@ -379,6 +379,11 @@ export default function ScanScreen() {
   // ---- Estado 5 em diante: câmera na tela ----
 
   const isPaused = result.kind !== 'idle'
+  // Quando existe uma ação primária branca no overlay (retry ou "Ir para
+  // Viagem"), "Escanear próximo" vira secundária — dois botões brancos
+  // contained empilhados não teriam hierarquia nenhuma.
+  const hasPrimaryAction =
+    result.kind === 'failure' && (result.canRetry || result.code === 'TRIP_NOT_ACTIVE')
 
   return (
     <View style={styles.container}>
@@ -442,12 +447,28 @@ export default function ScanScreen() {
               Tentar novamente
             </Button>
           ) : null}
+          {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
+              afordância: sem ela o motorista lê "Inicie uma viagem antes de
+              registrar embarques" sem nenhum caminho até lá. */}
+          {result.code === 'TRIP_NOT_ACTIVE' ? (
+            <Button
+              mode="contained"
+              buttonColor="#FFFFFF"
+              textColor={TONE_COLOR[result.tone]}
+              onPress={() => router.navigate('/(driver)/trip')}
+              style={styles.action}
+              contentStyle={styles.actionContent}
+              labelStyle={styles.actionLabel}
+            >
+              Ir para Viagem
+            </Button>
+          ) : null}
           {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema
               (primária #208AEF) e ficam ilegíveis sobre vermelho ou âmbar. */}
           <Button
-            mode={result.canRetry ? 'text' : 'contained'}
-            buttonColor={result.canRetry ? undefined : '#FFFFFF'}
-            textColor={result.canRetry ? '#FFFFFF' : TONE_COLOR[result.tone]}
+            mode={hasPrimaryAction ? 'text' : 'contained'}
+            buttonColor={hasPrimaryAction ? undefined : '#FFFFFF'}
+            textColor={hasPrimaryAction ? '#FFFFFF' : TONE_COLOR[result.tone]}
             onPress={resume}
             style={styles.action}
             contentStyle={styles.actionContent}
