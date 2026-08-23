@@ -39,7 +39,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "O PureUrban usa a câmera para escanear o QR code dos alunos no embarque."
+          "cameraPermission": "O PureUrban usa a câmera para escanear o QR code dos alunos no embarque.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ]
     ],
