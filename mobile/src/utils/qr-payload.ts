@@ -48,5 +48,10 @@ export function decodeQrPayload(raw: string): QrCodePayload | null {
 
   // Reconstrói o objeto em vez de devolver `parsed`: um QR com campos extras não
   // pode vazar para o body do check-in.
-  return { studentId, sessionId }
+  //
+  // Normaliza para minúsculas: o regex aceita hex maiúsculo (flag `/i`), mas a
+  // busca no roster é exata — tanto no mock quanto no Prisma. Sem isto, um QR
+  // com UUID maiúsculo passava aqui, ia à rede e voltava como
+  // STUDENT_NOT_ALLOWED, dizendo ao motorista a coisa errada.
+  return { studentId: studentId.toLowerCase(), sessionId: sessionId.toLowerCase() }
 }
