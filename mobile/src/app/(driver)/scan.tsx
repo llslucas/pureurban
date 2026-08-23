@@ -229,6 +229,14 @@ export default function ScanScreen() {
         setResult({ kind: 'idle' })
       }, SUCCESS_RESUME_MS)
     } catch (error: unknown) {
+      // Estado 17 da Tabela de Verdade: "Nada". Quando o refresh falha, o
+      // `api-client` já chamou `logout()` e `router.replace('/(auth)/login')`
+      // ANTES de lançar — pintar overlay aqui desenharia um erro vermelho com
+      // botão de "Tentar novamente" sobre uma tela que está desmontando, e o
+      // retry só poderia falhar de novo.
+      if (error instanceof ApiClientError && error.code === 'UNAUTHORIZED') {
+        return
+      }
       const described = describeFailure(error)
       setResult({ kind: 'failure', ...described })
     }
