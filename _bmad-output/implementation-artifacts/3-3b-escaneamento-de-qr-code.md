@@ -76,8 +76,9 @@ Toda decisão de UI de `(driver)/scan.tsx` sai daqui. Se a implementação diver
 
 | # | Estado | Gatilho | O que a tela mostra | Câmera |
 |---|---|---|---|---|
-| 1 | Permissão não solicitada | primeiro mount | Explicação + botão grande "Permitir acesso à câmera" | off |
-| 2 | Permissão negada | usuário negou | Mensagem + botão "Abrir configurações" (`Linking.openSettings`) | off |
+| 0 | Permissão indefinida | `useCameraPermissions()` ainda não resolveu (`permission === null`) | `ActivityIndicator` + "Preparando câmera..." | off |
+| 1 | Permissão pendente, ainda re-perguntável | primeiro mount **ou** negada com `canAskAgain: true` | Explicação + botão grande "Permitir acesso à câmera" | off |
+| 2 | Permissão negada definitivamente | `canAskAgain: false` | Mensagem + botão "Abrir configurações" (`Linking.openSettings`) | off |
 | 3 | Carregando viagem | query `['activeTrip']` em `pending` | `ActivityIndicator` + "Carregando viagem..." | off |
 | 4 | Sem viagem ativa | `activeTrip` null ou `COMPLETED` | "Nenhuma viagem ativa" + botão "Ir para Viagem" → `/(driver)/trip` | off |
 | 5 | Pronto para escanear | permissão ok + viagem `ACTIVE` | Câmera + moldura de alto contraste + contador da sessão | **on** |
@@ -99,6 +100,7 @@ Toda decisão de UI de `(driver)/scan.tsx` sai daqui. Se a implementação diver
 - **Âmbar não é vermelho.** `DUPLICATE_CHECK_IN` significa "o aluno está no ônibus" — o objetivo do motorista foi atingido. Pintar de vermelho ensina o motorista a ignorar vermelho.
 - **Erro não auto-retoma.** Estados 8–16 esperam toque explícito em "Escanear próximo". Só o estado 7 (sucesso) auto-retoma, após ~2,5s.
 - **Fallback é obrigatório (estado 16).** O contrato tem mais códigos do que a AC #3 lista, e a 3.3a pode ganhar outros. Um `switch` sem `default` transforma código novo em tela em branco.
+- **A permissão tem dois estágios, não um.** O Android só devolve `canAskAgain: false` a partir da **segunda** negativa; o iOS já na primeira. Por isso as linhas 1 e 2 são discriminadas por `canAskAgain`, e não por "o usuário negou": mandar um motorista Android às configurações do sistema depois de uma única negativa é pior do que simplesmente perguntar de novo. A linha 0 existe porque o hook devolve `null` no primeiro render, antes de qualquer decisão.
 - **Estado 10 nunca toca a rede.** O contrato é explícito: *"O QR bruto nunca trafega (o app do motorista decodifica e envia campos estruturados)"*.
 
 ---
