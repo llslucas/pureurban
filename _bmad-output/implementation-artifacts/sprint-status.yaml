@@ -1,5 +1,5 @@
 # generated: 2026-03-25T21:46:25-03:00
-# last_updated: 2026-08-23T21:40:00-03:00
+# last_updated: 2026-08-23T23:15:00-03:00
 # project: pureurban
 # project_key: NOKEY
 # tracking_system: file-system
@@ -54,13 +54,17 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 development_status:
   # === Epic 1: Fundação do Projeto e Infraestrutura ===
-  epic-1: done
+  # Reaberto em 23/08/2026 (sprint-change-proposal-2026-08-23): as stories 1.6 e 1.7
+  # entregam o ambiente de execução do mobile, ausente desde a 1.5.
+  epic-1: in-progress
   1-1-inicializacao-dos-projetos-e-repositorio: done
   1-2-schema-prisma-e-configuracao-do-banco-de-dados: done
   1-3-setup-effect-ts-e-composition-root: done
   1-4-infraestrutura-compartilhada-guards-filters-pipes: done
   1-5-setup-mobile-dependencias-e-configuracao-offline: done
-  epic-1-retrospective: done
+  1-6-ambiente-de-execucao-web-do-app-mobile: backlog
+  1-7-development-build-android-para-validacao-nativa: backlog
+  epic-1-retrospective: done  # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
   epic-2: done
@@ -79,6 +83,8 @@ development_status:
   3-1-iniciar-e-encerrar-viagem: review
   3-2b-geracao-e-exibicao-de-qr-code-do-aluno: done
   3-3a-check-in-de-embarque: done
+  # 3-3b em diante: bloqueadas pela Story 1.6 (sem ambiente de execução mobile).
+  # Código da 3-3b está implementado e revisado (c36dd69) — falta apenas verificação em execução.
   3-3b-escaneamento-de-qr-code: in-progress
   3-4b-check-in-offline-com-fila-de-sincronizacao: backlog
   3-5a-lista-de-alunos-da-viagem-com-status: done

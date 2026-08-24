@@ -8,8 +8,8 @@ date: '2026-03-15'
 lastStep: 8
 status: 'complete'
 completedAt: '2026-03-15T14:57:00-03:00'
-revisedAt: '2026-07-12'
-revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simplificação do offline sync em tiers, CI/CD e testes E2E incorporados ao MVP. Revisão 12/07/2026 (sprint-change-proposal-2026-07-12, aprovado): nova §12 (Contrato de API e Desenvolvimento Paralelo — OpenAPI-first), §10 reescrita em duas trilhas formais, §9 substituída pelo ciclo contrato → trilhas paralelas → integração, e regras 11-13 adicionadas à §8. Nenhuma decisão estrutural alterada.'
+revisedAt: '2026-08-23'
+revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simplificação do offline sync em tiers, CI/CD e testes E2E incorporados ao MVP. Revisão 12/07/2026 (sprint-change-proposal-2026-07-12, aprovado): nova §12 (Contrato de API e Desenvolvimento Paralelo — OpenAPI-first), §10 reescrita em duas trilhas formais, §9 substituída pelo ciclo contrato → trilhas paralelas → integração, e regras 11-13 adicionadas à §8. Nenhuma decisão estrutural alterada. Revisão 23/08/2026 (sprint-change-proposal-2026-08-23, aprovado): Expo Go removido como alvo de distribuição — premissa incompatível com a stack MMKV/Nitro decidida em §3. Nova subseção §3 (Ambiente de Execução e Validação) definindo web como alvo primário de desenvolvimento e development build Android para validação nativa; regras 14-16 adicionadas à §8. Nenhuma decisão estrutural alterada.'
 ---
 
 # Architecture Decision Document — PureUrban
@@ -21,7 +21,7 @@ revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simp
 - **Domínio:** App de gestão de transporte escolar/universitário (Expo/React Native + NestJS)
 - **Complexidade:** Média-Alta — 37 FRs em 7 categorias, 20 NFRs
 - **Recurso:** 2 desenvolvedores (Lucas + 1) — MVP ~9 meses (dezembro/2026)
-- **Distribuição:** Expo Go / build de dev (sem loja), Android 8+ / iOS 13+, telas 5", dispositivos de baixo custo
+- **Distribuição:** Development build (EAS, sem loja), Android 8+ / iOS 13+, telas 5", dispositivos de baixo custo. **Expo Go não é alvo** — ver §3, Ambiente de Execução e Validação
 - **Natureza acadêmica (TCC):** Hexagonal Architecture + DDD + Functional Core / Imperative Shell — parte da tese, não opcional
 
 ### Stack Definida
@@ -144,6 +144,27 @@ O imperative shell (NestJS) injeta um runtime do Effect já montado com todas as
 - expo-sqlite: fila de check-ins offline pendentes — queries estruturadas (ver seção Offline Sync)
 
 **UI:** React Native Paper (Material Design) — componentes acessíveis (botões grandes, contraste alto — NFR18/NFR19).
+
+### Ambiente de Execução e Validação (Mobile)
+
+**Expo Go não é um alvo suportado.** O `react-native-mmkv` v4 usa Nitro Modules — código nativo ausente do binário do Expo Go — e está no caminho de boot do app (`_layout.tsx`, `auth.store.ts`, `api-client.ts`, `mmkv-persister.ts`). Qualquer tentativa de rodar no Expo Go falha antes da tela de login, independentemente da versão do SDK.
+
+O mobile é executado em dois ambientes complementares:
+
+| Ambiente | Comando | Papel |
+|---|---|---|
+| **Web** (alvo primário de desenvolvimento) | `npm run web` | Ciclo diário. Telas, navegação, estado, SSE, offline Tier 1, leitura de QR via webcam |
+| **Development build Android** (EAS) | `eas build -p android --profile development` | Validação nativa. Push, GPS, offline Tier 2 real, NFR5 e NFR18-NFR20 |
+
+**Substituições no alvo web** — equivalentes em API, distintos em substrato:
+
+| Nativo | Web | Consequência |
+|---|---|---|
+| MMKV (mmap) | `localStorage` | Sem criptografia, perfil de performance diferente |
+| expo-sqlite (SQLite nativo) | wa-sqlite (WASM/OPFS) | Exige `assetExts: ['wasm']` e headers COOP/COEP no Metro |
+| expo-camera (nativo) | `getUserMedia` + `useWebBarcodeScanner` | Webcam, não câmera de device |
+
+As regras decorrentes deste ambiente estão na §8 (regras 14, 15 e 16).
 
 ### Infraestrutura & Deploy
 
@@ -660,6 +681,9 @@ Mobile (Aluno/Motorista)
 11. Tipos de API no mobile são **gerados** a partir de `api/openapi.json` (via `openapi-typescript`) — NUNCA escritos à mão. Editar `src/types/api.d.ts` manualmente é violação de contrato
 12. Toda story de trilha mobile (`X.Yb`) desenvolve contra os handlers MSW da story de contrato (`X.0`) — a trilha mobile NÃO depende do backend estar rodando até a story de integração (`X.N`)
 13. Nenhum endpoint **e nenhum evento SSE** entra numa story `X.Ya` sem estar declarado no contrato da story `X.0` do épico. Vale para o payload REST e para o schema de cada evento do stream — o mobile precisa mockar ambos. (Domain events internos entre bounded contexts — §4 — não são contrato de cliente e ficam fora desta regra, exceto quando expostos num stream SSE)
+14. Toda dependência mobile nova DEVE ter suporte web declarado **ou** uma variante `.web.tsx` / `.web.ts` antes de ser adotada. Vale explicitamente para a biblioteca de mapas do Épico 5, ainda não escolhida
+15. Nenhuma story mobile é considerada `done` sem execução verificada em pelo menos um dos dois ambientes da §3. Stories que dependem de recurso nativo (push, GPS, offline Tier 2) exigem o development build Android
+16. `expo export --platform web` DEVE fazer parte da pipeline de CI como smoke test de bundle
 
 ---
 

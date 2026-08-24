@@ -303,6 +303,53 @@ Para que o app esteja pronto para receber funcionalidades com suporte offline.
 
 ---
 
+### Story 1.6: Ambiente de Execução Web do App Mobile
+
+Como desenvolvedor,
+Quero executar o app mobile no alvo web,
+Para que exista um ambiente onde as stories mobile possam ser desenvolvidas e verificadas.
+
+**Acceptance Criteria:**
+
+**Given** o app mobile sem ambiente de execução viável (Expo Go incompatível com MMKV/Nitro)
+**When** configuro o alvo web
+**Then** `mobile/metro.config.js` existe, estende `expo/metro-config` e registra `wasm` em `resolver.assetExts`
+**And** o dev server envia os headers `Cross-Origin-Opener-Policy: same-origin` e `Cross-Origin-Embedder-Policy: credentialless`, exigidos pelo `SharedArrayBuffer` do wa-sqlite
+**And** `npx expo export --platform web` completa sem erro
+**And** `npm run web` sobe o app e o login autentica de ponta a ponta com a API local
+**And** o MMKV opera via `localStorage` — tokens e cache do TanStack Query sobrevivem a reload (Tier 1)
+**And** o `expo-sqlite` abre a base e roda as migrations em wa-sqlite/OPFS (Tier 2)
+**And** a leitura de QR code funciona em `(driver)/scan.tsx` via webcam
+**And** nenhuma alteração é feita em código de aplicação — apenas configuração
+**And** o README documenta o comando e as limitações do alvo web (Architecture §3)
+
+**Camada:** Infraestrutura · **Depende de:** 1.5 · **FRs:** habilitador · **Desbloqueia:** 3.3b, 3.4b, 3.5b, 3.6
+
+---
+
+### Story 1.7: Development Build Android para Validação Nativa
+
+Como desenvolvedor,
+Quero um development build Android instalável,
+Para que os recursos nativos e os NFRs de device possam ser validados de fato.
+
+**Acceptance Criteria:**
+
+**Given** o alvo web cobre lógica e telas, mas não recursos nativos
+**When** configuro o development build
+**Then** `expo-dev-client` está instalado e `mobile/eas.json` define o profile `development`
+**And** `eas build -p android --profile development` produz um APK instalável
+**And** o APK roda em emulador Android no Windows, conectado ao dev server via `adb reverse`
+**And** o MMKV opera nativamente (mmap) e o `expo-sqlite` usa SQLite nativo
+**And** a leitura de QR funciona pela câmera do device/emulador (virtual scene)
+**And** NFR5 é medido: boot operacional em menos de 3s
+**And** o README documenta o fluxo de build e instalação
+**And** nenhuma conta Apple Developer nem hardware macOS é necessário
+
+**Camada:** Infraestrutura · **Depende de:** 1.6 · **FRs:** habilitador · **Desbloqueia:** 4.4b, 5.1b, 5.2b, NFR5, NFR18-NFR20
+
+---
+
 ## Epic 2: Identidade, Acesso e Organização
 
 Empresa cadastrada, motoristas e alunos criados com suas credenciais, rotas configuradas com vínculos — todos podem fazer login e ver suas rotas. O sistema está pronto para operação.
@@ -1003,6 +1050,7 @@ Para que eu saiba quando ele vai chegar ao meu ponto.
 **And** as atualizações aparecem com latência máxima de 5 segundos na percepção do aluno (NFR2)
 **And** a tela é utilizável em dispositivo de 5" a 720p (NFR20)
 **And** a story é desenvolvida contra o stream SSE mockado da Story 5.0, que emite uma sequência de posições
+**And** a biblioteca de mapas escolhida tem suporte web ou variante `.web.tsx` (Architecture §8, regra 14) — `react-native-maps` não atende e exige alternativa
 
 **Camada:** Mobile (Aluno) · **Depende de:** 5.0 · **FRs:** FR32 · **NFRs:** NFR2, NFR20
 
@@ -1077,9 +1125,9 @@ O refatiamento dos Épicos 3, 4 e 5 em trilhas **não removeu nem realocou nenhu
 
 | Épico | Antes | Depois | Detalhe |
 |---|---|---|---|
-| Epic 1 | 5 | 5 | intocado (done) |
+| Epic 1 | 5 | 7 | +1.6 e 1.7 (ambiente de execução — sprint-change-proposal-2026-08-23) |
 | Epic 2 | 6 | 6 | intocado (done) |
 | Epic 3 | 5 | 9 | 1 entregue + 1 contrato + 2 backend + 4 mobile + 1 integração |
 | Epic 4 | 5 | 12 | 1 contrato + 5 backend + 5 mobile + 1 integração |
 | Epic 5 | 3 | 7 | 1 contrato + 2 backend + 3 mobile + 1 integração |
-| **Total** | **24** | **39** | 12 stories restantes viram 27 |
+| **Total** | **24** | **41** | 12 stories restantes viram 27, + 2 habilitadoras de ambiente |
