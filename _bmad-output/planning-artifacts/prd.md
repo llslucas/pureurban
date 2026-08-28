@@ -222,11 +222,17 @@ O PureUrban é composto por dois artefatos de software:
 
 **Abordagem:** MVP de Resolução de Problema — provar que o PureUrban elimina a espera indevida e substitui a carteirinha física, enquanto demonstra a tese arquitetural.
 
-**Cronograma:**
-- **Fase 1 (MVP/Protótipo):** ~2 meses (entrega fim do semestre — maio/2026) — protótipo utilizável
-- **Fase 2 (Refinamento):** +6 meses (entrega final TCC — dezembro/2026) — documentação completa + polish
+**Cronograma (revisado em 28/08/2026):**
+- **Fase 1 (MVP/Protótipo):** Épicos 1 a 5 — entrega até novembro/2026
+- **Fase 2 (Refinamento):** documentação completa, métricas e polish — entrega final TCC dezembro/2026
 
-**Recurso humano:** Desenvolvedor solo (Lucas)
+> O cronograma original (Fase 1 até maio/2026) não se concretizou. A revisão de 28/08/2026
+> reduziu o escopo de front-end do MVP em vez de estender o prazo — ver
+> `sprint-change-proposal-2026-08-28.md`.
+
+**Recurso humano:** Desenvolvedor solo (Lucas) + agentes de IA. O segundo desenvolvedor
+previsto na Architecture §10 não se materializou; o fatiamento em trilhas paralelas foi
+revertido nos Épicos 4 e 5 em consequência disso.
 
 ### Fase 1 — MVP (Protótipo Utilizável)
 
@@ -248,7 +254,9 @@ O PureUrban é composto por dois artefatos de software:
 **Explicitamente fora do MVP:**
 - Dashboard administrativo (Dona Márcia)
 - Histórico de viagens e relatórios
-- Push notifications complexas (pode usar básico)
+- **Push notifications (qualquer nível)** — o lembrete automático do FR30 é entregue in-app
+- **Avisos gerais do motorista (broadcast) — FR36 e FR37**
+- **Mapa cartográfico** — a localização é apresentada como última posição conhecida + ETA (FR32)
 - Gestão avançada de rotas
 - Publicação em loja
 
@@ -258,7 +266,9 @@ O PureUrban é composto por dois artefatos de software:
 - Testes de domínio demonstrando isolamento funcional core / imperative shell
 - Métricas de acoplamento e coesão (Instability, Abstractness)
 - Dashboard administrativo básico
-- Push notifications completas
+- Avisos gerais do motorista — broadcast (FR36, FR37)
+- Mapa cartográfico com marcador animado (evolução do FR32)
+- Push notifications completas (evolução do FR30)
 - Polish de UX e tratamento de edge cases
 
 ### Fase 3 — Visão Futura (Pós-TCC)
@@ -325,20 +335,23 @@ O PureUrban é composto por dois artefatos de software:
 - **FR27:** Motorista recebe notificação imediata quando aluno informa que não retornará
 - **FR28:** Motorista pode ver quais alunos notificaram ausência na lista de embarque
 - **FR29:** Sistema permite que aluno cancele a notificação de ausência dentro de um período de segurança
-- **FR30:** Sistema envia lembrete automático ao aluno que embarcou na ida mas não fez check-in na volta após um período definido
+- **FR30:** Sistema envia lembrete automático ao aluno que embarcou na ida mas não fez check-in na volta após um período definido. **No MVP o lembrete é entregue in-app** (canal SSE + estado lido na abertura do app); push notification fica para a Fase 2
 
 ### Localização em Tempo Real
 
 - **FR31:** App do motorista transmite localização GPS durante viagens ativas
-- **FR32:** Aluno pode visualizar localização do ônibus em tempo real no mapa
+- **FR32:** Aluno pode visualizar a localização do ônibus em tempo real. **No MVP a apresentação é a última posição conhecida com distância e tempo estimado até o ponto do aluno** — o mapa cartográfico fica para a Fase 2. A Jornada 1 ("o ônibus está a 3 pontos de distância, chegando em ~8 minutos") é atendida por esta forma
 - **FR33:** Sistema interrompe transmissão de GPS quando a viagem é encerrada
 - **FR34:** Sistema exibe último ponto conhecido quando há perda de sinal GPS
 - **FR35:** Localização é atualizada via SSE com armazenamento em Redis
 
-### Comunicação
+### Comunicação — **diferido para a Fase 2** (revisão de 28/08/2026)
 
-- **FR36:** Motorista pode enviar aviso geral para todos os alunos da rota (ex: atraso, mudança)
-- **FR37:** Aluno recebe avisos enviados pelo motorista da sua rota
+- **FR36 (Fase 2):** Motorista pode enviar aviso geral para todos os alunos da rota (ex: atraso, mudança)
+- **FR37 (Fase 2):** Aluno recebe avisos enviados pelo motorista da sua rota
+
+> Não aparece em nenhuma das quatro jornadas do PRD e está abaixo de todas as
+> prioridades listadas na Mitigação de Riscos. **Cobertura de FRs do MVP: 35/37.**
 
 ## Requisitos Não-Funcionais
 

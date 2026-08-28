@@ -9,7 +9,7 @@ lastStep: 8
 status: 'complete'
 completedAt: '2026-03-15T14:57:00-03:00'
 revisedAt: '2026-08-23'
-revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simplificação do offline sync em tiers, CI/CD e testes E2E incorporados ao MVP. Revisão 12/07/2026 (sprint-change-proposal-2026-07-12, aprovado): nova §12 (Contrato de API e Desenvolvimento Paralelo — OpenAPI-first), §10 reescrita em duas trilhas formais, §9 substituída pelo ciclo contrato → trilhas paralelas → integração, e regras 11-13 adicionadas à §8. Nenhuma decisão estrutural alterada. Revisão 23/08/2026 (sprint-change-proposal-2026-08-23, aprovado): Expo Go removido como alvo de distribuição — premissa incompatível com a stack MMKV/Nitro decidida em §3. Nova subseção §3 (Ambiente de Execução e Validação) definindo web como alvo primário de desenvolvimento e development build Android para validação nativa; regras 14-16 adicionadas à §8. Nenhuma decisão estrutural alterada.'
+revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simplificação do offline sync em tiers, CI/CD e testes E2E incorporados ao MVP. Revisão 12/07/2026 (sprint-change-proposal-2026-07-12, aprovado): nova §12 (Contrato de API e Desenvolvimento Paralelo — OpenAPI-first), §10 reescrita em duas trilhas formais, §9 substituída pelo ciclo contrato → trilhas paralelas → integração, e regras 11-13 adicionadas à §8. Nenhuma decisão estrutural alterada. Revisão 23/08/2026 (sprint-change-proposal-2026-08-23, aprovado): Expo Go removido como alvo de distribuição — premissa incompatível com a stack MMKV/Nitro decidida em §3. Nova subseção §3 (Ambiente de Execução e Validação) definindo web como alvo primário de desenvolvimento e development build Android para validação nativa; regras 14-16 adicionadas à §8. Nenhuma decisão estrutural alterada. Revisão 28/08/2026 (sprint-change-proposal-2026-08-28, aprovado): recurso humano corrigido para desenvolvedor solo; §10 reescrita como Modelo de Execução (Desenvolvedor Solo) com a nota da tese reenquadrada; §9 ganha o ciclo vertical dos Épicos 4 e 5 ao lado do ciclo de trilhas do Épico 3; §12 rescopa a camada de mock ao Épico 3 e troca boarding.broadcast por boarding.checkin_reminder; regras 12, 14 e 15 da §8 ajustadas; build Android demovido a validação final. FR36/FR37 diferidos para a Fase 2; FR30 e FR32 mudam de forma de entrega. Nenhuma decisão estrutural alterada.'
 ---
 
 # Architecture Decision Document — PureUrban
@@ -20,7 +20,7 @@ revisionNotes: 'Prazo estendido para dez/2026, equipe ampliada para 2 devs, simp
 
 - **Domínio:** App de gestão de transporte escolar/universitário (Expo/React Native + NestJS)
 - **Complexidade:** Média-Alta — 37 FRs em 7 categorias, 20 NFRs
-- **Recurso:** 2 desenvolvedores (Lucas + 1) — MVP ~9 meses (dezembro/2026)
+- **Recurso:** desenvolvedor solo (Lucas) + agentes de IA — MVP até novembro/2026, defesa em dezembro/2026
 - **Distribuição:** Development build (EAS, sem loja), Android 8+ / iOS 13+, telas 5", dispositivos de baixo custo. **Expo Go não é alvo** — ver §3, Ambiente de Execução e Validação
 - **Natureza acadêmica (TCC):** Hexagonal Architecture + DDD + Functional Core / Imperative Shell — parte da tese, não opcional
 
@@ -154,7 +154,7 @@ O mobile é executado em dois ambientes complementares:
 | Ambiente | Comando | Papel |
 |---|---|---|
 | **Web** (alvo primário de desenvolvimento) | `npm run web` | Ciclo diário. Telas, navegação, estado, SSE, offline Tier 1, leitura de QR via webcam |
-| **Development build Android** (EAS) | `eas build -p android --profile development` | Validação nativa. Push, GPS, offline Tier 2 real, NFR5 e NFR18-NFR20 |
+| **Development build Android** (EAS) | `eas build -p android --profile development` | **Validação final, antes da defesa.** NFR5 (boot < 3s) e NFR18-NFR20 (ergonomia, tela de 5"). Não é pré-requisito de nenhuma story de feature: push saiu do MVP, GPS usa a Geolocation API no web e o Tier 2 foi verificado em wa-sqlite/OPFS na Story 1.6 |
 
 **Substituições no alvo web** — equivalentes em API, distintos em substrato:
 
@@ -679,10 +679,10 @@ Mobile (Aluno/Motorista)
 9. Pastas `shell/` são o ÚNICO lugar onde NestJS, Prisma e Redis podem ser importados
 10. Use cases DEVEM retornar `WithEvents<A>` — nunca emitir eventos diretamente no core
 11. Tipos de API no mobile são **gerados** a partir de `api/openapi.json` (via `openapi-typescript`) — NUNCA escritos à mão. Editar `src/types/api.d.ts` manualmente é violação de contrato
-12. Toda story de trilha mobile (`X.Yb`) desenvolve contra os handlers MSW da story de contrato (`X.0`) — a trilha mobile NÃO depende do backend estar rodando até a story de integração (`X.N`)
+12. **(histórico — vale apenas para o Épico 3)** Stories de trilha mobile (`X.Yb`) do Épico 3 desenvolvem contra os handlers MSW da Story 3.0. A partir do Épico 4 o projeto voltou ao fatiamento vertical e a camada de mock foi removida (§10): stories de feature são desenvolvidas contra a API local (`docker compose up` + `npm run start:dev`)
 13. Nenhum endpoint **e nenhum evento SSE** entra numa story `X.Ya` sem estar declarado no contrato da story `X.0` do épico. Vale para o payload REST e para o schema de cada evento do stream — o mobile precisa mockar ambos. (Domain events internos entre bounded contexts — §4 — não são contrato de cliente e ficam fora desta regra, exceto quando expostos num stream SSE)
-14. Toda dependência mobile nova DEVE ter suporte web declarado **ou** uma variante `.web.tsx` / `.web.ts` antes de ser adotada. Vale explicitamente para a biblioteca de mapas do Épico 5, ainda não escolhida
-15. Nenhuma story mobile é considerada `done` sem execução verificada em pelo menos um dos dois ambientes da §3. Stories que dependem de recurso nativo (push, GPS, offline Tier 2) exigem o development build Android
+14. Toda dependência mobile nova DEVE ter suporte web declarado **ou** uma variante `.web.tsx` / `.web.ts` antes de ser adotada. A biblioteca de mapas do Épico 5 deixou de ser necessária na revisão de 28/08/2026 — o FR32 é entregue como última posição + ETA, sem renderização cartográfica
+15. Nenhuma story mobile é considerada `done` sem execução verificada em pelo menos um dos dois ambientes da §3. **Todas as stories de feature restantes são verificáveis no alvo web.** O development build Android (Story 1.7) é exigido apenas para NFR5 e NFR18-NFR20, na validação final antes da defesa
 16. `expo export --platform web` DEVE fazer parte da pipeline de CI como smoke test de bundle
 
 ---
@@ -699,7 +699,14 @@ Mobile (Aluno/Motorista)
 6. Auth module (JWT + Guards + RBAC)
 7. Primeiro bounded context com CRUD (Rotas/Turmas)
 
-### Fase de trilhas paralelas (Épicos 3 → 4 → 5)
+### Fase de execução por épico (Épicos 3 → 4 → 5)
+
+> **Revisão de 28/08/2026 (`sprint-change-proposal-2026-08-28`, aprovado):** o ciclo de
+> trilhas paralelas descrito abaixo vale integralmente para o **Épico 3**, que executa até
+> o fim sob ele. A partir do **Épico 4** o projeto voltou ao fatiamento vertical — ver o
+> ciclo vertical logo após os invariantes.
+
+#### Épico 3 — ciclo de trilhas paralelas (modelo histórico)
 
 A partir do Épico 3, a implementação deixa de ser uma lista linear de features e passa a repetir um **ciclo por épico**. A ordem dos épicos permanece **3 (Embarque) → 4 (Ausência e Comunicação) → 5 (Localização)**; o que muda é a estrutura interna de cada um:
 
@@ -726,9 +733,32 @@ A partir do Épico 3, a implementação deixa de ser uma lista linear de feature
 - O épico só está entregue na `X.N`. Antes disso existem duas metades, não um incremento demonstrável.
 - O drift check no CI (§12) é o que impede as trilhas de divergirem em silêncio entre `X.0` e `X.N`.
 
+#### Épicos 4 e 5 — ciclo vertical (revisão de 28/08/2026)
+
+```
+  X.0  Contrato de API (OpenAPI-first)
+        │  DTOs + controllers stub (501) + Swagger + openapi.json + tipos gerados
+        │  SEM handlers MSW — não há trilha paralela a desbloquear
+        ↓
+  X.1 … X.n  Fatias verticais por FR
+        │  core Effect + shell + adapters + tela, na mesma story,
+        │  desenvolvidas contra a API local
+        ↓
+  X.N  E2E do épico (mocks não existem — nada a desligar)
+```
+
+**Invariantes que sobrevivem:** a `X.0` continua bloqueante; nenhum endpoint ou evento SSE
+entra numa fatia sem estar no contrato; o drift check no CI (§12) continua sendo o guardião
+do `openapi.json`.
+
+**Guarda-corpo de tamanho:** uma fatia vertical que passe de ~8 ACs ou toque mais de ~15
+arquivos é dividida por camada **dentro do mesmo épico**, em sequência (backend, depois
+mobile contra a API local) — nunca voltando à camada de mock.
+
 ### Trabalho transversal (após o Épico 5)
 
-8. Push notifications (Expo Push API) — pode ser antecipado dentro do Épico 4 (Story 4.4a)
+8. Push notifications (Expo Push API) — **diferido para a Fase 2**. No MVP o lembrete do FR30
+   é entregue in-app pelo canal SSE do Épico 4
 9. Testes E2E consolidados (Supertest/Playwright API + Playwright mobile) — o grosso já é entregue nas stories `X.N`
 
 **Dependências entre passos:**
@@ -741,29 +771,54 @@ A partir do Épico 3, a implementação deixa de ser uma lista linear de feature
 
 ---
 
-## 10. Divisão de Trabalho (2 Desenvolvedores)
+## 10. Modelo de Execução (Desenvolvedor Solo)
 
-A arquitetura hexagonal com bounded contexts cria uma **fronteira natural de divisão** — `core/` vs `shell/` e domínios independentes permitem trabalho paralelo com baixo acoplamento. A partir do Épico 3, essa fronteira deixa de ser uma sugestão informal e vira a **estrutura formal do backlog**: duas trilhas de execução, sincronizadas pelo contrato OpenAPI (§12).
+O segundo desenvolvedor previsto em 12/07/2026 não se materializou. Confirmado em
+28/08/2026 (`sprint-change-proposal-2026-08-28`, aprovado): o projeto é executado por um
+**desenvolvedor solo (Lucas) apoiado por agentes de IA**. O fatiamento em trilhas paralelas
+— cujo **único** objetivo era o paralelismo — foi revertido a partir do Épico 4.
 
-### As duas trilhas
+**O que sai:** a camada de mock MSW como obrigação de processo, e a divisão de stories por
+camada (`X.Ya` / `X.Yb`).
 
-| | **Trilha API** (Dev 1) | **Trilha Mobile** (Dev 2) |
-|---|---|---|
-| **Contrato (`X.0`)** | Escreve: DTOs, controllers stub (501), decorators Swagger, exporta o `openapi.json` | Revisa e consome: gera `src/types/api.d.ts`, escreve os handlers MSW (REST e SSE) |
-| **Implementação** | Stories `X.Ya` — functional core (Effect) + shell NestJS + adapters | Stories `X.Yb` — telas, stores Zustand, services, hooks |
-| **Especialidade** | Domain events, SSE, Redis Pub/Sub, idempotência, multi-tenancy | Offline (Tier 1 e Tier 2), cache, UX, acessibilidade (NFR18-NFR20) |
-| **Testes** | Use cases do core sem infraestrutura (< 100ms por suite) | Componentes e fluxos contra os mocks MSW |
-| **Integração (`X.N`)** | Sobe a API real, valida o drift check | Desliga os mocks, aponta o `api-client.ts` para a API real |
+**O que fica:** o contrato OpenAPI-first (§12). O `openapi.json` versionado e o drift check
+no CI têm valor independente do paralelismo — são a documentação viva da API e o mecanismo
+que impede divergência silenciosa entre o código e o contrato publicado.
 
-O contrato é o **único ponto de sincronização obrigatório** entre as trilhas. Fora dele, cada dev trabalha em arquivos disjuntos (`api/src/domains/**` vs `mobile/src/**`) — conflito de merge entre as trilhas é, por construção, quase impossível.
+**O que muda no Épico 3:** nada. Ele executou inteiro sob o modelo de duas trilhas e termina
+assim. O modelo está preservado na §9 como registro histórico.
 
-### Estratégia de Onboarding do Dev 2
+### A fronteira arquitetural continua valendo
 
-- Dev 1 (Lucas) estabelece padrões nos primeiros bounded contexts (`shared/` + `auth/`) — **feito** (Épicos 1 e 2)
-- Dev 2 opera integralmente na trilha mobile a partir do Épico 3 — não precisa saber Effect TS para produzir
-- Dev 2 entra gradualmente no functional core quando houver folga — a trilha mobile deixou de ser um gargalo para isso
+A arquitetura hexagonal com bounded contexts cria uma fronteira natural — `core/` vs `shell/`
+e domínios independentes. Ela deixa de ser usada como linha de divisão **entre pessoas** e
+volta a ser o que sempre foi: a linha de divisão **entre responsabilidades**, dentro da mesma
+fatia vertical.
 
-> **Nota para a tese:** a separação em trilhas transforma a afirmação "a arquitetura hexagonal facilita trabalho paralelo em equipes pequenas" de hipótese teórica em **evidência coletável** — a partir do Épico 3 é possível medir stories concluídas em paralelo, conflitos de merge entre trilhas e retrabalho na story de integração.
+| | Dentro de uma fatia vertical `X.n` |
+|---|---|
+| **Contrato (`X.0`)** | DTOs, controllers stub (501), decorators Swagger, `openapi.json` commitado, `src/types/api.d.ts` gerado |
+| **Backend** | functional core (Effect) + shell NestJS + adapters |
+| **Mobile** | telas, stores Zustand, services, hooks — contra a **API local** |
+| **Testes** | use cases do core sem infraestrutura (< 100ms por suite) + fluxos contra a API local |
+| **E2E (`X.N`)** | prova o épico ponta a ponta; não há mocks a desligar |
+
+**Guarda-corpo de tamanho:** fatia vertical acima de ~8 ACs ou ~15 arquivos é dividida por
+camada, **em sequência** (backend, depois mobile contra a API local), dentro do mesmo épico —
+nunca voltando à camada de mock.
+
+### Nota para a tese (revisada em 28/08/2026)
+
+A afirmação original — *"a arquitetura hexagonal facilita trabalho paralelo em equipes
+pequenas"* — deixa de ser verificável em três épicos e passa a ser verificável em um.
+O reenquadramento preserva o material e melhora o desenho experimental:
+
+- **Épico 3** = estudo de caso do modelo de trilhas paralelas com contrato OpenAPI.
+- **Épicos 4 e 5** = grupo de comparação, sob fatiamento vertical.
+
+O resultado deixa de ser uma afirmação de viabilidade sem controle e passa a ser uma
+**observação comparativa** sobre o custo da camada de mock para um desenvolvedor solo —
+material mais defensável, porque tem termo de comparação.
 
 ---
 
@@ -774,7 +829,8 @@ O contrato é o **único ponto de sincronização obrigatório** entre as trilha
 **Gaps conhecidos:**
 - ⚠️ Schema Prisma (entidades/campos): definir na primeira história
 - ⚠️ Deploy específico (Railway vs Render): decidir no momento do deploy
-- ⚠️ Ramp-up do Dev 2 em Effect TS: prever 3-4 semanas de curva de aprendizado
+- ⚠️ Shell de navegação do mobile ausente (Story 1.8) — bloqueia toda verificação de story mobile
+- ⚠️ Seed do banco quebrado sob Prisma 7 (Story 1.9) — bloqueia stories que dependem de dados semeados
 - Nenhum gap crítico identificado
 
 **Compatibilidade verificada:**
@@ -787,7 +843,10 @@ O contrato é o **único ponto de sincronização obrigatório** entre as trilha
 
 ## 12. Contrato de API e Desenvolvimento Paralelo (OpenAPI-first)
 
-As trilhas de API e Mobile (§10) executam em paralelo. O `api/openapi.json` versionado é o contrato que impede que elas divirjam — sem ele, "trabalhar em paralelo" vira "trabalhar às cegas e integrar no escuro".
+O `api/openapi.json` versionado é o contrato entre a API e o app. Ele nasceu para impedir que
+duas trilhas paralelas divergissem; com o retorno ao modelo solo (§10) o paralelismo saiu, mas
+**o contrato ficou** — agora como documentação viva da API e como guardião contra divergência
+silenciosa entre o código e o contrato publicado, via drift check no CI.
 
 **Decisão:** o contrato é um **artefato versionado no repositório**, não um endpoint servido em runtime. O Swagger já configurado (`api/src/main.ts`) documenta a API rodando; isso não basta para a trilha mobile, que precisa do contrato *antes* de o backend existir. O `openapi.json` commitado é o que torna as trilhas paralelas viáveis.
 
@@ -796,9 +855,10 @@ As trilhas de API e Mobile (§10) executam em paralelo. O `api/openapi.json` ver
 1. **Story `X.0`** declara DTOs, controllers stub e decorators Swagger completos. Os controllers retornam `501 Not Implemented` — o contrato existe, a lógica não.
 2. `npm run openapi:export` (em `api/`) emite `api/openapi.json`. **O arquivo é commitado.**
 3. Mobile roda `openapi-typescript api/openapi.json -o src/types/api.d.ts`. Nenhum tipo de API é escrito à mão (§8, regra 11).
-4. Mobile cria os handlers MSW em `mobile/src/mocks/handlers/` a partir do contrato — a trilha mobile desenvolve **sem backend rodando** (§8, regra 12).
-5. Trilhas `X.Ya` (API) e `X.Yb` (Mobile) executam em paralelo, cada uma validando contra o contrato.
-6. **Story `X.N`** desliga os mocks, aponta o `api-client.ts` para a API real e roda os E2E do épico.
+4. **(Épico 3 apenas)** Mobile cria os handlers MSW em `mobile/src/mocks/handlers/` a partir do contrato (§8, regra 12).
+5. **Épico 3:** trilhas `X.Ya` (API) e `X.Yb` (Mobile) executam em paralelo, cada uma validando contra o contrato.
+   **Épicos 4 e 5:** fatias verticais `X.1 … X.n`, cada uma implementando core + shell + tela contra a API local.
+6. **Story `X.N`** roda os E2E do épico. No Épico 3 ela também desliga os mocks; nos Épicos 4 e 5 não há mocks a desligar.
 
 ### Eventos SSE são contrato
 
@@ -806,14 +866,20 @@ O real-time do PureUrban não é acessório — é o produto (embarque em tempo 
 
 | Épico | Stream | Eventos declarados no `X.0` |
 |---|---|---|
-| 4 | `GET /api/v1/boarding/events` | `boarding.not_returning`, `boarding.absence_cancelled`, `boarding.broadcast` |
+| 4 | `GET /api/v1/boarding/events` | `boarding.not_returning`, `boarding.absence_cancelled`, `boarding.checkin_reminder` |
 | 5 | `GET /api/v1/tracking/trips/:id/stream` | `location.updated` |
 
 Cada evento é declarado na story `X.0` como schema compartilhado — nome do evento, shape do `data`, e o endpoint de stream que o emite. A story `X.Ya` que publica o evento **não pode alterar esse shape** sem passar por uma mudança de contrato revisada pelas duas trilhas (§8, regra 13).
 
 > Distinção importante: os **domain events internos** (§4 — `WithEvents`, `EventEmitter2`) são um mecanismo de comunicação entre bounded contexts e **não** são contrato de cliente. Só entram no `X.0` quando são expostos num stream SSE. `boarding.checked_in`, por exemplo, é interno ao backend no Épico 3; `boarding.not_returning` atravessa a fronteira no Épico 4 e por isso vira contrato.
 
-### A camada de mock cobre stream, não só request/response
+### A camada de mock cobre stream, não só request/response *(histórico — Épico 3)*
+
+> **Revisão de 28/08/2026:** esta subseção descreve uma exigência que valeu enquanto as
+> trilhas eram paralelas. A partir do Épico 4 a camada de mock foi removida (§10) e o `msw`
+> deixa de ser dependência obrigatória do fluxo: as telas de real-time são desenvolvidas
+> contra o stream SSE da API local. O texto abaixo fica preservado como registro do modelo
+> aplicado ao Épico 3.
 
 Consequência direta do item acima: **os handlers MSW precisam ser capazes de emitir sequências de eventos ao longo do tempo**, não apenas responder a requisições.
 

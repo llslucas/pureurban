@@ -39,14 +39,22 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 #
-# EPIC 3-5 STORY SUFFIXES (per epics.md, sprint-change-proposal 2026-07-12):
+# STORY SUFFIXES:
+# ===============
+# EPIC 3 (modelo histórico — trilhas paralelas, sprint-change-proposal 2026-07-12):
 # - X.0  = contract story (DTOs, Swagger, openapi.json, MSW handlers) — blocks both tracks
 # - X.Ya = backend story
 # - X.Yb = mobile story
 # - X.N  = integration/E2E story — the epic's demonstrable milestone
+#
+# EPICS 4 e 5 (fatiamento vertical, sprint-change-proposal 2026-08-28):
+# - X.0  = contract story (DTOs, Swagger, openapi.json, tipos gerados) — SEM handlers MSW
+# - X.n  = fatia vertical por FR (core Effect + shell + adapters + tela), contra a API local
+# - X.N  = E2E story — não há mocks a desligar
+# Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-08-28T00:00:00-03:00"
+last_updated: "2026-08-28T21:00:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -63,6 +71,15 @@ development_status:
   1-4-infraestrutura-compartilhada-guards-filters-pipes: done
   1-5-setup-mobile-dependencias-e-configuracao-offline: done
   1-6-ambiente-de-execucao-web-do-app-mobile: done
+  # NOVA (sprint-change-proposal-2026-08-28): extraída da Story 3.6, onde estava sequenciada
+  # DEPOIS das três stories que bloqueia. `_layout.tsx` não renderiza saída de router —
+  # nenhuma tela do projeto é alcançável (verificado em Chromium na 1.6). Absorve também a
+  # correção de idempotência do enableMocking() e a remoção de ~910 linhas do template Expo.
+  # EXECUTA A SEGUIR — bloqueia 3.3b, 3.4b, 3.5b, 3.6 e toda story mobile subsequente.
+  1-8-shell-de-navegacao-e-remocao-do-template-expo: backlog
+  # DEMOVIDA de bloqueio para validação final (sprint-change-proposal-2026-08-28): push saiu
+  # do MVP, o GPS usa a Geolocation API no alvo web e o Tier 2 foi verificado em wa-sqlite/OPFS
+  # na Story 1.6. Restam NFR5 e NFR18-NFR20. BLOQUEIA A DEFESA, não o desenvolvimento.
   1-7-development-build-android-para-validacao-nativa: backlog
   # Criada pelo code review da 1.6 (28/08/2026). O seed está quebrado por drift do
   # Prisma 7 e não é alcançável por nenhum comando documentado: `npm run seed` não
@@ -71,7 +88,9 @@ development_status:
   # prisma/seed.ts falha em `new PrismaClient()` sem `adapter`. Enquanto não fechar,
   # nenhuma story que dependa de dados semeados tem ambiente reproduzível.
   # Decisão do Lucas: story técnica própria, antes do Épico 4. Ver deferred-work.md.
-  1-8-corrigir-seed-do-banco-sob-prisma-7: backlog
+  # RENUMERADA de 1-8 para 1-9 em 28/08/2026, liberando o número 1.8 ao shell de navegação
+  # (que executa antes). Conteúdo e posição na sequência inalterados.
+  1-9-corrigir-seed-do-banco-sob-prisma-7: backlog
   epic-1-retrospective: done  # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
@@ -94,9 +113,10 @@ development_status:
   # 3-3b em diante: o ambiente de execução web (Story 1.6) EXISTE e está verificado,
   # mas continuam bloqueadas por dois achados da 1.6 (27/08/2026, ver deferred-work.md):
   #   Bloqueio 5 — src/app/_layout.tsx não renderiza saída de router: nenhuma tela do
-  #                projeto é alcançável, autenticado ou não. Escopo da Story 3.6.
-  #   Bloqueio 6 — enableMocking() não é idempotente; o modo MSW não sobe.
-  # Terceiro achado da 1.6 (seed quebrado sob Prisma 7) virou a Story 1.8 acima —
+  #                projeto é alcançável, autenticado ou não. ESCOPO MIGRADO PARA A STORY 1.8
+  #                em 28/08/2026 (antes estava na 3.6, depois das stories que bloqueia).
+  #   Bloqueio 6 — enableMocking() não é idempotente; o modo MSW não sobe. Também na 1.8.
+  # Terceiro achado da 1.6 (seed quebrado sob Prisma 7) virou a Story 1.9 acima —
   # não bloqueia a 3-3b, mas bloqueia qualquer story que dependa de dados semeados.
   # Código da 3-3b está implementado e revisado (c36dd69) — falta verificação em execução.
   3-3b-escaneamento-de-qr-code: in-progress
@@ -107,30 +127,29 @@ development_status:
   epic-3-retrospective: optional
 
   # === Epic 4: Notificação de Ausência e Comunicação ===
-  # 12 stories (1 contrato, 5 backend, 5 mobile, 1 integração)
+  # REESTRUTURADO em 28/08/2026 (sprint-change-proposal-2026-08-28): 12 -> 6 stories.
+  # Fatiamento vertical (o Dev 2 não se materializou; a camada MSW foi removida).
+  # CORTADAS -> Fase 2: 4-5a e 4-5b (broadcast do motorista, FR36/FR37).
+  # 4.4 troca push notification por lembrete in-app; o scheduler e o use case do core
+  # que decide "quem deve ser lembrado" são preservados integralmente.
   epic-4: backlog
-  4-0-contrato-de-api-ausencia-e-comunicacao: backlog
-  4-1a-registro-de-ausencia-nao-vou-voltar: backlog
-  4-1b-botao-nao-vou-voltar: backlog
-  4-2a-canal-de-eventos-de-embarque-em-tempo-real-sse: backlog
-  4-2b-recebimento-de-ausencia-em-tempo-real: backlog
-  4-3a-cancelamento-de-ausencia-e-periodo-de-seguranca: backlog
-  4-3b-cancelamento-de-ausencia: backlog
-  4-4a-lembrete-automatico-de-check-in-pendente: backlog
-  4-4b-recebimento-do-lembrete-e-resposta-rapida: backlog
-  4-5a-avisos-gerais-do-motorista-broadcast: backlog
-  4-5b-envio-e-recebimento-de-avisos: backlog
-  4-6-integracao-e-e2e-do-epico-4: backlog
+  4-0-contrato-de-api-ausencia: backlog
+  4-1-registro-de-ausencia-nao-vou-voltar: backlog
+  4-2-canal-sse-e-recebimento-em-tempo-real: backlog
+  4-3-cancelamento-de-ausencia: backlog
+  4-4-lembrete-automatico-de-check-in-pendente: backlog
+  4-5-e2e-do-epico-4: backlog
   epic-4-retrospective: optional
 
   # === Epic 5: Localização em Tempo Real ===
-  # 7 stories (1 contrato, 2 backend, 3 mobile, 1 integração)
+  # REESTRUTURADO em 28/08/2026 (sprint-change-proposal-2026-08-28): 7 -> 4 stories.
+  # Fatiamento vertical. 5.2 substitui o mapa cartográfico por última posição conhecida +
+  # distância/ETA ao ponto do aluno — elimina a dependência de biblioteca de mapas com
+  # suporte web (nunca escolhida) e preserva SSE + Redis Pub/Sub. A antiga 5-3b
+  # (comportamento degradado) foi incorporada à 5-2.
   epic-5: backlog
-  5-0-contrato-de-api-localizacao-em-tempo-real: backlog
-  5-1a-ingestao-de-gps-redis-e-pub-sub: backlog
-  5-1b-transmissao-de-gps-durante-viagem-ativa: backlog
-  5-2a-sse-de-localizacao: backlog
-  5-2b-mapa-do-onibus-em-tempo-real: backlog
-  5-3b-comportamento-degradado-e-perda-de-sinal: backlog
-  5-4-integracao-e-e2e-do-epico-5: backlog
+  5-0-contrato-de-api-localizacao: backlog
+  5-1-ingestao-e-transmissao-de-gps: backlog
+  5-2-acompanhamento-do-onibus-em-tempo-real: backlog
+  5-3-e2e-do-epico-5: backlog
   epic-5-retrospective: optional

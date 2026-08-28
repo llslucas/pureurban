@@ -55,18 +55,18 @@ This document provides the complete epic and story breakdown for PureUrban, deco
 - FR27: Motorista recebe notificação imediata quando aluno informa que não retornará
 - FR28: Motorista pode ver quais alunos notificaram ausência na lista de embarque
 - FR29: Sistema permite que aluno cancele a notificação de ausência dentro de um período de segurança
-- FR30: Sistema envia lembrete automático ao aluno que embarcou na ida mas não fez check-in na volta após um período definido
+- FR30: Sistema envia lembrete automático ao aluno que embarcou na ida mas não fez check-in na volta após um período definido — **no MVP entregue in-app** (canal SSE + estado lido na abertura do app); push fica para a Fase 2
 
 **Localização em Tempo Real:**
 - FR31: App do motorista transmite localização GPS durante viagens ativas
-- FR32: Aluno pode visualizar localização do ônibus em tempo real no mapa
+- FR32: Aluno pode visualizar a localização do ônibus em tempo real — **no MVP como última posição conhecida + distância/ETA até o ponto do aluno**; mapa cartográfico fica para a Fase 2
 - FR33: Sistema interrompe transmissão de GPS quando a viagem é encerrada
 - FR34: Sistema exibe último ponto conhecido quando há perda de sinal GPS
 - FR35: Localização é atualizada via SSE com armazenamento em Redis
 
-**Comunicação:**
-- FR36: Motorista pode enviar aviso geral para todos os alunos da rota (ex: atraso, mudança)
-- FR37: Aluno recebe avisos enviados pelo motorista da sua rota
+**Comunicação — diferido para a Fase 2 (revisão de 28/08/2026):**
+- ~~FR36~~ *(Fase 2)*: Motorista pode enviar aviso geral para todos os alunos da rota (ex: atraso, mudança)
+- ~~FR37~~ *(Fase 2)*: Aluno recebe avisos enviados pelo motorista da sua rota
 
 ### NonFunctional Requirements
 
@@ -191,8 +191,8 @@ Nenhum documento de UX Design foi encontrado. Requisitos de UX derivados dos NFR
 - FR33: Epic 5 — Interrupção de GPS ao encerrar viagem
 - FR34: Epic 5 — Exibição de último ponto conhecido
 - FR35: Epic 5 — Atualização via SSE + Redis
-- FR36: Epic 4 — Aviso geral do motorista
-- FR37: Epic 4 — Recebimento de avisos pelo aluno
+- ~~FR36~~: **Fase 2** — Aviso geral do motorista (diferido em 28/08/2026)
+- ~~FR37~~: **Fase 2** — Recebimento de avisos pelo aluno (diferido em 28/08/2026)
 
 ## Epic List
 
@@ -209,11 +209,11 @@ Motorista inicia viagem, alunos fazem check-in via QR code, motorista vê lista 
 **FRs cobertos:** FR11, FR12, FR13, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25
 
 ### Epic 4: Notificação de Ausência e Comunicação
-Aluno pode avisar "não vou voltar" com um toque, motorista recebe instantaneamente, sistema envia lembrete automático — o maior problema (espera indevida) é eliminado. Motorista pode enviar avisos gerais.
-**FRs cobertos:** FR26, FR27, FR28, FR29, FR30, FR36, FR37
+Aluno pode avisar "não vou voltar" com um toque, motorista recebe instantaneamente, sistema envia lembrete automático in-app — o maior problema (espera indevida) é eliminado.
+**FRs cobertos:** FR26, FR27, FR28, FR29, FR30 *(FR36 e FR37 diferidos para a Fase 2 — revisão de 28/08/2026)*
 
 ### Epic 5: Localização em Tempo Real
-Aluno vê o ônibus no mapa em tempo real, motorista transmite GPS automaticamente durante viagens — ansiedade de espera no ponto eliminada.
+Aluno acompanha o ônibus em tempo real — última posição conhecida com distância e tempo estimado até seu ponto — e o motorista transmite GPS automaticamente durante as viagens. Ansiedade de espera no ponto eliminada.
 **FRs cobertos:** FR31, FR32, FR33, FR34, FR35
 
 ---
@@ -346,7 +346,62 @@ Para que os recursos nativos e os NFRs de device possam ser validados de fato.
 **And** o README documenta o fluxo de build e instalação
 **And** nenhuma conta Apple Developer nem hardware macOS é necessário
 
-**Camada:** Infraestrutura · **Depende de:** 1.6 · **FRs:** habilitador · **Desbloqueia:** 4.4b, 5.1b, 5.2b, NFR5, NFR18-NFR20
+**Camada:** Infraestrutura · **Depende de:** Épico 5 concluído · **FRs:** habilitador ·
+**Desbloqueia:** NFR5, NFR18-NFR20 · **Momento:** validação final, antes da defesa
+
+> **Revisão de 28/08/2026:** demovida de bloqueio para validação final. Push saiu do MVP,
+> o GPS usa a Geolocation API no alvo web e o Tier 2 foi verificado em wa-sqlite/OPFS na
+> Story 1.6 — nenhuma story de feature depende mais do build nativo. Restam NFR5 e
+> NFR18-NFR20. **Bloqueia a defesa, não o desenvolvimento.**
+
+---
+
+### Story 1.8: Shell de Navegação e Remoção do Template Expo
+
+Como desenvolvedor,
+Quero que o app monte um navegador funcional e roteie por papel de usuário,
+Para que as telas do produto sejam alcançáveis e as stories mobile possam ser verificadas.
+
+**Acceptance Criteria:**
+
+**Given** `mobile/src/app/_layout.tsx` sem `<Slot />`, `<Stack />` nem `<Tabs />` — nenhuma tela alcançável em nenhum estado de autenticação (verificado em Chromium na Story 1.6)
+**When** implemento o shell de navegação
+**Then** o layout raiz renderiza saída de router e as rotas `(auth)`, `(driver)`, `(student)` e `(admin)` são alcançáveis pela barra de endereços no alvo web
+**And** o usuário autenticado é roteado para o grupo correspondente ao seu `role`, tanto no login novo quanto na reabertura com sessão hidratada do MMKV
+**And** o usuário não autenticado é roteado para `(auth)/login` sem tela em branco
+**And** `enableMocking()` torna-se idempotente por guarda ancorada no estado do servidor MSW (`server.listening`) — uma guarda de módulo NÃO resolve, porque o Fast Refresh reavalia o módulo e zera a flag (diagnóstico registrado no `deferred-work.md`)
+**And** o cluster de template do Expo é removido: `app/index.tsx`, `app/explore.tsx`, `components/animated-icon*`, `components/app-tabs*`, `components/themed-text`, `components/themed-view`, `components/ui/collapsible`, `components/hint-row`, `components/web-badge`, `components/external-link` e os assets órfãos — ~910 linhas sem nenhum importador de produto
+**And** `npx expo export --platform web` continua completando sem erro
+**And** a AC #5 da Story 3.2b (fluxo de 1 toque até o QR, NFR19) passa a ser demonstrável
+**And** as ACs #4, #5 e #7 da Story 1.6, fechadas como diferidas, são verificadas e fechadas
+
+**Camada:** Infraestrutura · **Depende de:** 1.6 · **FRs:** habilitador · **Desbloqueia:** 3.3b, 3.4b, 3.5b, 3.6 e toda story mobile subsequente
+
+> **Criada em 28/08/2026** (`sprint-change-proposal-2026-08-28`, aprovado), extraída da
+> Story 3.6. Estava sequenciada **depois** das três stories que bloqueia.
+
+---
+
+### Story 1.9: Corrigir o Seed do Banco sob Prisma 7
+
+Como desenvolvedor,
+Quero um comando de seed que funcione,
+Para que qualquer story que dependa de dados semeados tenha ambiente reproduzível.
+
+**Acceptance Criteria:**
+
+**Given** o seed quebrado em três camadas (achado do code review da Story 1.6)
+**When** corrijo o fluxo de seed
+**Then** existe um comando documentado e funcional para semear o banco
+**And** `prisma/seed.ts` instancia o `PrismaClient` com o `adapter` exigido pelo Prisma 7
+**And** a configuração de seed vive onde o Prisma 7 a espera (`prisma.config.ts`), não como hook órfão em `package.json`
+**And** o README documenta o comando correto — hoje as stories prescrevem `npm run seed`, que não existe
+**And** rodar o seed duas vezes não quebra nem duplica dados
+
+**Camada:** Infraestrutura · **Depende de:** — · **FRs:** habilitador · **Desbloqueia:** qualquer story que dependa de dados semeados · **Momento:** antes do Épico 4
+
+> **Renumerada de 1.8 para 1.9 em 28/08/2026** para liberar o número 1.8 ao shell de
+> navegação, que executa antes. Conteúdo e posição na sequência inalterados.
 
 ---
 
@@ -482,6 +537,22 @@ Stories sem contraparte na outra camada mantêm apenas o sufixo da camada que ex
 
 > **Exceção:** a Story 3.1 foi implementada full-stack antes desta mudança e **não é refatiada**. Ela permanece como está, em `review`.
 
+> **Revisão de 28/08/2026 (`sprint-change-proposal-2026-08-28`, aprovado):** esta convenção
+> vale integralmente para o **Épico 3**, que executa até o fim sob ela. A partir do **Épico 4**
+> o projeto voltou ao **fatiamento vertical**, porque o segundo desenvolvedor não se
+> materializou e o paralelismo — único motivo da convenção — deixou de existir.
+>
+> | Sufixo | Épico 3 | Épicos 4 e 5 |
+> |---|---|---|
+> | `X.0` | contrato + tipos + handlers MSW | contrato + tipos, **sem MSW** |
+> | `X.Ya` / `X.Yb` | duas trilhas paralelas | **não se aplica** |
+> | `X.n` | — | fatia vertical por FR (core + shell + tela) |
+> | `X.N` | integração: desligar mocks + E2E | **E2E apenas** |
+>
+> **Guarda-corpo:** fatia vertical acima de ~8 ACs ou ~15 arquivos é dividida por camada,
+> em sequência (backend, depois mobile contra a API local), dentro do mesmo épico — nunca
+> voltando à camada de mock.
+
 ---
 
 ## Epic 3: Gestão de Viagens e Embarque Digital
@@ -608,7 +679,6 @@ Para que trechos sem sinal não impeçam o embarque digital.
 **When** escaneia um QR code
 **Then** o check-in é enfileirado em `expo-sqlite` conforme Architecture §5 Tier 2 — FIFO por `created_at`, limite de 500 itens
 **And** a interface exibe "Modo Offline — dados serão sincronizados" (NFR13)
-**And** cada item da fila exibe badge de estado (`✓` sincronizado, `⏳` pendente, `✗` falhou)
 **And** quando a conexão retorna, a fila é drenada automaticamente com backoff de 1s a 30s e no máximo 5 tentativas por item
 **And** cada requisição envia o header `X-Idempotency-Key` — a contraparte servidor já existe desde a Story 3.3a, então reenvios não duplicam check-ins (NFR12)
 **And** os dados persistem mesmo com crash do app (NFR11)
@@ -616,7 +686,13 @@ Para que trechos sem sinal não impeçam o embarque digital.
 
 > **Nota:** esta story deixou de ter parte backend. A idempotência foi puxada para a Story 3.3a, onde pertence conceitualmente — é uma propriedade do endpoint, não do offline.
 
-**Camada:** Mobile · **Depende de:** 3.3b · **FRs:** FR21 · **NFRs:** NFR11, NFR12, NFR13, NFR14
+**Camada:** Mobile · **Depende de:** 3.3b, 1.8 · **FRs:** FR21 · **NFRs:** NFR11, NFR12, NFR13, NFR14
+
+> **Revisão de 28/08/2026:** a interface da fila foi enxugada para banner global
+> ("Modo Offline — dados serão sincronizados", NFR13). O badge por item saiu e o limite de
+> 500 permanece como regra da fila, sem representação na interface. O mecanismo da fila, a
+> idempotência e a persistência a crash (NFR11, NFR12, NFR14) são preservados integralmente
+> — é o que demonstra o Tier 2 da Architecture §5.
 
 ### Story 3.5a: Lista de Alunos da Viagem com Status (Backend)
 
@@ -672,7 +748,11 @@ Para que o épico seja considerado entregue de fato, não apenas nas duas metade
 **And** teste E2E cobre o cenário offline: check-in sem rede → reconexão → sincronização sem duplicata
 **And** os tempos de resposta de NFR1 (< 2s no check-in) e NFR4 (< 1s na lista) são verificados contra a API real
 
-**Camada:** Integração · **Depende de:** 3.2b, 3.3a, 3.3b, 3.4b, 3.5a, 3.5b · **FRs:** valida FR11–FR25
+**Camada:** Integração · **Depende de:** 1.8, 3.2b, 3.3a, 3.3b, 3.4b, 3.5a, 3.5b · **FRs:** valida FR11–FR25
+
+> **Revisão de 28/08/2026:** o shell de navegação e a idempotência do `enableMocking()`,
+> antes escopados para esta story, migraram para a **Story 1.8**. A 3.6 passa a ser
+> exclusivamente a integração e o E2E do épico.
 
 ### Rastreabilidade FR → Story (Épico 3)
 
@@ -695,7 +775,7 @@ Para que o épico seja considerado entregue de fato, não apenas nas duas metade
 
 Aluno pode avisar "não vou voltar" com um toque, motorista recebe instantaneamente, sistema envia lembrete automático — o maior problema (espera indevida) é eliminado. Motorista pode enviar avisos gerais.
 
-**Composição:** 12 stories (1 contrato, 5 backend, 5 mobile, 1 integração).
+**Composição:** 6 stories (1 contrato, 4 fatias verticais, 1 E2E) — revisão de 28/08/2026.
 
 ### Story 4.0: Contrato de API — Ausência e Comunicação
 
@@ -709,38 +789,18 @@ Para que as trilhas de backend e mobile trabalhem em paralelo sem divergir.
 **When** defino o contrato
 **Then** `POST /api/v1/boarding/not-returning` está declarado com DTO de entrada (`tripId`), DTO de resposta (incluindo `notifiedAt` e `cancellableUntil`) e decorators Swagger completos
 **And** `POST /api/v1/boarding/cancel-absence` está declarado
-**And** `POST /api/v1/boarding/broadcast` está declarado com a mensagem e a lista de avisos pré-definidos
 **And** `GET /api/v1/boarding/events` está declarado como stream SSE
-**And** o **formato dos eventos SSE** está declarado como schema compartilhado: `boarding.not_returning`, `boarding.absence_cancelled`, `boarding.broadcast` — o mobile precisa mockar esses eventos, então eles são contrato tanto quanto os endpoints REST
-**And** o endpoint de registro de push token do Expo está declarado (pré-requisito do lembrete automático da 4.4a)
+**And** o **formato dos eventos SSE** está declarado como schema compartilhado: `boarding.not_returning`, `boarding.absence_cancelled`, `boarding.checkin_reminder` — o schema de cada evento é contrato tanto quanto os endpoints REST
 **And** os códigos de erro tipados estão declarados (`CANCELLATION_PERIOD_EXPIRED`, `ALREADY_NOT_RETURNING`, `STUDENT_NOT_ON_TRIP`, `TRIP_NOT_ACTIVE`)
 **And** o header `X-Idempotency-Key` está documentado nos endpoints de escrita
 **And** `npm run openapi:export` regenera `api/openapi.json` com os novos endpoints e o arquivo está commitado
-**And** o mobile regenera `src/types/api.d.ts` e cria handlers MSW para os endpoints REST **e** para o stream SSE
+**And** o mobile regenera `src/types/api.d.ts` a partir do contrato
 **And** os controllers retornam `501 Not Implemented`
+**And** **nenhum handler MSW é criado** — a partir deste épico as fatias são desenvolvidas contra a API local (Architecture §10)
 
 **Camada:** Contrato · **Depende de:** Épico 3 concluído · **FRs:** habilitador
 
-### Story 4.1a: Registro de Ausência "Não Vou Voltar" (Backend)
-
-Como sistema,
-Quero registrar que um aluno não retornará na viagem de volta,
-Para que o motorista não precise esperar por ele.
-
-**Acceptance Criteria:**
-
-**Given** um aluno que fez check-in na viagem de ida
-**When** `POST /api/v1/boarding/not-returning` é chamado com `tripId`
-**Then** a ausência é persistida com `notifiedAt` (timestamp) e o status do aluno na viagem passa a `NOT_RETURNING` (FR26)
-**And** o use case valida que o aluno pertence à rota da viagem — caso contrário retorna `STUDENT_NOT_ON_TRIP`
-**And** notificar duas vezes retorna `ALREADY_NOT_RETURNING` sem duplicar o registro
-**And** domain event `boarding.not_returning` é emitido via `WithEvents`
-**And** a resposta inclui `cancellableUntil` (`notifiedAt` + 2 minutos) — o cliente não calcula essa janela
-**And** o use case do core é testado sem infraestrutura (< 100ms por suite)
-
-**Camada:** Backend · **Depende de:** 4.0 · **FRs:** FR26
-
-### Story 4.1b: Botão "Não Vou Voltar" (Mobile Aluno)
+### Story 4.1: Registro de Ausência "Não Vou Voltar" (Fatia Vertical)
 
 Como aluno,
 Quero avisar com um toque que não retornarei no ônibus,
@@ -748,38 +808,30 @@ Para que o motorista não precise esperar por mim.
 
 **Acceptance Criteria:**
 
-**Given** aluno autenticado com viagem de retorno ativa na sua rota
-**When** acessa `(student)/home.tsx`
-**Then** o botão "Não vou voltar" é proeminente na tela principal
+**Backend**
+
+**Given** um aluno que fez check-in na viagem de ida
+**When** `POST /api/v1/boarding/not-returning` é chamado com `tripId`
+**Then** a ausência é persistida com `notifiedAt` e o status do aluno na viagem passa a `NOT_RETURNING` (FR26)
+**And** o use case valida que o aluno pertence à rota da viagem — caso contrário retorna `STUDENT_NOT_ON_TRIP`
+**And** notificar duas vezes retorna `ALREADY_NOT_RETURNING` sem duplicar o registro
+**And** domain event `boarding.not_returning` é emitido via `WithEvents`
+**And** a resposta inclui `cancellableUntil` (`notifiedAt` + 2 minutos) — o cliente não calcula essa janela
+**And** o use case do core é testado sem infraestrutura (< 100ms por suite)
+
+**Mobile (Aluno)**
+
+**And** o botão "Não vou voltar" é proeminente em `(student)/home.tsx`
 **And** o fluxo completo exige no máximo 2 toques, incluindo a confirmação (NFR19)
-**And** após confirmar, a tela mostra o estado "Ausência registrada" com o countdown de cancelamento alimentado por `cancellableUntil` do contrato
+**And** após confirmar, a tela mostra "Ausência registrada" com o countdown alimentado por `cancellableUntil`
 **And** os erros do contrato (`ALREADY_NOT_RETURNING`, `STUDENT_NOT_ON_TRIP`, `TRIP_NOT_ACTIVE`) têm mensagens claras ao aluno
-**And** a story é desenvolvida contra os handlers MSW da Story 4.0
+**And** a tela é desenvolvida contra a **API local**, não contra mocks
 
-**Camada:** Mobile (Aluno) · **Depende de:** 4.0 · **FRs:** FR26 · **NFRs:** NFR19
+**Camada:** Fatia vertical · **Depende de:** 4.0 · **FRs:** FR26 · **NFRs:** NFR19
 
-### Story 4.2a: Canal de Eventos de Embarque em Tempo Real — SSE (Backend)
+---
 
-Como sistema,
-Quero publicar os eventos de embarque num canal em tempo real,
-Para que o app do motorista reflita ausências e avisos sem polling.
-
-**Acceptance Criteria:**
-
-**Given** os domain events de embarque sendo emitidos pelo core
-**When** um evento `boarding.not_returning`, `boarding.absence_cancelled` ou `boarding.broadcast` é despachado
-**Then** ele é publicado no Redis Pub/Sub pelo shell
-**And** `GET /api/v1/boarding/events` faz subscribe no canal e faz streaming SSE para o cliente, filtrado por `tripId` e `companyId`
-**And** o payload de cada evento segue exatamente o schema declarado na Story 4.0
-**And** a latência entre o registro da ausência e a entrega do evento ao cliente é menor que 3 segundos (NFR3)
-**And** a conexão SSE é encerrada elegantemente quando a viagem termina
-**And** apenas o motorista atribuído à rota consegue abrir o stream daquela viagem
-
-> **Nota de decomposição:** a Story 4.2 original misturava a infraestrutura de entrega com a experiência na tela. Esta story é só a infraestrutura; a experiência é a 4.2b.
-
-**Camada:** Backend · **Depende de:** 4.1a · **FRs:** FR27 (entrega) · **NFRs:** NFR3
-
-### Story 4.2b: Recebimento de Ausência em Tempo Real (Mobile Motorista)
+### Story 4.2: Canal SSE de Embarque e Recebimento em Tempo Real (Fatia Vertical)
 
 Como motorista,
 Quero ser notificado instantaneamente quando um aluno informa que não retornará,
@@ -787,38 +839,30 @@ Para que eu possa partir sem espera desnecessária.
 
 **Acceptance Criteria:**
 
-**Given** viagem de retorno ativa e a tela `(driver)/student-list.tsx` aberta
-**When** chega um evento SSE `boarding.not_returning`
-**Then** o status do aluno na lista muda para `NÃO VAI VOLTAR` com destaque visual (FR28)
+**Backend**
+
+**Given** um motorista autenticado com viagem ativa
+**When** abre `GET /api/v1/boarding/events`
+**Then** o controller faz subscribe no canal Redis Pub/Sub da viagem e faz streaming dos eventos declarados na Story 4.0 (FR27)
+**And** cada evento entregue segue exatamente o schema do contrato
+**And** a entrega ao motorista acontece em menos de 3 segundos após o registro da ausência (NFR3)
+**And** apenas o motorista atribuído à rota consegue abrir o stream daquela viagem
+**And** a conexão SSE é encerrada elegantemente quando a viagem termina
+**And** múltiplos clientes na mesma viagem compartilham o mesmo subscribe
+
+**Mobile (Motorista)**
+
+**And** com `(driver)/student-list.tsx` aberta, um evento `boarding.not_returning` muda o status do aluno para `NÃO VAI VOLTAR` com destaque visual (FR28)
 **And** a contagem resumida se ajusta automaticamente (ex.: "28/32" → "28/31")
 **And** um toast contextual anuncia a ausência sem bloquear a tela
 **And** um evento `boarding.absence_cancelled` reverte o status e a contagem
 **And** a reconexão do EventSource é automática após queda de rede, sem duplicar entradas na lista
-**And** a story é desenvolvida contra o stream SSE mockado da Story 4.0
 
-**Camada:** Mobile (Motorista) · **Depende de:** 4.0 · **FRs:** FR27, FR28 · **NFRs:** NFR3, NFR18
+**Camada:** Fatia vertical · **Depende de:** 4.1, 3.5b · **FRs:** FR27, FR28 · **NFRs:** NFR3, NFR18
 
-### Story 4.3a: Cancelamento de Ausência e Período de Segurança (Backend)
+---
 
-Como sistema,
-Quero permitir o cancelamento da ausência dentro de uma janela de 2 minutos,
-Para que um toque acidental do aluno não vire uma decisão irreversível.
-
-**Acceptance Criteria:**
-
-**Given** um aluno que notificou "não vou voltar" há menos de 2 minutos
-**When** `POST /api/v1/boarding/cancel-absence` é chamado
-**Then** a ausência é revertida e o status do aluno volta a `NOT_CHECKED_IN` (FR29)
-**And** domain event `boarding.absence_cancelled` é emitido via `WithEvents`
-**Given** a janela de 2 minutos expirada
-**When** o aluno tenta cancelar
-**Then** o sistema retorna o tagged error `CANCELLATION_PERIOD_EXPIRED`
-**And** a regra dos 2 minutos vive no functional core, testável isoladamente com relógio injetado (< 100ms por suite)
-**And** a duração da janela é configuração do core, não um número mágico espalhado pelo código
-
-**Camada:** Backend · **Depende de:** 4.1a · **FRs:** FR29
-
-### Story 4.3b: Cancelamento de Ausência (Mobile Aluno)
+### Story 4.3: Cancelamento de Ausência (Fatia Vertical)
 
 Como aluno,
 Quero poder cancelar minha notificação de ausência dentro de um período seguro,
@@ -826,133 +870,104 @@ Para que eu possa mudar de ideia caso tenha apertado por engano.
 
 **Acceptance Criteria:**
 
-**Given** aluno que acabou de notificar "não vou voltar"
-**When** a tela `(student)/home.tsx` está aberta
-**Then** um botão "Cancelar" é exibido com countdown regressivo alimentado por `cancellableUntil` — o cliente **exibe** a janela, não a decide
+**Backend**
+
+**Given** uma ausência registrada há menos de 2 minutos
+**When** `POST /api/v1/boarding/cancel-absence` é chamado
+**Then** a ausência é revertida e o status do aluno volta ao anterior (FR29)
+**And** fora da janela, o endpoint retorna `CANCELLATION_PERIOD_EXPIRED`
+**And** a decisão da janela é do **servidor** — o cliente apenas exibe o countdown
+**And** domain event `boarding.absence_cancelled` é emitido via `WithEvents`
+**And** o use case do core é testado sem infraestrutura, com relógio injetado
+
+**Mobile (Aluno)**
+
+**And** um botão "Cancelar" é exibido com countdown regressivo alimentado por `cancellableUntil`
 **And** ao tocar "Cancelar" dentro da janela, o estado volta a "Retorno confirmado"
 **And** quando a janela expira, o botão desaparece e a ausência é apresentada como consolidada
 **And** o erro `CANCELLATION_PERIOD_EXPIRED` (corrida entre o toque e a expiração) é tratado com mensagem clara, sem travar a tela
-**And** a story é desenvolvida contra os handlers MSW da Story 4.0
 
-**Camada:** Mobile (Aluno) · **Depende de:** 4.1b · **FRs:** FR29 · **NFRs:** NFR19
+**Camada:** Fatia vertical · **Depende de:** 4.1 · **FRs:** FR29 · **NFRs:** NFR19
 
-### Story 4.4a: Lembrete Automático de Check-in Pendente (Backend)
+---
 
-Como sistema,
-Quero lembrar automaticamente o aluno que embarcou na ida mas não fez check-in na volta,
+### Story 4.4: Lembrete Automático de Check-in Pendente (Fatia Vertical)
+
+Como aluno que embarcou na ida mas não fez check-in na volta,
+Quero ser lembrado de confirmar se vou retornar,
 Para que o motorista não espere sem necessidade — a jornada da Ana.
 
 **Acceptance Criteria:**
 
-**Given** um aluno que fez check-in na viagem de ida e uma viagem de retorno ativa na mesma rota
-**When** passam 15 minutos do início da viagem de retorno sem check-in nem ausência registrada do aluno
-**Then** um scheduler dispara uma push notification via Expo Push: "Você vai retornar? Toque para confirmar" (FR30)
-**And** a notificação carrega os dados de ação (`tripId`, `studentId`) para permitir a resposta rápida da Story 4.4b
-**And** o lembrete é enviado no máximo uma vez por aluno por viagem
+**Backend**
+
+**Given** um aluno que fez check-in na ida e uma viagem de retorno ativa na mesma rota
+**When** passam 15 minutos do início da viagem de retorno sem check-in nem ausência registrada
+**Then** o scheduler emite o evento `boarding.checkin_reminder` no stream da Story 4.2, com `tripId` e `studentId` (FR30)
+**And** o lembrete é emitido no máximo uma vez por aluno por viagem
 **And** alunos que já notificaram ausência ou já fizeram check-in de retorno não recebem lembrete
 **And** o período (15 min) é configuração do core, testável com relógio injetado
 **And** o disparo do scheduler é lógica do shell; a decisão de "quem deve ser lembrado" é um use case do core, testado sem infraestrutura
+**And** o estado "lembrete pendente" é derivável na abertura do app, para o aluno que não estava conectado ao stream
 
-**Camada:** Backend · **Depende de:** 4.1a · **FRs:** FR30
+**Mobile (Aluno)**
 
-### Story 4.4b: Recebimento do Lembrete e Resposta Rápida (Mobile Aluno)
-
-Como aluno que embarcou na ida mas não fez check-in na volta,
-Quero receber um lembrete perguntando se vou retornar,
-Para que eu possa responder sem abrir o app.
-
-**Acceptance Criteria:**
-
-**Given** o app do aluno com push token registrado no backend
-**When** o lembrete da Story 4.4a chega
-**Then** a notificação é exibida com a ação "Não vou voltar" respondível direto da notificação
-**And** responder pela notificação produz exatamente os mesmos efeitos do botão da Story 4.1b (mesma chamada, mesmo estado)
-**And** tocar a notificação sem responder abre `(student)/home.tsx` no estado correto
-**And** o registro do push token acontece no login e é revogado no logout
+**And** o lembrete aparece em `(student)/home.tsx` como aviso in-app com a ação "Não vou voltar"
+**And** responder pelo aviso produz exatamente os mesmos efeitos do botão da Story 4.1 (mesma chamada, mesmo estado)
+**And** o aluno que abre o app depois do disparo vê o lembrete pendente, sem depender de ter estado conectado
 **And** a jornada da Ana (edge case do PRD) é coberta ponta a ponta
-**And** a story é desenvolvida contra os handlers MSW da Story 4.0
 
-**Camada:** Mobile (Aluno) · **Depende de:** 4.1b · **FRs:** FR30 · **NFRs:** NFR19
+> **Revisão de 28/08/2026:** a entrega por **push notification** foi diferida para a Fase 2.
+> O FR30 exige "lembrete automático", não prescreve o meio. O scheduler e o use case do core
+> — a parte arquiteturalmente relevante — são preservados integralmente; sai o registro de
+> push token e as notification actions.
 
-### Story 4.5a: Avisos Gerais do Motorista — Broadcast (Backend)
+**Camada:** Fatia vertical · **Depende de:** 4.2 · **FRs:** FR30 · **NFRs:** NFR19
 
-Como sistema,
-Quero entregar avisos do motorista a todos os alunos da rota,
-Para que atrasos e mudanças sejam comunicados sem ligação telefônica.
+---
 
-**Acceptance Criteria:**
-
-**Given** motorista autenticado com rota atribuída
-**When** `POST /api/v1/boarding/broadcast` é chamado com uma mensagem
-**Then** o aviso é persistido com autor, rota, `tripId` e timestamp (FR36)
-**And** o evento `boarding.broadcast` é publicado e entregue a todos os alunos vinculados à rota pelo canal SSE da Story 4.2a
-**And** apenas a role `driver` pode enviar avisos (RolesGuard)
-**And** o motorista só consegue enviar avisos para rotas atribuídas a ele
-**And** a mensagem é validada via Effect Schema (não vazia, limite de tamanho) — erro de validação retorna 400 tipado
-**And** o use case do core é testado sem infraestrutura
-
-**Camada:** Backend · **Depende de:** 4.2a · **FRs:** FR36
-
-### Story 4.5b: Envio e Recebimento de Avisos (Mobile Motorista + Aluno)
-
-Como motorista, quero enviar avisos aos alunos da minha rota; como aluno, quero recebê-los,
-Para que atrasos e mudanças cheguem a todos de uma vez.
-
-**Acceptance Criteria:**
-
-**Given** motorista com viagem ativa
-**When** abre o compositor de avisos na tela do motorista
-**Then** pode escolher um aviso pré-definido (ex.: "Atraso de 15 minutos", "Mudança de ponto") ou digitar texto livre
-**And** o envio é confirmado visualmente e o fluxo cabe em poucos toques com uma mão (NFR18, NFR19)
-**Given** aluno com o app aberto
-**When** chega um evento SSE `boarding.broadcast` da sua rota
-**Then** o aviso aparece em `(student)/home.tsx` como notificação in-app (FR37)
-**And** os avisos recentes da viagem ficam acessíveis (não somem ao serem dispensados)
-**And** a story é desenvolvida contra o stream SSE mockado da Story 4.0
-
-**Camada:** Mobile (Motorista + Aluno) · **Depende de:** 4.2b · **FRs:** FR36, FR37 · **NFRs:** NFR18, NFR19
-
-### Story 4.6: Integração e E2E do Épico 4
+### Story 4.5: E2E do Épico 4
 
 Como desenvolvedor,
-Quero substituir os mocks pela API real e provar os fluxos de ausência e comunicação end-to-end,
+Quero provar os fluxos de ausência end-to-end contra a API real,
 Para que o épico seja considerado entregue de fato.
 
 **Acceptance Criteria:**
 
-**Given** as trilhas API e Mobile do Épico 4 concluídas
-**When** desligo os handlers MSW (REST e SSE) e aponto o app para a API real
+**Given** as fatias 4.1 a 4.4 concluídas
+**When** rodo o app contra a API local
 **Then** o fluxo completo funciona: aluno toca "não vou voltar" → motorista vê o status mudar e a contagem se ajustar em menos de 3 segundos (NFR3)
 **And** o fluxo de cancelamento funciona dentro da janela e é corretamente rejeitado fora dela
-**And** o lembrete automático dispara para um aluno que embarcou na ida e não fez check-in na volta, e a resposta pela notificação registra a ausência
-**And** um aviso enviado pelo motorista chega a todos os alunos da rota
+**And** o lembrete automático dispara para um aluno que embarcou na ida e não fez check-in na volta, e a resposta pelo aviso in-app registra a ausência
 **And** o `openapi.json` commitado não diverge do gerado a partir do código (drift check)
-**And** teste E2E cobre: notificar ausência, cancelar dentro da janela, tentar cancelar fora da janela, receber aviso geral
-**And** a latência de NFR3 é medida contra a API real, não contra mock
+**And** teste E2E cobre: notificar ausência, cancelar dentro da janela, tentar cancelar fora da janela, receber lembrete
+**And** a latência de NFR3 é medida contra a API real
 
-**Camada:** Integração · **Depende de:** 4.1a–4.5b · **FRs:** valida FR26–FR30, FR36, FR37
+> **Não há mocks a desligar** — as fatias verticais foram desenvolvidas contra a API local
+> desde o início (Architecture §10).
+
+**Camada:** E2E · **Depende de:** 4.1–4.4 · **FRs:** valida FR26–FR30
+
+---
 
 ### Rastreabilidade FR → Story (Épico 4)
 
 | FR | Story |
 |---|---|
-| FR26 | 4.1a + 4.1b |
-| FR27 | 4.2a (entrega) + 4.2b (recebimento) |
-| FR28 | 4.2b |
-| FR29 | 4.3a + 4.3b |
-| FR30 | 4.4a + 4.4b |
-| FR36 | 4.5a + 4.5b |
-| FR37 | 4.5b |
+| FR26 | 4.1 |
+| FR27, FR28 | 4.2 |
+| FR29 | 4.3 |
+| FR30 | 4.4 |
+| ~~FR36, FR37~~ | **Diferidos para a Fase 2** (revisão de 28/08/2026) |
 
-**Cobertura do épico: 7/7 FRs (FR26–FR30, FR36, FR37).**
+**Cobertura do épico: 5/5 FRs de MVP (FR26–FR30).**
 
 ---
-
 ## Epic 5: Localização em Tempo Real
 
 Aluno vê o ônibus no mapa em tempo real, motorista transmite GPS automaticamente durante viagens — ansiedade de espera no ponto eliminada.
 
-**Composição:** 7 stories (1 contrato, 2 backend, 3 mobile, 1 integração).
+**Composição:** 4 stories (1 contrato, 2 fatias verticais, 1 E2E) — revisão de 28/08/2026.
 
 ### Story 5.0: Contrato de API — Localização em Tempo Real
 
@@ -966,36 +981,17 @@ Para que as trilhas de backend e mobile trabalhem em paralelo sem divergir.
 **When** defino o contrato
 **Then** `POST /api/v1/tracking/location` está declarado com DTO de entrada (`tripId`, `latitude`, `longitude`, `accuracy`, `capturedAt`) e decorators Swagger completos
 **And** `GET /api/v1/tracking/trips/:id/stream` está declarado como stream SSE
-**And** `GET /api/v1/tracking/trips/:id/location` está declarado para o **último ponto conhecido** — é o estado inicial do mapa antes do primeiro evento SSE chegar (pré-requisito da Story 5.3b)
+**And** `GET /api/v1/tracking/trips/:id/location` está declarado para o **último ponto conhecido** — é o estado inicial da tela antes do primeiro evento SSE chegar, e o que fica visível quando o sinal cai (pré-requisito da Story 5.2)
 **And** o formato do evento `location.updated` está declarado como schema compartilhado (coordenadas, `tripId`, `timestamp`)
 **And** os códigos de erro tipados estão declarados (`TRIP_NOT_ACTIVE`, `NO_LOCATION_AVAILABLE`)
 **And** `npm run openapi:export` regenera `api/openapi.json` e o arquivo está commitado
-**And** o mobile regenera `src/types/api.d.ts` e cria handlers MSW capazes de **emitir uma sequência de eventos `location.updated`** — o mock precisa simular movimento, não só uma resposta estática
+**And** o mobile regenera `src/types/api.d.ts` a partir do contrato
 **And** os controllers retornam `501 Not Implemented`
+**And** **nenhum handler MSW é criado** — a Story 5.2 é desenvolvida contra o stream SSE da API local (Architecture §10)
 
 **Camada:** Contrato · **Depende de:** Épico 4 concluído · **FRs:** habilitador
 
-### Story 5.1a: Ingestão de GPS — Redis e Pub/Sub (Backend)
-
-Como sistema,
-Quero receber e distribuir as coordenadas do motorista,
-Para que os alunos possam acompanhar o ônibus em tempo real.
-
-**Acceptance Criteria:**
-
-**Given** uma viagem ativa
-**When** `POST /api/v1/tracking/location` recebe as coordenadas do motorista
-**Then** a posição é armazenada no Redis com TTL curto, sobrescrevendo a anterior (FR35)
-**And** o Redis Pub/Sub publica `location.updated` com coordenadas, `tripId` e `timestamp`
-**And** coordenadas enviadas para uma viagem não ativa são rejeitadas com `TRIP_NOT_ACTIVE`
-**And** `GET /api/v1/tracking/trips/:id/location` retorna o último ponto conhecido ou `NO_LOCATION_AVAILABLE`
-**And** posições **não são persistidas no PostgreSQL** — o histórico de trajeto está fora do escopo do MVP (Architecture: Redis é o único store de localização)
-**And** apenas o motorista atribuído à viagem pode enviar coordenadas
-**And** a lógica de ingestão é testada sem infraestrutura real (Redis via port do core)
-
-**Camada:** Backend · **Depende de:** 5.0 · **FRs:** FR35
-
-### Story 5.1b: Transmissão de GPS durante Viagem Ativa (Mobile Motorista)
+### Story 5.1: Ingestão e Transmissão de GPS (Fatia Vertical)
 
 Como motorista,
 Quero que minha localização seja transmitida automaticamente durante as viagens,
@@ -1003,111 +999,103 @@ Para que os alunos possam me acompanhar sem que eu precise fazer nada.
 
 **Acceptance Criteria:**
 
-**Given** o motorista inicia uma viagem
-**When** a viagem passa a `ACTIVE`
-**Then** o app começa a capturar GPS via `expo-location` e envia a posição a cada 5 segundos (FR31)
+**Backend**
+
+**Given** uma viagem ativa
+**When** `POST /api/v1/tracking/location` recebe as coordenadas do motorista
+**Then** a posição é armazenada no Redis com TTL curto, sobrescrevendo a anterior (FR35)
+**And** o Redis Pub/Sub publica `location.updated` com coordenadas, `tripId` e `timestamp`
+**And** coordenadas enviadas para uma viagem não ativa são rejeitadas com `TRIP_NOT_ACTIVE`
+**And** `GET /api/v1/tracking/trips/:id/location` retorna o último ponto conhecido ou `NO_LOCATION_AVAILABLE`
+**And** posições **não são persistidas no PostgreSQL** — o histórico de trajeto está fora do escopo do MVP
+**And** apenas o motorista atribuído à viagem pode enviar coordenadas
+**And** a lógica de ingestão é testada sem infraestrutura real (Redis via port do core)
+
+**Mobile (Motorista)**
+
+**And** quando a viagem passa a `ACTIVE`, o app captura GPS via `expo-location` e envia a posição a cada 5 segundos (FR31)
 **And** a permissão de localização é solicitada com justificativa clara antes da primeira viagem
-**Given** a viagem é encerrada
-**When** o app recebe/observa o fim da viagem
-**Then** a captura de GPS **para automaticamente** (FR33)
-**And** o GPS não é coletado em nenhum momento fora de uma viagem ativa (NFR10) — o start/stop é amarrado ao ciclo de vida da viagem, nunca a um toque manual do motorista
-**And** perda temporária de rede não derruba a captura: as posições são descartadas (não enfileiradas — posição velha não tem valor), e o envio retoma sozinho
-**And** a story é desenvolvida contra os handlers MSW da Story 5.0
+**And** ao encerrar a viagem, a captura de GPS **para automaticamente** (FR33)
+**And** o GPS não é coletado em nenhum momento fora de uma viagem ativa (NFR10) — o start/stop é amarrado ao ciclo de vida da viagem, nunca a um toque manual
+**And** perda temporária de rede não derruba a captura: as posições são descartadas (posição velha não tem valor) e o envio retoma sozinho
+**And** no alvo web o `expo-location` opera pela Geolocation API do browser
 
-**Camada:** Mobile (Motorista) · **Depende de:** 5.0 · **FRs:** FR31, FR33 · **NFRs:** NFR10
+**Camada:** Fatia vertical · **Depende de:** 5.0 · **FRs:** FR31, FR33, FR35 · **NFRs:** NFR10
 
-### Story 5.2a: SSE de Localização (Backend)
+---
 
-Como sistema,
-Quero fazer streaming das posições do ônibus para os alunos da rota,
-Para que o mapa deles atualize sem polling.
+### Story 5.2: Acompanhamento do Ônibus em Tempo Real (Fatia Vertical)
+
+Como aluno,
+Quero saber onde o ônibus está e em quanto tempo ele chega ao meu ponto,
+Para que eu não precise esperar sem informação.
 
 **Acceptance Criteria:**
+
+**Backend**
 
 **Given** um aluno vinculado à rota de uma viagem ativa
 **When** abre `GET /api/v1/tracking/trips/:id/stream`
 **Then** o `tracking-sse.controller.ts` faz subscribe no canal Redis Pub/Sub daquela viagem e faz streaming dos eventos `location.updated` (FR35)
 **And** o evento entregue segue exatamente o schema declarado na Story 5.0
 **And** a latência entre o `POST` do motorista e a entrega ao aluno é menor que 5 segundos (NFR2)
-**And** apenas alunos vinculados à rota conseguem abrir o stream daquela viagem (validação de permissão — FR6)
+**And** apenas alunos vinculados à rota conseguem abrir o stream daquela viagem (FR6)
 **And** a conexão SSE é encerrada elegantemente quando a viagem termina
-**And** múltiplos alunos assistindo à mesma viagem compartilham o mesmo subscribe (não abre uma conexão Redis por cliente)
+**And** múltiplos alunos assistindo à mesma viagem compartilham o mesmo subscribe
 
-**Camada:** Backend · **Depende de:** 5.1a · **FRs:** FR35 · **NFRs:** NFR2
+**Mobile (Aluno)**
 
-### Story 5.2b: Mapa do Ônibus em Tempo Real (Mobile Aluno)
-
-Como aluno,
-Quero ver a localização do ônibus no mapa em tempo real,
-Para que eu saiba quando ele vai chegar ao meu ponto.
-
-**Acceptance Criteria:**
-
-**Given** viagem ativa na rota do aluno
-**When** o aluno acessa `(student)/track-bus.tsx`
-**Then** o mapa carrega com o último ponto conhecido (`GET /tracking/trips/:id/location`) e depois passa a atualizar via SSE (EventSource) (FR32)
-**And** o marcador do ônibus é animado entre posições, sem "pular" a cada evento
+**And** `(student)/track-bus.tsx` carrega o último ponto conhecido (`GET /tracking/trips/:id/location`) e depois passa a atualizar via SSE (FR32)
+**And** a tela apresenta **a última posição conhecida com a distância e o tempo estimado até o ponto do aluno** — não um mapa cartográfico
 **And** as atualizações aparecem com latência máxima de 5 segundos na percepção do aluno (NFR2)
-**And** a tela é utilizável em dispositivo de 5" a 720p (NFR20)
-**And** a story é desenvolvida contra o stream SSE mockado da Story 5.0, que emite uma sequência de posições
-**And** a biblioteca de mapas escolhida tem suporte web ou variante `.web.tsx` (Architecture §8, regra 14) — `react-native-maps` não atende e exige alternativa
-
-**Camada:** Mobile (Aluno) · **Depende de:** 5.0 · **FRs:** FR32 · **NFRs:** NFR2, NFR20
-
-### Story 5.3b: Comportamento Degradado e Perda de Sinal (Mobile Aluno)
-
-Como aluno,
-Quero ver a última localização conhecida quando o sinal cai,
-Para que eu tenha alguma referência mesmo em áreas sem cobertura.
-
-**Acceptance Criteria:**
-
-**Given** o mapa aberto com o ônibus em movimento
-**When** nenhum evento `location.updated` chega por mais de 15 segundos
-**Then** o mapa mantém o último ponto conhecido com o indicador visual "Sem sinal GPS" (FR34)
-**And** quando os eventos voltam, o indicador some e o mapa atualiza para a posição atual
-**Given** a viagem encerrada
-**When** o aluno acessa o mapa
-**Then** a mensagem "Nenhuma viagem ativa no momento" é exibida
-**And** a conexão SSE é encerrada elegantemente
+**And** quando nenhum evento `location.updated` chega por mais de 15 segundos, a tela mantém o último ponto conhecido com o indicador "Sem sinal GPS" (FR34, NFR13)
+**And** quando os eventos voltam, o indicador some e a tela atualiza para a posição atual
+**And** com a viagem encerrada, a mensagem "Nenhuma viagem ativa no momento" é exibida e a conexão SSE é encerrada elegantemente
 **And** a reconexão do EventSource após queda de rede é automática, com backoff
+**And** a tela é utilizável em dispositivo de 5" a 720p (NFR20)
 
-> **Nota de decomposição:** esta story é mobile-only. "Último ponto conhecido" e "sem sinal há 15s" são estado de cliente — o backend não precisa saber que o sinal caiu, porque a **ausência de eventos já é o sinal**.
+> **Revisão de 28/08/2026:** o **mapa cartográfico e o marcador animado foram diferidos para
+> a Fase 2**. A Jornada 1 do PRD descreve o valor como *"o ônibus está a 3 pontos de
+> distância, chegando em ~8 minutos"* — proximidade e tempo, não cartografia. A substituição
+> elimina a dependência de uma biblioteca de mapas com suporte web (Architecture §8, regra 14),
+> nunca escolhida, e **preserva integralmente** o SSE + Redis Pub/Sub, que é o que o épico
+> demonstra. A antiga Story 5.3b (comportamento degradado) foi incorporada aqui.
 
-**Camada:** Mobile (Aluno) · **Depende de:** 5.2b · **FRs:** FR34 · **NFRs:** NFR13
+**Camada:** Fatia vertical · **Depende de:** 5.1 · **FRs:** FR32, FR34, FR35 · **NFRs:** NFR2, NFR13, NFR20
 
-### Story 5.4: Integração e E2E do Épico 5
+---
+
+### Story 5.3: E2E do Épico 5
 
 Como desenvolvedor,
-Quero substituir os mocks pela API real e provar o rastreamento end-to-end,
+Quero provar o rastreamento end-to-end contra a API real,
 Para que o épico seja considerado entregue de fato.
 
 **Acceptance Criteria:**
 
-**Given** as trilhas API e Mobile do Épico 5 concluídas
-**When** desligo os handlers MSW e aponto o app para a API real
-**Then** o fluxo completo funciona: motorista inicia viagem → GPS começa a transmitir → aluno abre o mapa e vê o ônibus se movendo
+**Given** as fatias 5.1 e 5.2 concluídas
+**When** rodo o app contra a API local
+**Then** o fluxo completo funciona: motorista inicia viagem → GPS começa a transmitir → aluno abre a tela e vê a posição e o ETA se atualizando
 **And** encerrar a viagem interrompe a transmissão de GPS e encerra o stream do aluno (FR33, NFR10)
 **And** o `openapi.json` commitado não diverge do gerado a partir do código (drift check)
-**And** teste E2E cobre o caminho feliz (ônibus se movendo no mapa) e o degradado (sem eventos por 15s → "Sem sinal GPS" → recuperação)
-**And** a latência de NFR2 (< 5s) é medida contra a API real, não contra mock
+**And** teste E2E cobre o caminho feliz (posição atualizando) e o degradado (sem eventos por 15s → "Sem sinal GPS" → recuperação)
+**And** a latência de NFR2 (< 5s) é medida contra a API real
 
-**Camada:** Integração · **Depende de:** 5.1a–5.3b · **FRs:** valida FR31–FR35
+**Camada:** E2E · **Depende de:** 5.1, 5.2 · **FRs:** valida FR31–FR35
+
+---
 
 ### Rastreabilidade FR → Story (Épico 5)
 
 | FR | Story |
 |---|---|
-| FR31 | 5.1b |
-| FR32 | 5.2b |
-| FR33 | 5.1b (parada automática) + 5.4 (validação E2E) |
-| FR34 | 5.3b |
-| FR35 | 5.1a (Redis + Pub/Sub) + 5.2a (SSE) |
+| FR31, FR33 | 5.1 |
+| FR32, FR34 | 5.2 |
+| FR35 | 5.1 (Redis + Pub/Sub) + 5.2 (SSE) |
 
 **Cobertura do épico: 5/5 FRs (FR31–FR35).**
 
 ---
-
 ## Validação de Cobertura Total
 
 | Épico | FRs cobertos | Qtd |
@@ -1115,19 +1103,27 @@ Para que o épico seja considerado entregue de fato.
 | Epic 1 | Nenhum (habilitador técnico) | 0 |
 | Epic 2 | FR1–FR10 | 10 |
 | Epic 3 | FR11–FR25 | 15 |
-| Epic 4 | FR26–FR30, FR36, FR37 | 7 |
+| Epic 4 | FR26–FR30 | 5 |
 | Epic 5 | FR31–FR35 | 5 |
-| **Total** | | **37/37** |
+| **Total MVP** | | **35/37** |
+| **Diferido (Fase 2)** | FR36, FR37 | 2 |
 
-O refatiamento dos Épicos 3, 4 e 5 em trilhas **não removeu nem realocou nenhum FR** — apenas redistribuiu FRs entre stories *dentro* do mesmo épico. O `FR Coverage Map` (FR → Épico) permanece válido e inalterado.
+O refatiamento de 12/07/2026 em trilhas **não removeu nem realocou nenhum FR** — apenas redistribuiu FRs entre stories *dentro* do mesmo épico.
+
+A revisão de **28/08/2026** (`sprint-change-proposal-2026-08-28`, aprovado) é a primeira que altera a cobertura: **FR36 e FR37 saem do MVP** para a Fase 2. Além disso, **FR30 e FR32 mudam de forma de entrega** (lembrete in-app em vez de push; última posição + ETA em vez de mapa cartográfico) — ambos permanecem cobertos.
 
 ### Contagem de Stories
 
 | Épico | Antes | Depois | Detalhe |
 |---|---|---|---|
-| Epic 1 | 5 | 7 | +1.6 e 1.7 (ambiente de execução — sprint-change-proposal-2026-08-23) |
-| Epic 2 | 6 | 6 | intocado (done) |
-| Epic 3 | 5 | 9 | 1 entregue + 1 contrato + 2 backend + 4 mobile + 1 integração |
-| Epic 4 | 5 | 12 | 1 contrato + 5 backend + 5 mobile + 1 integração |
-| Epic 5 | 3 | 7 | 1 contrato + 2 backend + 3 mobile + 1 integração |
-| **Total** | **24** | **41** | 12 stories restantes viram 27, + 2 habilitadoras de ambiente |
+| Épico | 12/07/2026 | 23/08/2026 | **28/08/2026** | Detalhe da última revisão |
+|---|---|---|---|---|
+| Epic 1 | 5 | 7 | **9** | +1.8 (shell de navegação, extraída da 3.6) e 1.9 (seed, renumerada de 1.8) |
+| Epic 2 | 6 | 6 | **6** | intocado (done) |
+| Epic 3 | 9 | 9 | **9** | contagem intocada; 3.4b e 3.6 reduzidas em escopo |
+| Epic 4 | 12 | 12 | **6** | fatiamento vertical (1 contrato + 4 fatias + 1 E2E); broadcast cortado |
+| Epic 5 | 7 | 7 | **4** | fatiamento vertical (1 contrato + 2 fatias + 1 E2E); 5.3b dobrada na 5.2 |
+| **Total** | **39** | **41** | **34** | **−8 stories** |
+
+> A tabela acima substitui a contagem "Antes/Depois" de 12/07/2026, que só comparava duas
+> revisões. **Stories abertas em 28/08/2026: 25 → 18.**
