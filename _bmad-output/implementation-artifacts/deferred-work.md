@@ -91,3 +91,50 @@ dentro dele.
 ## Deferred from: code review of story-1.6 (2026-08-28)
 
 - **Falha de `initializeDatabase()` só é logada — o app segue sem fila offline e sem sinal** [mobile/src/app/_layout.tsx:30-34] — pré-existente, decisão deliberada da Story 1.5 ("Errors são logados mas não travam o app — modo degradado preferível a crash"). `initializeDatabase().catch(console.error).finally(() => setIsDbReady(true))` abre o portão de boot mesmo quando o banco não abriu, então o app roda sem Tier 2 e nada no produto indica isso — nem ao dev, nem ao motorista. No alvo web o gatilho mais provável é `crossOriginIsolated === false` (acesso por IP de LAN, ou `--https`, que contorna o patch do `metro.config.js`), onde o wa-sqlite rejeita a abertura. Não corrigido na 1.6 porque a AC #8 proíbe tocar em `_layout.tsx`. Contraste deliberado com o caminho do MSW, que na mesma tela **para o app** em caso de falha (`_layout.tsx:44-48`) — a assimetria é intencional hoje, mas vira dívida quando o Tier 2 for exercitado de verdade na 3.4b / Story 1.7.
+
+---
+
+## Reescopo e diferimentos — sprint-change-proposal-2026-08-28 (aprovado por Lucas, 28/08/2026)
+
+### Itens reescopados da Story 3.6 para a Story 1.8
+
+A Story 3.6 é a **última** do Épico 3, mas os dois primeiros itens abaixo bloqueiam as
+stories que vêm **antes** dela (3.3b, 3.4b, 3.5b). Foram extraídos para a nova **Story 1.8
+— Shell de Navegação e Remoção do Template Expo**, que executa a seguir.
+
+| Item | Origem | Novo escopo |
+|---|---|---|
+| Layout raiz não renderiza saída de router — nenhuma tela alcançável | dev da 1.6 (27/08) | **Story 1.8** |
+| `enableMocking()` não é idempotente; o modo MSW não sobe | dev da 1.6 (27/08) | **Story 1.8** |
+| AC #5 da 3.2b não demonstrável (nav shell ausente) | code review da 3.2b (23/08) | **Story 1.8** — fecha por consequência |
+| Ratificação de `eslint` + `eslint-config-expo` no mobile | code review da 3.2b (23/08) | **Story 1.8** — o lint passa a rodar sobre o código que sobrar |
+
+A Story 3.6 fica exclusivamente com a integração e o E2E do Épico 3.
+
+### Diferido para a Fase 2 pela revisão de escopo
+
+- **Avisos gerais do motorista (broadcast)** — FR36 e FR37, ex-stories 4.5a e 4.5b. Não
+  aparece em nenhuma das quatro jornadas do PRD e está abaixo de todas as prioridades da
+  Mitigação de Riscos. Sai junto o endpoint `POST /api/v1/boarding/broadcast` e o evento
+  SSE `boarding.broadcast`.
+- **Push notifications** — evolução do FR30. No MVP o lembrete automático é entregue in-app
+  pelo evento `boarding.checkin_reminder` no stream do Épico 4, mais o estado lido na
+  abertura do app. O scheduler e o use case do core da Story 4.4 são preservados
+  integralmente; saem o registro de push token e as notification actions.
+- **Mapa cartográfico com marcador animado** — evolução do FR32. No MVP a Story 5.2
+  apresenta a última posição conhecida com distância e tempo estimado até o ponto do aluno.
+  Fecha, sem ser pago, o risco aberto da Architecture §8 regra 14 (biblioteca de mapas com
+  suporte web, nunca escolhida — `react-native-maps` não atende).
+- **Badge de estado por item da fila offline** (`✓` / `⏳` / `✗`) e representação visual do
+  teto de 500 itens — Story 3.4b. O mecanismo da fila, a idempotência e a persistência a
+  crash (NFR11, NFR12, NFR14) permanecem no MVP; só a interface foi enxugada para o banner
+  global "Modo Offline — dados serão sincronizados" (NFR13).
+
+### Registro para a tese
+
+A `architecture.md` §10 afirmava que o fatiamento em trilhas transformaria *"a arquitetura
+hexagonal facilita trabalho paralelo em equipes pequenas"* de hipótese em **evidência
+coletável**. Com o retorno ao modelo solo, isso deixa de ser coletável nos Épicos 4 e 5.
+Reenquadramento adotado: o **Épico 3** é o estudo de caso do modelo de trilhas paralelas e
+os **Épicos 4 e 5** são o grupo de comparação sob fatiamento vertical — observação
+comparativa em vez de afirmação de viabilidade sem controle.
