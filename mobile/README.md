@@ -1,56 +1,149 @@
-# Welcome to your Expo app 👋
+# PureUrban — App Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App [Expo](https://expo.dev) (SDK 55) do PureUrban, com roteamento por arquivos via
+[Expo Router](https://docs.expo.dev/router/introduction) em `src/app/`.
 
-## Get started
+## Ambientes de execução
 
-1. Install dependencies
+O projeto tem **dois** ambientes, e nenhum deles é o Expo Go — o app depende de MMKV
+(Nitro Modules), que o Expo Go não carrega em versão nenhuma:
+
+| Ambiente | Comando | Para quê |
+|---|---|---|
+| **Alvo web** (Story 1.6) | `npm run web` | Desenvolvimento e verificação do dia a dia |
+| **Development build Android** (Story 1.7) | ver a Story 1.7 | Validação nativa: push, GPS em background, Tier 2 real |
+
+> ### ⚠️ Estado atual: o ambiente sobe, mas nenhuma tela do produto renderiza
+>
+> O alvo web está **provado e funcionando** na camada de infraestrutura: bundle,
+> cross-origin isolation, MMKV sobre `localStorage` e o Tier 2 em wa-sqlite/OPFS.
+> O que ainda **não** funciona é o app em si — dois bloqueios conhecidos, ambos de
+> código de aplicação e ambos válidos também no alvo nativo:
+>
+> 1. **Nenhuma rota é alcançável.** `src/app/_layout.tsx` não renderiza saída de
+>    router (não há `<Slot />`, `<Stack />` nem `<Tabs />`). `/login`, `/scan`,
+>    `/trip` e `/qr-code` devolvem tela em branco quando deslogado, e o template
+>    "Welcome to Expo" quando logado. Sem erro no console. **Escopo da Story 3.6.**
+> 2. **O modo MSW derruba o app.** Ver a seção *Mocks* abaixo.
+>
+> Consequência prática: dá para desenvolver e inspecionar infraestrutura aqui, mas
+> **não** para verificar fluxos de produto até a Story 3.6 fechar. Login e câmera
+> nunca foram exercitados neste ambiente. Ver `_bmad-output/implementation-artifacts/deferred-work.md`.
+
+## Alvo web
+
+### Pré-requisitos
+
+1. Dependências instaladas: `npm install`
+2. Banco e Redis no ar, a partir da raiz do repositório: `docker compose up -d`
+3. Migrações aplicadas: `cd ../api && npx prisma migrate deploy && npx prisma generate`
+4. API no ar: `cd ../api && npm run start:dev`
+5. Um usuário para logar. **O seed não funciona** — `npm run seed` não existe,
+   `npx prisma db seed` responde `No seed command configured` (o Prisma 7 moveu essa
+   chave para `prisma.config.ts` e ela não foi migrada) e `prisma/seed.ts` falha em
+   `new PrismaClient()` sem `adapter`. Crie o admin pela própria API:
 
    ```bash
-   npm install
+   curl -X POST http://localhost:3000/api/v1/auth/register \
+     -H 'Content-Type: application/json' \
+     -d '{"name":"PureUrban Dev","email":"admin@pureurban.dev","password":"admin123456"}'
    ```
 
-2. Start the app
+6. `mobile/.env` criado a partir de `.env.example`:
 
    ```bash
-   npx expo start
+   cp .env.example .env
    ```
 
-In the output, you'll find options to open the app in a
+   ⚠️ **`.env.example` traz o valor do alvo web, não o de todos os alvos.** No web,
+   `EXPO_PUBLIC_API_URL` precisa apontar para o host do browser
+   (`http://localhost:3000`, ou a porta que a API estiver usando). Para o **emulador
+   Android**, comente a linha: o fallback `http://10.0.2.2:3000` é o valor correto, e
+   `localhost` dentro do emulador aponta para o próprio emulador. Ver os comentários
+   do `.env.example` para cada alvo.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   `.env` é lido em todos os modos, produção inclusa. Um valor de host local é
+   ignorado em builds de produção (`src/utils/constants.ts`), com erro no console.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### Subir
 
 ```bash
-npm run reset-project
+npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+O script fixa `--port 8081` de propósito. A porta faz parte do contrato com a API:
+`CORS_ORIGIN` (em `api/.env`, default `http://localhost:8081`) precisa casar com a
+origem do dev server. Se você subir noutra porta, o app carrega normalmente e **só o
+login falha**, com erro de CORS no console — ajuste `CORS_ORIGIN`, não a URL da API.
 
-### Other setup steps
+### ⚠️ Abra sempre por `http://localhost:8081` — nunca pelo IP de LAN
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Duas APIs do caminho crítico só existem em **secure context** (HTTPS ou `localhost`).
+`localhost` conta como contexto seguro mesmo em HTTP; `http://192.168.x.x:8081` não:
 
-## Learn more
+| API | Onde é usada | O que quebra |
+|---|---|---|
+| `crypto.randomUUID()` | `expo-crypto` → `auth.store.ts` | O **login** falha |
+| `navigator.mediaDevices.getUserMedia` | `expo-camera` web → `QrScanner` | A câmera não abre |
+| `crossOriginIsolated` / `SharedArrayBuffer` | wa-sqlite (OPFS) → `initializeDatabase()` | O **Tier 2 inteiro** morre |
 
-To learn more about developing your project with Expo, look at the following resources:
+O sintoma mais confuso é o primeiro: pelo IP de LAN o login quebra, não só a câmera.
+E o terceiro é pior ainda, porque é **silencioso** — `initializeDatabase()` só loga o
+erro e o app segue sem fila offline (`src/app/_layout.tsx`), sem nada na tela.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Mocks (MSW)
 
-## Join the community
+> **⚠️ Quebrado no alvo web hoje — não use.** Com a flag ligada, o app renderiza
+> "Falha ao inicializar os mocks (MSW)" e para. O MSW em si **funciona** e intercepta
+> corretamente no browser; o que quebra é `enableMocking()` não ser idempotente: o
+> efeito de `_layout.tsx` roda duas vezes e o segundo `server.listen()` lança
+> `Invariant Violation: cannot configure an already enabled network`. O app para de
+> propósito (design da Story 3.0: melhor parar do que mandar requisições para a API
+> real sem aviso). Correção pendente em `src/mocks/index.ts` — **Story 3.6**.
 
-Join our community of developers creating universal apps.
+`EXPO_PUBLIC_USE_MOCKS=1` no `.env` faz as requisições da API serem atendidas em
+memória pelo MSW, sem backend de pé. `.env.example` lista os usuários e os IDs que os
+handlers conhecem. Com a flag ligada, o console mostra `[mocks] MSW ativo`. Reinicie o
+dev server ao trocar a flag — variáveis `EXPO_PUBLIC_*` entram no bundle em build time.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Exportar o bundle web
+
+```bash
+npx expo export --platform web   # emite ./dist
+```
+
+## Limitações do alvo web
+
+O alvo web é ambiente de **desenvolvimento e verificação**, não substituto do device:
+
+| Limitação | Consequência |
+|---|---|
+| Suporte web do `expo-sqlite` é **alpha** (doc oficial) | O Tier 2 (fila offline) só é validado de verdade no development build da Story 1.7 |
+| MMKV vira `localStorage` | Sem criptografia; perfil de performance diferente; cota do browser (~5-10MB) |
+| Exige `http://localhost:8081` | IP de LAN quebra **login** (`crypto.randomUUID`) e câmera (`getUserMedia`) |
+| `COEP: credentialless` não é suportado no Safari | O alvo é Chrome/Edge/Firefox. Restrição de ambiente de dev, não de produto |
+| Câmera é webcam, não câmera de device | Ergonomia de embarque (NFR18–NFR20) não é avaliável aqui. **A webcam nunca foi exercitada** — a AC #7 da Story 1.6 ficou diferida |
+| Push (Story 4.4b), GPS em background e Tier 2 real | Exigem a Story 1.7 (Architecture §8, regra 15) |
+| Servir `dist/` estático | Precisa dos mesmos headers COOP/COEP **e** de rewrite catch-all — ver abaixo |
+
+### Servir `dist/` como estático
+
+O `metro.config.js` injeta `Cross-Origin-Opener-Policy: same-origin` e
+`Cross-Origin-Embedder-Policy: credentialless` — **só no dev server**. Sem cross-origin
+isolation não existe `SharedArrayBuffer`, e sem ele o wa-sqlite (o `expo-sqlite` do
+web) não abre o banco. Qualquer servidor estático que sirva `dist/` precisa emitir os
+**mesmos dois headers**, senão o app carrega mas o Tier 2 morre.
+
+Além dos headers, o servidor precisa de **rewrite catch-all para `/index.html`**.
+`app.json` usa `web.output: "single"` — é um SPA com um único HTML, não mais um
+arquivo por rota. Sem o rewrite, acesso direto ou F5 em `/scan`, `/qr-code` ou
+`/login` devolve 404.
+
+## Convenções
+
+- Imports internos usam o alias `@/*` → `./src/*`
+- Arquivos em kebab-case, indentação de 2 espaços
+- `npm run lint` — ESLint (flat config, `eslint-config-expo`)
+- `npx tsc --noEmit` — checagem de tipos
+- `npm run openapi:types` — regenera `src/types/api.d.ts` a partir de `../api/openapi.json`
+- **Nunca commite `.env`** — use `.env.example` como referência

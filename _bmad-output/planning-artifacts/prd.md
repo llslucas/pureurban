@@ -196,9 +196,10 @@ O PureUrban é composto por dois artefatos de software:
 - **Cross-platform:** iOS e Android via Expo.
 - **Compatibilidade retroativa:** Suporte a dispositivos de baixo custo (Android 8+ / iOS 13+), visto que empresas de transporte frequentemente adquirem dispositivos baratos para motoristas.
 - **Modo offline:** Check-in via QR code e lista de alunos devem funcionar sem conectividade, com sincronização automática ao reconectar.
-- **Push notifications:** Via Expo Push Notifications — alertas de check-in pendente, notificações de "não vou voltar", atualizações de viagem.
+- **Push notifications:** Via Expo Push Notifications — alertas de check-in pendente, notificações de "não vou voltar", atualizações de viagem. Exigem o development build Android; não são validáveis no alvo web.
 - **Recursos do dispositivo:** GPS (localização do motorista), Câmera (leitura de QR code), Sistema de notificações push.
-- **Publicação:** Não será publicada em loja nesta versão (TCC). Distribuição via Expo Go ou build de desenvolvimento.
+- **Publicação:** Não será publicada em loja nesta versão (TCC).
+- **Ambiente de execução:** O Expo Go **não é um alvo viável** — a stack decidida usa `react-native-mmkv` (Nitro Modules), ausente do binário do Expo Go. O desenvolvimento acontece em dois ambientes complementares: **(a) alvo web** (`expo start --web`), usado no ciclo diário de desenvolvimento e para validação funcional de telas, fluxos e leitura de QR code; **(b) development build Android** (EAS Build, distribuição interna, sem loja), usado para validação nativa — push notifications, GPS, performance e ergonomia em device.
 
 ### Requisitos API Backend (NestJS)
 

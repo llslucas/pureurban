@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/types/api'
 import type { AssignedRoute } from '@/services/routes.service'
+import { getMockSessionEmail } from './session'
 
 type ErrorResponse = components['schemas']['ErrorResponseDto']
 
@@ -38,14 +39,6 @@ const EMPTY_ROSTER_EMAIL = 'aluno-sem-rota@pureurban.com'
 const ERROR_TRIGGER_EMAIL = 'aluno-erro@pureurban.com'
 const MULTI_ROUTE_EMAIL = 'aluno-multirota@pureurban.com'
 
-let currentSessionEmail: string | null = null
-
-// Chamado pelos handlers de auth no login — mantém os dois mocks coerentes sem
-// inventar um conceito de sessão no MSW.
-export function setMockSessionEmail(email: string | null): void {
-  currentSessionEmail = email
-}
-
 function errorResponse(status: number, code: string, message: string) {
   const body: ErrorResponse = { error: { code, message } }
   return HttpResponse.json(body, { status })
@@ -53,14 +46,14 @@ function errorResponse(status: number, code: string, message: string) {
 
 export const routesHandlers = [
   http.get('*/api/v1/routes/mine', () => {
-    if (currentSessionEmail === ERROR_TRIGGER_EMAIL) {
+    if (getMockSessionEmail() === ERROR_TRIGGER_EMAIL) {
       return errorResponse(500, 'INTERNAL_ERROR', 'Falha ao carregar rotas')
     }
 
     const data =
-      currentSessionEmail === EMPTY_ROSTER_EMAIL
+      getMockSessionEmail() === EMPTY_ROSTER_EMAIL
         ? []
-        : currentSessionEmail === MULTI_ROUTE_EMAIL
+        : getMockSessionEmail() === MULTI_ROUTE_EMAIL
           ? [MOCK_ROUTE, MOCK_SECOND_ROUTE]
           : [MOCK_ROUTE]
 

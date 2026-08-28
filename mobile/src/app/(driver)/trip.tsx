@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import { router } from 'expo-router'
 import { View, StyleSheet, ScrollView, Alert } from 'react-native'
 import { Button, Card, Text, ActivityIndicator, Chip } from 'react-native-paper'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -148,6 +149,21 @@ export default function TripScreen() {
           </Text>
         </Card.Content>
       </Card>
+      {/* Contagem de toques da NFR19: o login leva o motorista direto a esta
+          tela (0 toques) → 1 toque aqui → câmera aberta.
+          `navigate`, não `push`: dois toques rápidos empilhavam duas telas, e
+          cada uma abriria sua própria câmera. */}
+      <Button
+        mode="contained"
+        onPress={() => router.navigate('/(driver)/scan')}
+        disabled={isMutating}
+        style={styles.primaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.buttonLabel}
+        icon="qrcode-scan"
+      >
+        Escanear QR Code
+      </Button>
       <Button
         mode="contained"
         onPress={handleEnd}
