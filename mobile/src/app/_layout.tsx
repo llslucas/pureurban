@@ -1,28 +1,27 @@
-import { router } from 'expo-router'
+import { Stack } from 'expo-router'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import React, { useEffect, useState } from 'react'
 import { useColorScheme, View } from 'react-native'
-import { PaperProvider, Text } from 'react-native-paper'
+import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon'
-import AppTabs from '@/components/app-tabs'
 import { initializeDatabase } from '@/lib/database'
 import { mmkvPersister } from '@/lib/mmkv-persister'
 import { queryClient } from '@/lib/query-client'
 import { darkTheme, lightTheme } from '@/lib/theme'
 import { enableMocking, MOCKS_ENABLED } from '@/mocks'
 import { useAuthStore } from '@/stores/auth.store'
+import { ROLE_ROUTES, ROLES } from '@/utils/role-routes'
 
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme()
-  // Loading gate: AppTabs não monta antes do banco estar pronto
+  // Loading gate: o navegador não monta antes do banco estar pronto.
   const [isDbReady, setIsDbReady] = useState(false)
-  // Loading gate: mocks DEVEM estar prontos antes do AppTabs montar, senão a
+  // Loading gate: mocks DEVEM estar prontos antes do navegador montar, senão a
   // primeira query escapa do interceptor MSW. Com a flag desligada não há nada
   // para esperar — o portão já nasce aberto e nada aqui afeta produção.
   const [isMockReady, setIsMockReady] = useState(!MOCKS_ENABLED)
   const [mockError, setMockError] = useState<string | null>(null)
-  const { isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
 
   useEffect(() => {
     // Inicializa banco SQLite e cria tabela offline_queue na inicialização do app.
@@ -48,14 +47,6 @@ export default function TabLayout() {
       })
   }, [])
 
-  // Redirecionar para login se não autenticado após DB e mocks estarem prontos
-  useEffect(() => {
-    if (!isDbReady || !isMockReady) return
-    if (!isAuthenticated) {
-      router.replace('/(auth)/login')
-    }
-  }, [isDbReady, isMockReady, isAuthenticated])
-
   // Abaixo de todos os hooks: um early return acima deles quebra as Rules of
   // Hooks no render em que mockError deixa de ser null.
   if (mockError) {
@@ -74,6 +65,8 @@ export default function TabLayout() {
     )
   }
 
+  const isBooting = !isDbReady || !isMockReady
+
   return (
     <PersistQueryClientProvider
       client={queryClient}
@@ -83,10 +76,36 @@ export default function TabLayout() {
       }}
     >
       <PaperProvider theme={colorScheme === 'dark' ? darkTheme : lightTheme}>
-        <AnimatedSplashOverlay />
-        {isDbReady && isMockReady && isAuthenticated && <AppTabs />}
+        {isBooting ? (
+          // Nunca null enquanto os portões de boot não abrem: um layout raiz sem
+          // saída de router é exatamente a tela em branco que esta tela evita.
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          // headerShown: false no raiz — cada grupo monta o próprio <Stack> e
+          // decide o próprio header; sem isso o app empilha dois. Vale para os
+          // quatro grupos: (driver) e (student) dão títulos por tela, (admin) dá
+          // um título, e (auth) desliga o header (ver o layout do grupo).
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Protected guard={!isAuthenticated}>
+              <Stack.Screen name="(auth)" />
+            </Stack.Protected>
+            {/* Derivado de ROLE_ROUTES: um papel novo entra no mapa e ganha
+                guard e destino de uma vez. Guards escritos à mão aqui podiam
+                divergir do mapa, e a divergência não dá erro — dá loop entre
+                este navegador e o `+not-found`. */}
+            {ROLES.map((role) => (
+              <Stack.Protected
+                key={role}
+                guard={isAuthenticated && user?.role === role}
+              >
+                <Stack.Screen name={ROLE_ROUTES[role].group} />
+              </Stack.Protected>
+            ))}
+          </Stack>
+        )}
       </PaperProvider>
     </PersistQueryClientProvider>
   )
 }
-
