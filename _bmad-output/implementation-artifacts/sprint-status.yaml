@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-08-28T21:00:00-03:00"
+last_updated: "2026-08-29T00:15:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -72,11 +72,12 @@ development_status:
   1-5-setup-mobile-dependencias-e-configuracao-offline: done
   1-6-ambiente-de-execucao-web-do-app-mobile: done
   # NOVA (sprint-change-proposal-2026-08-28): extraída da Story 3.6, onde estava sequenciada
-  # DEPOIS das três stories que bloqueia. `_layout.tsx` não renderiza saída de router —
-  # nenhuma tela do projeto é alcançável (verificado em Chromium na 1.6). Absorve também a
-  # correção de idempotência do enableMocking() e a remoção de ~910 linhas do template Expo.
-  # EXECUTA A SEGUIR — bloqueia 3.3b, 3.4b, 3.5b, 3.6 e toda story mobile subsequente.
-  1-8-shell-de-navegacao-e-remocao-do-template-expo: backlog
+  # DEPOIS das três stories que bloqueia. Entregue em 28/08/2026: `_layout.tsx` passou a
+  # renderizar um <Stack> com guards por papel, o enableMocking() virou idempotente e ~930
+  # linhas do template Expo saíram da árvore. As telas do produto agora são alcançáveis.
+  # DESBLOQUEIA 3.3b, 3.4b, 3.5b e 3.6. Code review de 28/08 aplicado (7 decisões, 6 patches)
+  # e o caminho de logout verificado em browser (Bloco C da Task 6). Fechada.
+  1-8-shell-de-navegacao-e-remocao-do-template-expo: done
   # DEMOVIDA de bloqueio para validação final (sprint-change-proposal-2026-08-28): push saiu
   # do MVP, o GPS usa a Geolocation API no alvo web e o Tier 2 foi verificado em wa-sqlite/OPFS
   # na Story 1.6. Restam NFR5 e NFR18-NFR20. BLOQUEIA A DEFESA, não o desenvolvimento.
@@ -110,12 +111,11 @@ development_status:
   3-1-iniciar-e-encerrar-viagem: review
   3-2b-geracao-e-exibicao-de-qr-code-do-aluno: done
   3-3a-check-in-de-embarque: done
-  # 3-3b em diante: o ambiente de execução web (Story 1.6) EXISTE e está verificado,
-  # mas continuam bloqueadas por dois achados da 1.6 (27/08/2026, ver deferred-work.md):
-  #   Bloqueio 5 — src/app/_layout.tsx não renderiza saída de router: nenhuma tela do
-  #                projeto é alcançável, autenticado ou não. ESCOPO MIGRADO PARA A STORY 1.8
-  #                em 28/08/2026 (antes estava na 3.6, depois das stories que bloqueia).
-  #   Bloqueio 6 — enableMocking() não é idempotente; o modo MSW não sobe. Também na 1.8.
+  # 3-3b em diante: o ambiente de execução web (Story 1.6) EXISTE e está verificado, e os
+  # dois achados da 1.6 que as bloqueavam foram FECHADOS pela Story 1.8 em 28/08/2026:
+  #   Bloqueio 5 — src/app/_layout.tsx não renderizava saída de router. RESOLVIDO: shell de
+  #                navegação com <Stack> + guards por papel; telas alcançáveis.
+  #   Bloqueio 6 — enableMocking() não era idempotente. RESOLVIDO: guarda em globalThis.
   # Terceiro achado da 1.6 (seed quebrado sob Prisma 7) virou a Story 1.9 acima —
   # não bloqueia a 3-3b, mas bloqueia qualquer story que dependa de dados semeados.
   # Código da 3-3b está implementado e revisado (c36dd69) — falta verificação em execução.

@@ -13,22 +13,11 @@ O projeto tem **dois** ambientes, e nenhum deles é o Expo Go — o app depende 
 | **Alvo web** (Story 1.6) | `npm run web` | Desenvolvimento e verificação do dia a dia |
 | **Development build Android** (Story 1.7) | ver a Story 1.7 | Validação nativa: push, GPS em background, Tier 2 real |
 
-> ### ⚠️ Estado atual: o ambiente sobe, mas nenhuma tela do produto renderiza
->
-> O alvo web está **provado e funcionando** na camada de infraestrutura: bundle,
-> cross-origin isolation, MMKV sobre `localStorage` e o Tier 2 em wa-sqlite/OPFS.
-> O que ainda **não** funciona é o app em si — dois bloqueios conhecidos, ambos de
-> código de aplicação e ambos válidos também no alvo nativo:
->
-> 1. **Nenhuma rota é alcançável.** `src/app/_layout.tsx` não renderiza saída de
->    router (não há `<Slot />`, `<Stack />` nem `<Tabs />`). `/login`, `/scan`,
->    `/trip` e `/qr-code` devolvem tela em branco quando deslogado, e o template
->    "Welcome to Expo" quando logado. Sem erro no console. **Escopo da Story 3.6.**
-> 2. **O modo MSW derruba o app.** Ver a seção *Mocks* abaixo.
->
-> Consequência prática: dá para desenvolver e inspecionar infraestrutura aqui, mas
-> **não** para verificar fluxos de produto até a Story 3.6 fechar. Login e câmera
-> nunca foram exercitados neste ambiente. Ver `_bmad-output/implementation-artifacts/deferred-work.md`.
+As telas do produto são alcançáveis (shell de navegação da Story 1.8). O ponto de
+entrada roteia por papel: `DRIVER` cai em `/(driver)/trip`, `STUDENT` em
+`/(student)/home`, `ADMIN` em `/(admin)/home`; sem sessão, em `/(auth)/login`. Digitar
+uma rota protegida direto na barra de endereços redireciona para o destino do papel
+atual — nunca tela em branco.
 
 ## Alvo web
 
@@ -93,13 +82,11 @@ erro e o app segue sem fila offline (`src/app/_layout.tsx`), sem nada na tela.
 
 ### Mocks (MSW)
 
-> **⚠️ Quebrado no alvo web hoje — não use.** Com a flag ligada, o app renderiza
-> "Falha ao inicializar os mocks (MSW)" e para. O MSW em si **funciona** e intercepta
-> corretamente no browser; o que quebra é `enableMocking()` não ser idempotente: o
-> efeito de `_layout.tsx` roda duas vezes e o segundo `server.listen()` lança
-> `Invariant Violation: cannot configure an already enabled network`. O app para de
-> propósito (design da Story 3.0: melhor parar do que mandar requisições para a API
-> real sem aviso). Correção pendente em `src/mocks/index.ts` — **Story 3.6**.
+> `enableMocking()` é idempotente desde a Story 1.8: a guarda vive em `globalThis`
+> (não numa flag de módulo, que o Fast Refresh zeraria), então o segundo
+> `server.listen()` nunca acontece e salvar um arquivo com o dev server no ar não
+> derruba o app. Uma falha real na inicialização do MSW ainda para o app de propósito
+> (design da Story 3.0: melhor parar do que mandar requisições para a API real sem aviso).
 
 `EXPO_PUBLIC_USE_MOCKS=1` no `.env` faz as requisições da API serem atendidas em
 memória pelo MSW, sem backend de pé. `.env.example` lista os usuários e os IDs que os
