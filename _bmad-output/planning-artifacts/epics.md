@@ -369,7 +369,7 @@ Para que as telas do produto sejam alcançáveis e as stories mobile possam ser 
 **Then** o layout raiz renderiza saída de router e as rotas `(auth)`, `(driver)`, `(student)` e `(admin)` são alcançáveis pela barra de endereços no alvo web
 **And** o usuário autenticado é roteado para o grupo correspondente ao seu `role`, tanto no login novo quanto na reabertura com sessão hidratada do MMKV
 **And** o usuário não autenticado é roteado para `(auth)/login` sem tela em branco
-**And** `enableMocking()` torna-se idempotente por guarda ancorada no estado do servidor MSW (`server.listening`) — uma guarda de módulo NÃO resolve, porque o Fast Refresh reavalia o módulo e zera a flag (diagnóstico registrado no `deferred-work.md`)
+**And** `enableMocking()` torna-se idempotente por guarda ancorada em `globalThis` (promise de boot memoizada) — uma guarda de módulo NÃO resolve, porque o Fast Refresh reavalia o módulo e zera a flag (diagnóstico registrado no `deferred-work.md`). **Correção de 28/08/2026:** a versão anterior deste texto prescrevia `server.listening` como âncora; essa propriedade NÃO existe em `msw@2.15` (`grep -c listening` nos builds `node` e `native` devolve 0)
 **And** o cluster de template do Expo é removido: `app/index.tsx`, `app/explore.tsx`, `components/animated-icon*`, `components/app-tabs*`, `components/themed-text`, `components/themed-view`, `components/ui/collapsible`, `components/hint-row`, `components/web-badge`, `components/external-link` e os assets órfãos — ~910 linhas sem nenhum importador de produto
 **And** `npx expo export --platform web` continua completando sem erro
 **And** a AC #5 da Story 3.2b (fluxo de 1 toque até o QR, NFR19) passa a ser demonstrável

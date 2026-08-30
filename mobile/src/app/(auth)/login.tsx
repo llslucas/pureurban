@@ -6,6 +6,7 @@ import { Button, HelperText, Text, TextInput } from 'react-native-paper'
 import { tokenStorage } from '@/lib/storage'
 import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/stores/auth.store'
+import { homeForRole } from '@/utils/role-routes'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
@@ -36,14 +37,7 @@ export default function LoginScreen() {
       // Role é validada ANTES de autenticar: chamar login() primeiro deixava a
       // sessão persistida (user + sessionId no MMKV, isAuthenticated true) numa
       // role sem destino, parada na própria tela de login e sem redirect.
-      const destination =
-        result.user.role === 'DRIVER'
-          ? '/(driver)/trip'
-          : result.user.role === 'STUDENT'
-            ? '/(student)/home'
-            : result.user.role === 'ADMIN'
-              ? '/(admin)/home'
-              : null
+      const destination = homeForRole(result.user.role)
 
       if (!destination) {
         tokenStorage.clearTokens()

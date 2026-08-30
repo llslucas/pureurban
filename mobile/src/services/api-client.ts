@@ -141,6 +141,11 @@ async function request<T>(
     // a tela de QR continuava renderizando um código de sessão que o backend já
     // rejeitou. logout() é o único escritor que zera as três fontes de verdade.
     useAuthStore.getState().logout()
+    // O `replace` é redundante com os guards do layout raiz — o flip de
+    // `isAuthenticated` sozinho já desmonta o grupo do papel e monta `(auth)`.
+    // Mantido por ser inofensivo: verificado em browser (28/08/2026, refresh
+    // falhando contra a API real) que a transição `/trip → /login` é direta,
+    // sem passar pelo `+not-found` e sem frame em branco.
     router.replace('/(auth)/login')
     throw new ApiClientError('UNAUTHORIZED', 'Sessão expirada. Faça login novamente.', 401)
   }
