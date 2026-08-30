@@ -5,7 +5,7 @@ branch: feat/3-3b-escaneamento-de-qr-code
 
 # Story 3.3b: Escaneamento de QR Code (Mobile Motorista)
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -202,7 +202,7 @@ Toda decisão de UI de `(driver)/scan.tsx` sai daqui. Se a implementação diver
 
 - [x] 9.1 `cd mobile && npx tsc --noEmit` → **0 erros**. A baseline desta branch já é 0 — qualquer erro é seu.
 - [x] 9.2 `cd mobile && npm run lint` → limpo (0 erros, 0 warnings). Baseline desta branch já é limpa.
-- [ ] 9.3 Roteiro manual com `EXPO_PUBLIC_USE_MOCKS=1`, registrando o resultado de cada linha no Debug Log:
+- [x] 9.3 Roteiro executado no alvo **web** (Expo Web + Chromium headless) com `EXPO_PUBLIC_USE_MOCKS=1` em 2026-08-30, após a 1.6/1.8 terem entrado na `main`. **10/10 casos verdes, 27/27 asserts.** Resultado de cada linha registrado no Debug Log e em *Verificação de runtime (2026-08-30)*. Sem device/emulador nativo neste ambiente — ver as ressalvas de alvo web na mesma seção. Roteiro:
   | Caso | Como reproduzir | Estado esperado |
   |---|---|---|
   | Caminho feliz | login `motorista@pureurban.com` → Escanear → QR de `aluno@pureurban.com` | 7 (verde) |
@@ -256,6 +256,41 @@ As 2 decisões foram resolvidas pela opção (a) e os 19 patches foram aplicados
 - `npx tsc --noEmit` → **0 erros**; `npm run lint` → **limpo**.
 - Harness MSW em Node (`setupServer`, `onUnhandledRequest: 'error'`, nenhuma requisição escapou): **21/21 passaram** — caminho feliz, idempotência (chave nova → 409, mesma chave → replay 201 com id idêntico), header ausente → 400, as três sentinelas de motorista, as quatro sentinelas de `/routes/mine` da 3.2b, mais três casos novos que cobrem os patches de mock: viagem iniciada não vaza entre contas, `motorista-sem-viagem@` passa a enxergar a viagem que iniciou, e `/trips/active` nunca devolve `COMPLETED`.
 - **A metade de UI continua sem evidência de runtime** — e agora é maior do que era: os patches da máscara, do posicionamento das ações, da tipografia do overlay, do botão do estado 12, do `onMountError` e da releitura de permissão são todos visuais e nenhum foi visto num device. O roteiro da Task 9.3 continua sendo o gate para mover esta story a `done`.
+
+#### Verificação de runtime (2026-08-30)
+
+Contexto: o código da 3.3b já estava na `main` (entrou junto com a branch da 1.6, PR #8 — `git log main..feat/3-3b-escaneamento-de-qr-code` vazio). Com a 1.6 (alvo web) e a 1.8 (shell de navegação + `enableMocking` idempotente) mergeadas, o roteiro da Task 9.3 passou a ser executável. Verificação feita na branch `chore/3-3b-verificacao-de-ui`.
+
+**Ambiente:** Expo Web (`npm run web`, porta 8081) com `EXPO_PUBLIC_USE_MOCKS=1`, dirigido por Chromium headless (Playwright 1.58, `api/node_modules`). Sem device/emulador nativo neste ambiente (inalterado desde 23/08). O `expo export --platform web` da 3.2b **não falha mais** — o erro de `wa-sqlite.wasm` foi resolvido pela Story 1.6; o bundle web sobe e roda.
+
+**Como o roteiro foi dirigido:**
+- Câmera: `navigator.mediaDevices.getUserMedia` stubado por um `canvas.captureStream()` que desenha o QR do caso. A **detecção** é a real — `expo-camera` web usa o polyfill `barcode-detector` (zxing-wasm), que rodou de verdade sobre o vídeo do canvas.
+- Chamadas de API: contadas por um wrapper de `window.fetch` instalado por cima do `fetchProxy` do MSW, na tela de scan (registra inclusive as requisições que o MSW resolve).
+- "Sem rede": o wrapper força o `fetch` do `/boarding/check-in` a rejeitar com `TypeError` — fiel a uma falha de transporte vista pelo `api-client`. Não foi o "modo avião + mocks off" literal.
+
+**Resultado — 10/10 casos, 27/27 asserts verdes:**
+
+| Caso | Estado | Verificado |
+|---|---|---|
+| Caminho feliz | 7 | overlay **verde** "Embarque confirmado", contador "1 embarque nesta sessão", **1** POST `check-in` → 201, auto-retomada ~2,5s |
+| Duplicata | 8 | após Bruno+Ana embarcados, reler Bruno → overlay **âmbar** "Já embarcou / já fez check-in", check-ins `[201, 201, 409]` |
+| Aluno fora do roster | 9 | overlay **vermelho** "Aluno não autorizado", POST → 403 |
+| QR estranho (URL) | 10 | overlay **vermelho** "QR code inválido / não é um QR code de aluno", **zero** chamadas a `check-in` |
+| Viagem encerrada | 12 | overlay **vermelho** "Viagem não está ativa" **+ botão "Ir para Viagem"**, POST → 409 |
+| Outro motorista | 13 | overlay **vermelho** "Viagem de outro motorista / não é o responsável", POST → 403 |
+| Sem viagem | 4 | "Nenhuma viagem ativa" + "Ir para Viagem", câmera não montada |
+| Sem rede | 15 | overlay **cinza** "Sem conexão" + "Tentar novamente", `check-in` tentado e falho no transporte |
+| Rajada | — | QR parado 5s na frente da câmera (`useWebBarcodeScanner` varre a cada ~16ms) → **exatamente 1** POST. O gate `isPaused`/`isBusy` do Bloqueador 3 segura no web. |
+| Permissão | 1 | "Permissão da câmera" + "Permitir acesso à câmera"; após negar, a câmera não abre |
+
+Overlays conferidos por screenshot: verde/âmbar/vermelho/cinza distintos, texto ≥ 18sp em negrito, ações na metade inferior (alcance do polegar), botões de 56dp, máscara com janela central de alto contraste (o patch de `alignItems: 'stretch'` aparece correto).
+
+**Ressalvas do alvo web (não são defeitos):**
+- **Estado 2 da Tabela de Verdade** ("negado definitivamente" → "Abrir configurações") é **inalcançável no web**: `ExpoCameraManager.web` sempre reporta `canAskAgain: true`. Os dois estágios de permissão são específicos do Android. Só o estado 1 existe no web.
+- "Rajada" no web exercita o mesmo gate do caminho nativo, mas a cadência de disparo (`setInterval` de 16ms do polyfill) não é idêntica à do `CameraView` nativo — a prova aqui é do gate, não do timing do device.
+- Estados 6, 11, 14, 16 e 17 não têm caso dedicado no roteiro da Task 9.3 e continuam cobertos só pelo harness MSW em Node (23/08) e por leitura de código.
+
+Harness reproduzível: `scratchpad/run-all.mjs` + `lib.mjs` (fora do repo — não introduz test runner no `mobile/`, conforme *Questões Abertas* #1).
 
 ---
 
@@ -430,7 +465,8 @@ Claude Opus 5 (claude-opus-5)
   - `motorista-sem-viagem@` → `data: null`; `motorista-outra-viagem@` → `403 DRIVER_NOT_ASSIGNED`; `motorista-viagem-encerrada@` → viagem `ACTIVE` na tela **e** `409 TRIP_NOT_ACTIVE` no check-in (o estado 12 só é alcançável assim);
   - `POST /trips` com o `routeId` placeholder da 3.1 → `201`; `PATCH /trips/:id/end` → `COMPLETED`;
   - **regressão da 3.2b**: as quatro sentinelas de `/routes/mine` (`aluno@`, `aluno-sem-rota@`, `aluno-multirota@`, `aluno-erro@`) continuam corretas após a extração da sentinela de sessão para `session.ts`.
-- **Metade de UI da Task 9.3 NÃO foi executada.** Não há emulador Android, simulador iOS nem device físico neste ambiente (`adb`/`emulator` ausentes, `~/Android/Sdk` inexistente). `npx expo export --platform web` falha em `Unable to resolve module ./wa-sqlite/wa-sqlite.wasm from expo-sqlite/web/worker.ts` — **erro pré-existente**, idêntico ao registrado no Debug Log da 3.2b, originado em `src/lib/database.ts` → `_layout.tsx`, nenhum dos dois tocado aqui. Ficam sem evidência de runtime: abertura da câmera, moldura, overlays coloridos, fluxo de permissão e o comportamento de rajada em device real.
+- **Metade de UI da Task 9.3 — executada em 2026-08-30 no alvo web** (ver *Verificação de runtime (2026-08-30)* em Review Findings). 10/10 casos verdes. Continua sem device/emulador nativo; o `expo export --platform web` **deixou de falhar** (a Story 1.6 resolveu o `wa-sqlite.wasm`). O que segue sem evidência de runtime nativo: cadência real do disparo repetido em `CameraView` nativo e o estado 2 de permissão (inalcançável no web por design).
+- **Nota de estado de branch (2026-08-23, corrigida em 2026-08-30):** o *Git Intelligence* abaixo diz que a PR só ficaria limpa depois do merge da #5. Isso ficou obsoleto — os commits da 3.3b (`bd7c29c` … `c36dd69`) entraram na `main` junto com a branch da 1.6 (PR #8). A verificação de 30/08 roda direto sobre a `main`.
 
 ### Completion Notes List
 
@@ -444,8 +480,9 @@ Claude Opus 5 (claude-opus-5)
 - **Task 7 (contraste):** `outlined`/`contained-tonal` derivam a cor do tema (primária `#208AEF`) e ficam ilegíveis sobre o vermelho e o âmbar dos overlays. Os botões do overlay usam `buttonColor`/`textColor` explícitos.
 - **Task 8** deu a `(driver)/_layout.tsx` o mesmo tratamento que a 3.2b deu ao grupo do aluno (`initialRouteName` + títulos em português para as 4 telas) e acrescentou **um** botão a `(driver)/trip.tsx`, no ramo `ACTIVE`, com `router.navigate`. Nada mais foi tocado em `trip.tsx` — a tela pertence à Story 3.1, que está em `review`.
 - **AC #4 (< 2s percebido)** é atendida estruturalmente: `handleScan` entra em `checking` de forma síncrona, antes de qualquer `await`, então o retorno visual não depende da latência da API. Sem device, isso está provado por leitura do código, não por cronômetro.
-- **AC #1 e #5 ficam sem evidência de runtime**, junto com o comportamento de rajada em hardware real. **Recomendo ao Lucas rodar o roteiro da Task 9.3 num device/emulador antes de mover a story para `done`** — em especial as linhas *rajada*, *permissão negada* e *sem rede*.
-- Nenhum arquivo em `api/` foi tocado (AC #6), e `EXPO_PUBLIC_USE_MOCKS` continua em `0` no `.env.example` — os mocks não foram desligados nem o `api-client` apontado para a API real.
+- **AC #1 e #5 verificadas em runtime (web) em 2026-08-30**, incluindo *rajada*, *permissão* e *sem rede* — 10/10 casos verdes. Ver *Verificação de runtime (2026-08-30)*. Resta a verificação em device nativo (ambiente sem emulador), que a Story 1.7 cobre na validação final.
+- Nenhum arquivo em `api/` foi tocado (AC #6), e `EXPO_PUBLIC_USE_MOCKS` continua em `0` no `.env.example` — os mocks não foram desligados nem o `api-client` apontado para a API real. O `.env` local foi temporariamente colocado em `1` para o roteiro de 30/08 e revertido para `0` ao fim.
+- **Verificação de fechamento (2026-08-30, sobre a `main`):** `cd mobile && npx tsc --noEmit` → **0 erros**; `npm run lint` → **limpo** (0/0). `File List` sem nenhum caminho `api/`.
 
 ### File List
 
@@ -469,3 +506,4 @@ Claude Opus 5 (claude-opus-5)
 ### Change Log
 
 - 2026-08-23: Implementação da story 3.3b — escaneamento de QR code pelo motorista com registro de check-in contra os handlers MSW. Resolve o defer da Story 3.0 sobre headers por requisição no `api-client` (Task 2). Tasks 1–8 completas; Task 9.1/9.2/9.4 verdes; Task 9.3 executada apenas na metade de rede (16/16 via harness MSW em Node) — a metade de UI depende de device/emulador indisponível neste ambiente.
+- 2026-08-30: Task 9.3 fechada. Roteiro executado no alvo web (Expo Web + Chromium headless, `EXPO_PUBLIC_USE_MOCKS=1`) — 10/10 casos, 27/27 asserts verdes, incluindo rajada (1 POST), permissão e sem rede. `tsc`/`lint` revalidados na `main` (0 erros, limpo). Story movida para `done`. Ressalvas do alvo web e itens de device nativo registrados em *Verificação de runtime (2026-08-30)*.
