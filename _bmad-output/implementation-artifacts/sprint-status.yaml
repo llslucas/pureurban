@@ -96,8 +96,8 @@ development_status:
   # mobile (jest-expo + @testing-library/react-native), ausente desde a 1.5, e prova
   # o harness com uma suíte inicial sobre lógica pura (role-routes, qr-payload) mais
   # um render RN. DESBLOQUEIA a 3.4b (fila offline), que é inviável de validar à mão.
-  1-10-setup-test-runner-mobile: review
-  epic-1-retrospective: done  # retro de 11/05/2026 — cobre as stories 1.1-1.5
+  1-10-setup-test-runner-mobile: done
+  epic-1-retrospective: done # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
   epic-2: done
@@ -163,3 +163,4 @@ development_status:
   5-2-acompanhamento-do-onibus-em-tempo-real: backlog
   5-3-e2e-do-epico-5: backlog
   epic-5-retrospective: optional
+
