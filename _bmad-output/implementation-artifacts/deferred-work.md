@@ -148,3 +148,36 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - **`initialRouteName` como prop JSX não é de onde o expo-router lê a âncora** [mobile/src/app/(admin)/_layout.tsx:5] — `expo-router/build/useScreens.js:127` deriva a ordenação inicial do grupo de `node?.initialRouteName`, construído a partir do export `unstable_settings` do layout; a prop JSX só é repassada ao navegador do React Navigation por baixo. Inerte hoje porque `(admin)` tem exatamente uma tela, e o padrão é pré-existente — `(driver)/_layout.tsx` e `(student)/_layout.tsx` já fazem igual, com quatro e três telas, onde o comportamento de âncora seria observável.
 - **Órfãos do template Expo: cluster de theming, deps sem importador e `reset-project.js`** [mobile/src/constants/theme.ts, mobile/src/hooks/use-theme.ts, mobile/src/hooks/use-color-scheme.ts, mobile/src/hooks/use-color-scheme.web.ts, mobile/src/global.css, mobile/scripts/reset-project.js, mobile/package.json] — são as *Questões Abertas #1/#2/#3* da própria Story 1.8, mantidas de propósito: a AC #6 exige diff vazio em `package.json`, então nada disso podia sair na 1.8. Cadeia morta confirmada por grep: `constants/theme.ts` → `global.css`, `hooks/use-theme.ts` → `constants/theme` + `use-color-scheme`, sem nenhum importador de produto (o app usa `@/lib/theme`, do Paper). Cinco deps perderam o último importador: `expo-device`, `expo-symbols`, `expo-image`, `expo-glass-effect`, `@react-navigation/bottom-tabs`. **Item de maior prioridade desta limpeza:** `scripts/reset-project.js:14` tem `oldDirs = ["src", "scripts"]` — enquanto o template existia isso apagava template, mas agora `npm run reset-project` move/apaga o código-fonte real do produto. Detalhe irônico do resto: `_layout.tsx:4` importa `useColorScheme` do `react-native` direto, então `use-color-scheme.web.ts` — que existe justamente para o caso de hidratação web — é o hook que ninguém usa. Resolver junto com uma decisão do Lucas sobre manter ou não `useTheme()`/`ThemeColor` como padrão declarado no `project-context.md`.
 - **Mobile não tem runner de testes: a matriz de guards e `homeForRole` embarcam sem asserção** [mobile/package.json] — não há script `test` nem framework em `devDependencies`, e a Story 1.8 declara explicitamente que criar a suíte seria escopo novo. O custo ficou visível nesta review: `homeForRole` foi extraído para ser a fonte única de um mapeamento cuja divergência com os guards de `_layout.tsx` produz um loop de redirect **silencioso** (sem erro, sem log), e o code review fechou essa divergência derivando os guards do mapa — mas nada vigia a propriedade daqui em diante. Some-se a isso que toda a evidência de runtime das ACs #1-#4/#7/#8 é narrativa e não reproduzível (ver a ressalva de auditabilidade no Debug Log da story). Um único teste sobre `ROLE_ROUTES` × guards já pagaria o setup.
+
+## Endereçado pela Story 1.10 — Setup do Test Runner no Mobile (2026-08-30)
+
+- **Mobile não tinha runner de testes** (item do code review da 1.8, logo acima) —
+  **endereçado**. A 1.10 instalou `jest-expo`, `@testing-library/react-native` e `jest`,
+  criou `mobile/babel.config.js` e `mobile/jest.config.js`, expôs `npm test` /
+  `npm run test:watch` e provou o harness com `role-routes.test.ts` (consistência
+  `ROLES` × `ROLE_ROUTES` + `homeForRole`, incluindo colisão com chave de
+  `Object.prototype`), `qr-payload.test.ts` e `smoke-render.test.tsx` (render de um
+  primitivo `react-native`). Roda sem device/rede/`.env`, < 3s.
+- **`decodeQrPayload` e o round-trip do QR verificados só no olho** (open question #1 das
+  3.2b/3.3b) — **metade endereçada** por `qr-payload.test.ts`: round-trip, normalização de
+  UUID maiúsculo, descarte de campos extras e tabela de entradas forjadas/malformadas (URL
+  de cartaz, JSON truncado, array, campo ausente, UUID inválido, lixo binário), todas →
+  `null` sem lançar.
+- **Ainda aberto (fora do escopo da 1.10):** a outra metade da open question #1 — o mapa
+  código-de-erro → feedback do motorista (`describeFailure`, inline e não exportado em
+  `mobile/src/app/(driver)/scan.tsx`) continua sem cobertura. Extrair e testar é escopo da
+  3.4b/3.5b (a própria 1.10 proíbe tocar em `scan.tsx`).
+- **Ainda aberto (fora do escopo da 1.10):** a fila offline da 3.4b (driver/mock do SQLite
+  sob Jest) — decisão de design da própria 3.4b.
+- **Migração `@testing-library/react-native` v13 → v14** [mobile/package.json] — a 1.10
+  fixou a v13 porque a v14 exige o peer `test-renderer@^1` (novo renderer dedicado do RN)
+  que o Expo SDK 55 não traz, e a v13 depende de `react-test-renderer@19.2.0` — pacote que
+  o React 19 marca como deprecado. Nenhuma quebra hoje. **Gatilho de revisão:** quando um
+  Expo SDK trouxer `test-renderer@^1` no conjunto de deps, ou quando o RN remover o
+  `react-test-renderer`, migrar para a v14 e trocar o `react-test-renderer` das devDeps.
+
+## Deferred from: review of 1-10-setup-test-runner-mobile.md (2026-08-30)
+
+- source_spec: `_bmad-output/implementation-artifacts/1-10-setup-test-runner-mobile.md`
+  summary: Não há teste de integração dos guards de `mobile/src/app/_layout.tsx` nem do redirect login→home; o loop de redirect silencioso que motivou a 1.10 só está travado no nível do mapa `ROLE_ROUTES`, não no consumidor.
+  evidence: A 1.10 fecha a divergência `ROLE_ROUTES` × guards via `role-routes.test.ts`, mas os guards de `_layout.tsx` (`Stack.Protected` derivado de `ROLES`) e o redirect de `index.tsx`/`+not-found.tsx` via `homeForRole()` nunca são renderizados sob `render()`. Uma regressão que quebre a derivação no `_layout.tsx` sem tocar o mapa passa verde. O runner agora existe, então o teste é barato — só ficou fora do escopo "funções puras + 1 render" da 1.10.

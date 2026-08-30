@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-08-30T12:10:00-03:00"
+last_updated: "2026-08-30T19:15:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -92,6 +92,11 @@ development_status:
   # RENUMERADA de 1-8 para 1-9 em 28/08/2026, liberando o número 1.8 ao shell de navegação
   # (que executa antes). Conteúdo e posição na sequência inalterados.
   1-9-corrigir-seed-do-banco-sob-prisma-7: backlog
+  # Adição de meio de sprint (30/08/2026). Story técnica: instala o test runner do
+  # mobile (jest-expo + @testing-library/react-native), ausente desde a 1.5, e prova
+  # o harness com uma suíte inicial sobre lógica pura (role-routes, qr-payload) mais
+  # um render RN. DESBLOQUEIA a 3.4b (fila offline), que é inviável de validar à mão.
+  1-10-setup-test-runner-mobile: review
   epic-1-retrospective: done  # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
@@ -123,6 +128,8 @@ development_status:
   # verdes (rajada = 1 POST, permissão, sem rede inclusos). tsc/lint limpos na main.
   # Validação em device nativo fica com a Story 1.7 (validação final, não bloqueia). Fechada.
   3-3b-escaneamento-de-qr-code: done
+  # BLOQUEADA pela 1.10 (test runner do mobile): FIFO, backoff 1s→30s, ≤5 tentativas
+  # e idempotência entre reinícios são inviáveis de validar à mão.
   3-4b-check-in-offline-com-fila-de-sincronizacao: backlog
   3-5a-lista-de-alunos-da-viagem-com-status: done
   3-5b-lista-de-alunos-e-status-de-embarque: backlog

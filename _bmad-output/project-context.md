@@ -127,6 +127,11 @@ _Este arquivo contem regras criticas e padroes que agentes de IA devem seguir ao
 - Core (Effect TS) pode ser testado isoladamente SEM NestJS TestingModule
 - Shell precisa de TestingModule com providers mockados ou reais
 
+**Mobile (Story 1.10):**
+- `mobile/` usa `jest-expo` (preset), `@testing-library/react-native` para render
+- Arquivos `src/**/*.{test,spec}.{ts,tsx}` — `npm test` / `npm run test:watch`
+- Roda sem device/emulador/rede/Docker/`.env`; suite inicial cobre funcoes puras + um render de primitivo RN
+
 **Comandos:**
 - `npm test` — unit | `npm run test:e2e` — e2e Vitest
 - `npm run test:pw` — todos Playwright | `npm run test:pw:api` — API only

@@ -132,5 +132,6 @@ arquivo por rota. Sem o rewrite, acesso direto ou F5 em `/scan`, `/qr-code` ou
 - Arquivos em kebab-case, indentação de 2 espaços
 - `npm run lint` — ESLint (flat config, `eslint-config-expo`)
 - `npx tsc --noEmit` — checagem de tipos
+- `npm test` / `npm run test:watch` — Jest via `jest-expo`; arquivos `src/**/*.{test,spec}.{ts,tsx}`, sem device/rede/`.env`
 - `npm run openapi:types` — regenera `src/types/api.d.ts` a partir de `../api/openapi.json`
 - **Nunca commite `.env`** — use `.env.example` como referência
