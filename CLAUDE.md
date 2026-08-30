@@ -35,6 +35,7 @@ API (`cd api`):
 Mobile (`cd mobile`):
 
 - `npm start` | `npm run web` (Expo Web na porta 8081, fixa — a API libera essa origem no CORS)
+- `npm test` (Jest via `jest-expo`) | `npm run test:watch` — roda sem device, rede ou `.env`
 - `npm run lint` — `expo lint` (não há Prettier configurado aqui)
 - `npm run openapi:types` — regenera `src/types/api.d.ts` a partir de `../api/openapi.json`.
   Rode `openapi:export` na API antes.
