@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-08-29T00:15:00-03:00"
+last_updated: "2026-08-30T12:10:00-03:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -118,8 +118,11 @@ development_status:
   #   Bloqueio 6 — enableMocking() não era idempotente. RESOLVIDO: guarda em globalThis.
   # Terceiro achado da 1.6 (seed quebrado sob Prisma 7) virou a Story 1.9 acima —
   # não bloqueia a 3-3b, mas bloqueia qualquer story que dependa de dados semeados.
-  # Código da 3-3b está implementado e revisado (c36dd69) — falta verificação em execução.
-  3-3b-escaneamento-de-qr-code: in-progress
+  # Código da 3-3b entrou na main junto com a branch da 1.6 (PR #8). Task 9.3
+  # (roteiro de UI) executada no alvo web em 30/08/2026 — 10/10 casos, 27/27 asserts
+  # verdes (rajada = 1 POST, permissão, sem rede inclusos). tsc/lint limpos na main.
+  # Validação em device nativo fica com a Story 1.7 (validação final, não bloqueia). Fechada.
+  3-3b-escaneamento-de-qr-code: done
   3-4b-check-in-offline-com-fila-de-sincronizacao: backlog
   3-5a-lista-de-alunos-da-viagem-com-status: done
   3-5b-lista-de-alunos-e-status-de-embarque: backlog
