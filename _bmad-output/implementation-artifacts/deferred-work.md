@@ -45,7 +45,7 @@
 ## Deferred from: code review of 3-0-contrato-de-api-embarque-digital (2026-07-12)
 - Tipos gerados são inúteis para 11 dos request bodies existentes: `TypeLiteralClass`/`RefineClass` colapsam em `Record<string, never>` colidentes (o mesmo schema vazio é `$ref`'d por login, register, refresh, create-driver, create-student, create-route, assign-student, assign-driver) [mobile/src/types/api.d.ts] — pré-existente: classes Effect Schema usadas como `@Body` não produzem metadata Swagger. Só ficou visível agora porque esta story congelou o documento como artefato. Não bloqueia o Épico 3 (os 2 endpoints novos usam DTOs de classe e geram tipos corretos), mas bloqueia qualquer trilha futura que queira consumir os endpoints antigos via tipos gerados.
 - Não existe `ValidationPipe` global na API — `@IsUUID()` no `check-in.dto.ts` e todo class-validator nos DTOs do shell é código morto [api/src/main.ts] — pré-existente (mesmo padrão em `create-trip.dto.ts`). A decisão entre registrar um `ValidationPipe` global e padronizar no `EffectSchemaPipe` existente é escopo da 3.3a, quando o endpoint deixar de ser stub.
-- `api-client.ts` não expõe headers por requisição: `post<T>(path, body)` é estruturalmente incapaz de enviar o `X-Idempotency-Key` que o contrato agora declara obrigatório [mobile/src/services/api-client.ts] — pré-existente; o cliente HTTP é escopo da 3.3b/3.4b. Registrado aqui porque o contrato passou a depender disso.
+- `api-client.ts` não expõe headers por requisição: `post<T>(path, body)` é estruturalmente incapaz de enviar o `X-Idempotency-Key` que o contrato agora declara obrigatório [mobile/src/services/api-client.ts] — pré-existente; o cliente HTTP é escopo da 3.3b/3.4b. Registrado aqui porque o contrato passou a depender disso. **Endereçado pela Story 3.4b (01/09/2026):** a 3.3b já havia acrescentado o parâmetro `headers` a `post`/`patch`; a 3.4b fecha o item extraindo `ApiClientError` para `mobile/src/services/api-error.ts` (módulo sem imports) e passando a mesma `X-Idempotency-Key` gravada em `offline_queue.id` no dreno da fila.
 
 ## Deferred from: code review of 3-3a-check-in-de-embarque (2026-08-14)
 - Discriminador de `P2002` do domínio routing continua quebrado: `isExpectedUniqueViolation` inspeciona `e.meta?.target`, que vem `undefined` sob Prisma 7 + `@prisma/adapter-pg` — os campos do constraint só existem em `meta.driverAdapterError.cause.constraint.fields` [api/src/domains/routing/shell/adapters/prisma-route-assignment.adapter.ts:24-31]. A função retorna `false` incondicionalmente, então `ASSIGNMENT_ALREADY_EXISTS` quase certamente sai como 500. A Story 3.3a corrigiu o padrão apenas no adapter novo do boarding (escopo correto). Fica invisível porque a única suite que o exporia (`route-assignment.e2e-spec.ts`) está vermelha no `beforeAll` por motivo alheio. Candidato a story técnica do domínio routing.
@@ -167,8 +167,18 @@ comparativa em vez de afirmação de viabilidade sem controle.
   código-de-erro → feedback do motorista (`describeFailure`, inline e não exportado em
   `mobile/src/app/(driver)/scan.tsx`) continua sem cobertura. Extrair e testar é escopo da
   3.4b/3.5b (a própria 1.10 proíbe tocar em `scan.tsx`).
+  **Endereçado pela Story 3.4b (01/09/2026):** `describeFailure` foi movido sem alteração do
+  mapa para `mobile/src/utils/scan-feedback.ts` e exportado, e `scan-feedback.test.ts` cobre
+  os 9 códigos com feedback distinto, a linha 16 da tabela (código não enumerado), o fallback
+  `NETWORK_ERROR` e os dois estados novos da fila (`QUEUED_OFFLINE`, `QUEUE_FULL`).
 - **Ainda aberto (fora do escopo da 1.10):** a fila offline da 3.4b (driver/mock do SQLite
   sob Jest) — decisão de design da própria 3.4b.
+  **Endereçado pela Story 3.4b (01/09/2026):** não há mock de SQLite. A lógica (FIFO, backoff,
+  teto de 500, 5 tentativas, classificação do desfecho de cada POST) vive em
+  `mobile/src/utils/offline-queue.ts`, puro e sem import nativo, atrás da interface
+  `QueueStorage`, e é exercitada contra um fake em memória. `expo-sqlite` fica isolado em
+  `mobile/src/lib/offline-queue-storage.ts`, que nenhum teste importa e cuja verificação é o
+  roteiro manual no alvo web.
 - **Migração `@testing-library/react-native` v13 → v14** [mobile/package.json] — a 1.10
   fixou a v13 porque a v14 exige o peer `test-renderer@^1` (novo renderer dedicado do RN)
   que o Expo SDK 55 não traz, e a v13 depende de `react-test-renderer@19.2.0` — pacote que
@@ -181,3 +191,37 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/1-10-setup-test-runner-mobile.md`
   summary: Não há teste de integração dos guards de `mobile/src/app/_layout.tsx` nem do redirect login→home; o loop de redirect silencioso que motivou a 1.10 só está travado no nível do mapa `ROLE_ROUTES`, não no consumidor.
   evidence: A 1.10 fecha a divergência `ROLE_ROUTES` × guards via `role-routes.test.ts`, mas os guards de `_layout.tsx` (`Stack.Protected` derivado de `ROLES`) e o redirect de `index.tsx`/`+not-found.tsx` via `homeForRole()` nunca são renderizados sob `render()`. Uma regressão que quebre a derivação no `_layout.tsx` sem tocar o mapa passa verde. O runner agora existe, então o teste é barato — só ficou fora do escopo "funções puras + 1 render" da 1.10.
+
+## Deferred from: review of 3-4b-check-in-offline-com-fila-de-sincronizacao.md (2026-09-01)
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: Linhas `sent` nunca são apagadas da `offline_queue`, então a tabela cresce sem limite pela vida da instalação.
+  evidence: `markSent` só troca o status (`mobile/src/lib/offline-queue-storage.ts`), e o teto de `MAX_QUEUE_SIZE` conta apenas `pending`. Não há purga, TTL nem vacuum em nenhum ponto do app. Uma linha por embarque já enfileirado, com o payload JSON, acumula indefinidamente.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: `failedCount` nunca volta a zero: um único item `failed` prende o banner vermelho "Registre manualmente" em todas as telas do motorista, para sempre e através de reinícios.
+  evidence: Nada transiciona `failed` para outro status, não há ação de dispensar/reconhecer, e o banner é global por decisão de escopo (badge por item foi cortado para a Fase 2). O motorista também não tem como saber QUAL embarque falhou. Precisa de uma decisão de produto sobre como se reconhece o registro manual.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: A `offline_queue` não tem `userId`/`companyId`; num aparelho compartilhado, o motorista B drena os itens do motorista A com o token de B.
+  evidence: O schema criado em `mobile/src/lib/database-migrations.ts` tem só `id, operation, payload, status, created_at, attempts, last_error`, e `listPending` filtra apenas por status e operação. Os itens de A sairiam com `DRIVER_NOT_ASSIGNED`. Fora do escopo da 3.4b porque mudança incompatível no schema está na lista "Ask First" e não há versionamento de migração.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: O dreno não é acordado por foreground do app nem por conectividade nativa — só por boot, enfileiramento, timer de backoff e evento `online` do browser.
+  evidence: `mobile/src/hooks/use-offline-sync.ts` registra `startConnectivityListeners()`, que é no-op fora do alvo web. Em device, timers JS são suspensos em background: o motorista que guarda o celular entre paradas só retoma o dreno quando uma tela do motorista volta a renderizar. `(driver)/scan.tsx` já usa `AppState.addEventListener('change')` exatamente por isso. Story verificada só no alvo web, então o impacto é futuro.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: `sqliteQueueStorage` — o único SQL do app — não roda em nenhum teste; toda a suíte da fila corre contra um fake reimplementado.
+  evidence: Desvio consciente registrado nas Design Notes da story ("só o SQL fica para a verificação no browser"), mas permanece um buraco real: remover `status = 'pending'` do `WHERE` de `listPending` reenviaria itens já entregues em laço, com `npm test` verde. Caminho barato: extrair a bateria atual para `describeQueueStorage(makeStorage)` e rodá-la também contra um SQLite disponível no Node.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: Um scan offline paga o timeout completo de 30s antes de enfileirar quando a API está inalcançável sem RST.
+  evidence: `submit` em `(driver)/scan.tsx` sempre tenta o POST e só enfileira no `catch`. `app.store.isOnline` passou a ser escrito nesta story mas o scan não o lê; poderia curto-circuitar para `enqueueCheckIn` e manter a promessa de feedback < 2s da 3.3b. Impacto restrito ao caso "API fora do ar com TCP pendurado" — sem rede o `fetch` rejeita rápido.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: `setBoardedCount` conta como embarcado um item enfileirado que ainda pode terminar `failed`, e não há caminho de correção.
+  evidence: `(driver)/scan.tsx` incrementa o contador da sessão no ramo enfileirado, deliberadamente (o embarque foi aceito localmente), mas o dreno pode depois marcar o item `failed` por `INVALID_QR_CODE` fora da janela de 24h. O contador é local e informativo, então o erro é tolerável — mas fica divergente do servidor até a tela ser remontada.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
+  summary: Um dreno bem-sucedido não invalida nenhuma query do TanStack Query.
+  evidence: `runDrain` atualiza só os próprios contadores. Depois que embarques enfileirados chegam ao servidor, a lista de alunos da viagem (3.5a) e o `activeTrip` seguem servindo dados vencidos até o `staleTime` expirar.

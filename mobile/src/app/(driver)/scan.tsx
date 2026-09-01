@@ -7,18 +7,26 @@ import { useQuery } from '@tanstack/react-query'
 import { useCameraPermissions } from 'expo-camera'
 
 import { QrScanner } from '@/components/qr-scanner'
+import { notifyQueueChanged } from '@/hooks/use-offline-sync'
+import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
 import { boardingService } from '@/services/boarding.service'
 import { ApiClientError } from '@/services/api-client'
 import { tripService, type Trip } from '@/services/trip.service'
 import { useAuthStore } from '@/stores/auth.store'
+import { enqueueCheckIn, isTransportFailure } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
+import {
+  describeFailure,
+  feedbackIcon,
+  QUEUE_FULL_FEEDBACK,
+  QUEUED_FEEDBACK,
+  type Tone,
+} from '@/utils/scan-feedback'
 
 // Quanto tempo o resultado de SUCESSO fica na tela antes de a câmera voltar
 // sozinha. Só o sucesso auto-retoma: nos estados de erro o motorista precisa ler
 // o que aconteceu antes de continuar.
 const SUCCESS_RESUME_MS = 2500
-
-type Tone = 'success' | 'warn' | 'error' | 'offline'
 
 // Union discriminado em vez de booleanos soltos (architecture.md §6). Com
 // booleanos, `isChecking && isError` é representável e significa nada.
@@ -28,9 +36,8 @@ type ScanResult =
   | { kind: 'success'; title: string; detail: string }
   | {
       kind: 'failure'
-      // `code` é preservado no estado, e não só traduzido em texto: sem ele o
-      // código da falha não é recuperável para log nem para a fila da 3.4b
-      // (Task 7.3). 'NETWORK_ERROR' é o sintético do fetch cru.
+      // Campos de `ScanFeedback` (`@/utils/scan-feedback`), achatados no union
+      // para o render discriminar por `kind` sem desembrulhar um nível a mais.
       code: string
       tone: Tone
       title: string
@@ -46,6 +53,12 @@ interface Attempt {
   studentId: string
   tripId: string
   idempotencyKey: string
+  /**
+   * ISO 8601 do ESCANEAMENTO. Vira `created_at` na `offline_queue` e viaja como
+   * `occurredAt` no dreno — sem ele o embarque registraria a hora em que a rede
+   * voltou, e não a hora em que o aluno subiu no ônibus (NFR12).
+   */
+  scannedAt: string
 }
 
 const TONE_COLOR: Record<Tone, string> = {
@@ -55,126 +68,6 @@ const TONE_COLOR: Record<Tone, string> = {
   warn: '#B26A00',
   error: '#B3261E',
   offline: '#37474F',
-}
-
-/**
- * Traduz a falha em feedback visual, conforme a Tabela de Verdade da story.
- *
- * O `default` não é defensivo por educação: o contrato declara mais códigos do
- * que a AC #3 lista, e a Story 3.3a pode acrescentar outros. Sem ele, um código
- * novo vira overlay em branco — o motorista não saberia se embarcou ou não.
- */
-function describeFailure(error: unknown): {
-  code: string
-  tone: Tone
-  title: string
-  detail: string
-  canRetry: boolean
-} {
-  if (error instanceof ApiClientError) {
-    switch (error.code) {
-      case 'DUPLICATE_CHECK_IN':
-        // Âmbar, não vermelho: o aluno ESTÁ no ônibus, o objetivo do motorista
-        // foi atingido. Pintar de vermelho ensina o motorista a ignorar vermelho.
-        return {
-          code: 'DUPLICATE_CHECK_IN',
-          tone: 'warn',
-          title: 'Já embarcou',
-          detail: 'Este aluno já fez check-in nesta viagem.',
-          canRetry: false,
-        }
-      case 'STUDENT_NOT_ALLOWED':
-        return {
-          code: 'STUDENT_NOT_ALLOWED',
-          tone: 'error',
-          title: 'Aluno não autorizado',
-          detail: 'Este aluno não está vinculado à rota desta viagem.',
-          canRetry: false,
-        }
-      case 'TRIP_NOT_ACTIVE':
-        return {
-          code: 'TRIP_NOT_ACTIVE',
-          tone: 'error',
-          title: 'Viagem não está ativa',
-          detail: 'Inicie uma viagem antes de registrar embarques.',
-          canRetry: false,
-        }
-      case 'DRIVER_NOT_ASSIGNED':
-        return {
-          code: 'DRIVER_NOT_ASSIGNED',
-          tone: 'error',
-          title: 'Viagem de outro motorista',
-          detail: 'Você não é o responsável por esta viagem.',
-          canRetry: false,
-        }
-      case 'INVALID_QR_CODE':
-        return {
-          code: 'INVALID_QR_CODE',
-          tone: 'error',
-          title: 'QR code inválido',
-          detail: 'Peça ao aluno para abrir o QR code no app novamente.',
-          canRetry: false,
-        }
-      case 'REQUEST_TIMEOUT':
-        // Linha 15 da tabela dá um rótulo único para os dois gatilhos (rede
-        // caída e timeout). O detalhe distingue; o título, não.
-        return {
-          code: 'REQUEST_TIMEOUT',
-          tone: 'offline',
-          title: 'Sem conexão',
-          detail: 'O servidor demorou demais. Tente novamente.',
-          canRetry: true,
-        }
-      // Estado 14 da tabela. A AC #3 nomeia IDEMPOTENCY_KEY_CONFLICT entre os
-      // códigos que precisam de feedback DISTINTO, então ele não pode dividir a
-      // mensagem com os dois códigos abaixo. O texto é o da tabela.
-      case 'IDEMPOTENCY_KEY_CONFLICT':
-        return {
-          code: error.code,
-          tone: 'error',
-          title: 'Erro ao registrar',
-          detail: 'Tente novamente.',
-          canRetry: false,
-        }
-      // MISSING_IDEMPOTENCY_KEY e INVALID_IDEMPOTENCY_KEY só acontecem por bug
-      // do cliente. Não há ação útil para o motorista além de repetir a leitura,
-      // e reenviar a mesma chave não ajudaria — por isso `canRetry: false`.
-      case 'MISSING_IDEMPOTENCY_KEY':
-      case 'INVALID_IDEMPOTENCY_KEY':
-        return {
-          code: error.code,
-          tone: 'error',
-          title: 'Erro ao registrar',
-          detail: 'Não foi possível registrar o embarque. Escaneie novamente.',
-          canRetry: false,
-        }
-      default:
-        return {
-          code: error.code,
-          tone: 'error',
-          title: 'Erro ao registrar',
-          // A linha 16 da tabela manda exibir a `message` da API. O fallback só
-          // cobre o envelope sem mensagem — `api-client` preenche com um texto
-          // em inglês nesse caso, e o motorista não deve ver isso.
-          detail: error.message || 'Não foi possível registrar o embarque.',
-          // Só 5xx e falhas de transporte (`status: 0`) valem retry. Um 4xx não
-          // enumerado — `TRIP_NOT_FOUND`, por exemplo — é determinístico:
-          // reenviar com a MESMA chave só reproduz o mesmo erro, e a linha 16 da
-          // tabela não prevê botão de retry.
-          canRetry: error.status >= 500 || error.status === 0,
-        }
-    }
-  }
-
-  // Falha crua do fetch (sem rede, DNS, servidor fora do ar). A fila offline é a
-  // Story 3.4b — aqui o motorista reenvia manualmente, com a mesma chave.
-  return {
-    code: 'NETWORK_ERROR',
-    tone: 'offline',
-    title: 'Sem conexão',
-    detail: 'Não foi possível falar com o servidor. Tente novamente.',
-    canRetry: true,
-  }
 }
 
 export default function ScanScreen() {
@@ -249,6 +142,32 @@ export default function ScanScreen() {
     setResult({ kind: 'idle' })
   }, [])
 
+  // Persiste o embarque na `offline_queue` e devolve o feedback a exibir. O `id`
+  // do item É a `X-Idempotency-Key` da tentativa, então o dreno reenvia como
+  // replay e o servidor nunca vê uma operação nova.
+  const enqueue = useCallback(async (attempt: Attempt, transportError: unknown) => {
+    try {
+      const outcome = await enqueueCheckIn(sqliteQueueStorage, {
+        id: attempt.idempotencyKey,
+        studentId: attempt.studentId,
+        tripId: attempt.tripId,
+        scannedAt: attempt.scannedAt,
+      })
+      if (outcome.kind === 'full') return QUEUE_FULL_FEEDBACK
+      // Acorda o dreno, que vive no layout do grupo: sem isto o banner só
+      // apareceria no próximo tick do backoff.
+      notifyQueueChanged()
+      return QUEUED_FEEDBACK
+    } catch (error: unknown) {
+      // O banco local não abriu (OPFS sem `crossOriginIsolated`, disco cheio).
+      // Cair no feedback de rede da 3.3b devolve ao motorista a única
+      // afordância que sobrou — reenviar à mão com a MESMA chave — em vez de
+      // mentir que o embarque foi salvo.
+      console.error('[offline-queue] falha ao enfileirar o check-in:', error)
+      return describeFailure(transportError)
+    }
+  }, [])
+
   const submit = useCallback(async (attempt: Attempt) => {
     if (isSubmitting.current) return
     isSubmitting.current = true
@@ -280,12 +199,40 @@ export default function ScanScreen() {
       if (error instanceof ApiClientError && error.code === 'UNAUTHORIZED') {
         return
       }
+
+      // O discriminante da 3.4b: SÓ falha de transporte vai para a fila. Um
+      // `status >= 400` é resposta determinística do servidor — enfileirá-la
+      // gastaria 5 tentativas para reproduzir o mesmo erro e esconderia do
+      // motorista um feedback que ele precisa ver agora.
+      if (isTransportFailure(error)) {
+        const described = await enqueue(attempt, error)
+        if (described.code === QUEUED_FEEDBACK.code) {
+          // O embarque foi aceito localmente: trata como sucesso para a câmera.
+          // Sem marcar `lastSuccessStudentId`, a auto-retomada devolveria a
+          // câmera ao mesmo QR ainda enquadrado e o segundo enfileiramento
+          // nasceria com chave NOVA — duas linhas na fila, e um
+          // DUPLICATE_CHECK_IN garantido no dreno.
+          lastSuccessStudentId.current = attempt.studentId
+          setBoardedCount((n) => n + 1)
+          setResult({ kind: 'failure', ...described })
+          resumeTimer.current = setTimeout(() => {
+            resumeTimer.current = null
+            lastAttempt.current = null
+            isBusy.current = false
+            setResult({ kind: 'idle' })
+          }, SUCCESS_RESUME_MS)
+          return
+        }
+        setResult({ kind: 'failure', ...described })
+        return
+      }
+
       const described = describeFailure(error)
       setResult({ kind: 'failure', ...described })
     } finally {
       isSubmitting.current = false
     }
-  }, [])
+  }, [enqueue])
 
   const handleScan = useCallback(
     (raw: string) => {
@@ -338,8 +285,11 @@ export default function ScanScreen() {
         studentId: payload.studentId,
         tripId: activeTrip.id,
         // Uma chave por tentativa (Architecture §5, Tier 2). O retry reusa esta
-        // mesma chave; QR novo gera chave nova.
+        // mesma chave; QR novo gera chave nova. Sem rede, esta MESMA chave vira
+        // a primary key da `offline_queue`.
         idempotencyKey: Crypto.randomUUID(),
+        // Carimbado agora, e não no momento da falha nem do dreno.
+        scannedAt: new Date().toISOString(),
       }
       lastAttempt.current = attempt
       void submit(attempt)
@@ -522,7 +472,7 @@ export default function ScanScreen() {
       ) : result.kind === 'failure' ? (
         <View style={[styles.overlay, { backgroundColor: TONE_COLOR[result.tone] }]}>
           <View style={styles.overlayMessage}>
-            <Text style={styles.icon}>{result.tone === 'warn' ? '!' : '✕'}</Text>
+            <Text style={styles.icon}>{feedbackIcon(result)}</Text>
             <Text variant="headlineSmall" style={styles.overlayTitle}>
               {result.title}
             </Text>
