@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-08-30T19:15:00-03:00"
+last_updated: "2026-09-01T09:45:49+00:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -128,9 +128,11 @@ development_status:
   # verdes (rajada = 1 POST, permissão, sem rede inclusos). tsc/lint limpos na main.
   # Validação em device nativo fica com a Story 1.7 (validação final, não bloqueia). Fechada.
   3-3b-escaneamento-de-qr-code: done
-  # BLOQUEADA pela 1.10 (test runner do mobile): FIFO, backoff 1s→30s, ≤5 tentativas
-  # e idempotência entre reinícios são inviáveis de validar à mão.
-  3-4b-check-in-offline-com-fila-de-sincronizacao: backlog
+  # DESBLOQUEADA em 30/08/2026 pela 1.10 (test runner do mobile). FIFO, backoff
+  # 1s→30s, ≤5 tentativas e idempotência entre reinícios são exercitados por
+  # `mobile/src/utils/offline-queue.test.ts` contra um fake em memória do
+  # `QueueStorage`; só o SQL da `offline_queue` fica para a verificação no browser.
+  3-4b-check-in-offline-com-fila-de-sincronizacao: review
   3-5a-lista-de-alunos-da-viagem-com-status: done
   3-5b-lista-de-alunos-e-status-de-embarque: backlog
   3-6-integracao-e-e2e-do-epico-3: backlog

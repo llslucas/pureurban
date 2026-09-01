@@ -1,7 +1,12 @@
 import { router } from 'expo-router'
+import { reportSuccess, reportTransportFailure } from '@/lib/connectivity'
 import { tokenStorage } from '@/lib/storage'
+import { ApiClientError } from '@/services/api-error'
 import { useAuthStore } from '@/stores/auth.store'
 import { API_BASE_URL } from '@/utils/constants'
+
+// Reexportado para não quebrar os consumidores que já importavam a classe daqui.
+export { ApiClientError }
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
 
@@ -9,18 +14,6 @@ interface ApiError {
   code: string
   message: string
   details?: Record<string, unknown>
-}
-
-export class ApiClientError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly status: number,
-    public readonly details?: Record<string, unknown>,
-  ) {
-    super(message)
-    this.name = 'ApiClientError'
-  }
 }
 
 const REQUEST_TIMEOUT_MS = 30_000
@@ -112,12 +105,20 @@ async function request<T>(
     })
   } catch (err) {
     clearTimeout(timeoutId)
+    // Sinal de conectividade DERIVADO (Story 3.4b): chegar aqui significa que
+    // nenhuma resposta voltou — rede caída, DNS, API fora do ar ou timeout. É o
+    // único ponto do app que distingue "não falei com o servidor" de "o servidor
+    // disse não", e a NFR14 trata os dois primeiros como offline.
+    reportTransportFailure()
     if (err instanceof Error && err.name === 'AbortError') {
       throw new ApiClientError('REQUEST_TIMEOUT', 'A requisição excedeu o tempo limite', 0)
     }
     throw err
   }
   clearTimeout(timeoutId)
+  // Uma resposta chegou — inclusive 4xx/5xx. O transporte funcionou, então
+  // estamos online; o desfecho de negócio é problema de quem chamou.
+  reportSuccess()
 
   // Parse seguro — body pode não ser JSON (ex: 502 com HTML do proxy)
   const json = await parseResponseJson(response)
