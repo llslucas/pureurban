@@ -132,7 +132,7 @@ development_status:
   # 1s→30s, ≤5 tentativas e idempotência entre reinícios são exercitados por
   # `mobile/src/utils/offline-queue.test.ts` contra um fake em memória do
   # `QueueStorage`; só o SQL da `offline_queue` fica para a verificação no browser.
-  3-4b-check-in-offline-com-fila-de-sincronizacao: review
+  3-4b-check-in-offline-com-fila-de-sincronizacao: done
   3-5a-lista-de-alunos-da-viagem-com-status: done
   3-5b-lista-de-alunos-e-status-de-embarque: backlog
   3-6-integracao-e-e2e-do-epico-3: backlog
