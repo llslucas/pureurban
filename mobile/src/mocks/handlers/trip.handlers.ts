@@ -3,8 +3,11 @@ import type { components } from '@/types/api'
 import type { Trip } from '@/services/trip.service'
 import {
   MOCK_ACTIVE_TRIP_ID,
+  MOCK_EMPTY_ROSTER_TRIP_ID,
   MOCK_INACTIVE_TRIP_ID,
+  MOCK_LARGE_ROSTER_TRIP_ID,
   MOCK_OTHER_DRIVER_TRIP_ID,
+  MOCK_ROSTER_ERROR_TRIP_ID,
 } from './boarding.handlers'
 import { getMockSessionEmail } from './session'
 
@@ -28,6 +31,12 @@ const MOCK_ROUTE_ID = '880e8400-e29b-41d4-a716-446655440200'
 const NO_TRIP_EMAIL = 'motorista-sem-viagem@pureurban.com'
 const OTHER_DRIVER_EMAIL = 'motorista-outra-viagem@pureurban.com'
 const ENDED_TRIP_EMAIL = 'motorista-viagem-encerrada@pureurban.com'
+// Sentinelas da Story 3.5b: viagem ATIVA (a tela precisa passar dos estados 2-4
+// para exercitar 5-11), mas com um roster que dispara um estado específico da
+// lista — ver `boarding.handlers.ts`.
+const EMPTY_ROSTER_EMAIL = 'motorista-turma-vazia@pureurban.com'
+const LARGE_ROSTER_EMAIL = 'motorista-turma-grande@pureurban.com'
+const ROSTER_ERROR_EMAIL = 'motorista-lista-erro@pureurban.com'
 
 function makeTrip(overrides: Partial<Trip> = {}): Trip {
   return {
@@ -102,6 +111,18 @@ export const tripHandlers = [
       // servidor responda 409 TRIP_NOT_ACTIVE. Uma viagem COMPLETED aqui cairia
       // no estado 4 ("sem viagem ativa") e o estado 12 nunca seria exercitado.
       return envelope<Trip | null>(makeTrip({ id: MOCK_INACTIVE_TRIP_ID }))
+    }
+
+    if (email === EMPTY_ROSTER_EMAIL) {
+      return envelope<Trip | null>(makeTrip({ id: MOCK_EMPTY_ROSTER_TRIP_ID }))
+    }
+
+    if (email === LARGE_ROSTER_EMAIL) {
+      return envelope<Trip | null>(makeTrip({ id: MOCK_LARGE_ROSTER_TRIP_ID }))
+    }
+
+    if (email === ROSTER_ERROR_EMAIL) {
+      return envelope<Trip | null>(makeTrip({ id: MOCK_ROSTER_ERROR_TRIP_ID }))
     }
 
     return envelope<Trip | null>(makeTrip())

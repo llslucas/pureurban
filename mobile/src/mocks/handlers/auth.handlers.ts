@@ -3,6 +3,7 @@ import type { components } from '@/types/api'
 import type { AuthTokens, AuthUser } from '@/services/auth.service'
 import { setMockSessionEmail } from './session'
 import { resetTripMocks } from './trip.handlers'
+import { resetBoardingMocks } from './boarding.handlers'
 
 type ErrorResponse = components['schemas']['ErrorResponseDto']
 
@@ -69,6 +70,28 @@ const MOCK_USERS: Record<string, AuthUser> = {
     email: 'motorista-viagem-encerrada@pureurban.com',
     role: 'DRIVER',
   },
+  // Sentinelas da Story 3.5b (lista de alunos) — ver `trip.handlers.ts` e
+  // `boarding.handlers.ts`. Cada um tem viagem ATIVA, mas com um roster que
+  // exercita um estado da tela: sem alunos (estado 8), 60 alunos (NFR4) e falha
+  // de servidor com a lista em cache (estados 6 e 7).
+  'motorista-turma-vazia@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440005',
+    name: 'Igor Nunes',
+    email: 'motorista-turma-vazia@pureurban.com',
+    role: 'DRIVER',
+  },
+  'motorista-turma-grande@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440006',
+    name: 'Julia Campos',
+    email: 'motorista-turma-grande@pureurban.com',
+    role: 'DRIVER',
+  },
+  'motorista-lista-erro@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440007',
+    name: 'Kleber Assis',
+    email: 'motorista-lista-erro@pureurban.com',
+    role: 'DRIVER',
+  },
 }
 
 // Refresh tokens rotacionam de verdade: `attemptTokenRefresh` grava os dois
@@ -121,6 +144,11 @@ export const authHandlers = [
     // da Tabela de Verdade inalcançáveis pelo resto da sessão do app.
     // (`trip.handlers` não importa daqui, então não há ciclo.)
     resetTripMocks()
+    // Idem para o roster de embarque: sem isto, escanear com um motorista,
+    // deslogar e logar de novo abria a lista com alunos `CHECKED_IN` de uma
+    // viagem que, para o app, nunca aconteceu (Bloqueador 4 da Story 3.5b).
+    // `boarding.handlers` só importa de `@/types/api`, então não fecha ciclo.
+    resetBoardingMocks()
 
     return HttpResponse.json(
       { data: mintTokensFor(user), meta: { timestamp: new Date().toISOString() } },

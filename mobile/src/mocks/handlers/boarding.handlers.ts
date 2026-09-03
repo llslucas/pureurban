@@ -21,6 +21,13 @@ export const MOCK_INACTIVE_TRIP_ID = '770e8400-e29b-41d4-a716-446655440101'
 // Não tem entrada em `rosters`: os dois handlers respondem 403 antes de olhar o
 // roster, então um roster aqui seria estado inalcançável.
 export const MOCK_OTHER_DRIVER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440102'
+// Sentinelas da Story 3.5b (lista de alunos). Cada um torna alcançável um estado
+// da Tabela de Verdade da tela que, com um único roster de 4, seria código morto:
+// roster vazio (estado 8), roster grande (NFR4 / FlatList) e falha de servidor
+// com a lista ainda em cache (estados 6 e 7).
+export const MOCK_EMPTY_ROSTER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440103'
+export const MOCK_LARGE_ROSTER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440104'
+export const MOCK_ROSTER_ERROR_TRIP_ID = '770e8400-e29b-41d4-a716-446655440105'
 
 // Espelha MAX_KEY_LENGTH do @IdempotencyKey() da API.
 const MAX_IDEMPOTENCY_KEY_LENGTH = 200
@@ -40,6 +47,27 @@ const initialRoster = (): TripStudentItem[] => [
   { studentId: '660e8400-e29b-41d4-a716-446655440013', name: 'Diego Alves', status: 'NOT_RETURNING', checkedInAt: null },
 ]
 
+// 60 alunos com mistura dos três status (~1/3 CHECKED_IN com `checkedInAt`
+// preenchido) — o cenário de NFR4 / FlatList da Story 3.5b.
+const largeRoster = (): TripStudentItem[] =>
+  Array.from({ length: 60 }, (_, i): TripStudentItem => {
+    const n = i + 1
+    const studentId = `660e8400-e29b-41d4-a716-${n.toString(16).padStart(12, '0')}`
+    const name = `Aluno Teste ${String(n).padStart(2, '0')}`
+    if (i % 3 === 0) {
+      return {
+        studentId,
+        name,
+        status: 'CHECKED_IN',
+        checkedInAt: new Date(Date.now() - n * 60_000).toISOString(),
+      }
+    }
+    if (i % 7 === 0) {
+      return { studentId, name, status: 'NOT_RETURNING', checkedInAt: null }
+    }
+    return { studentId, name, status: 'NOT_CHECKED_IN', checkedInAt: null }
+  })
+
 let rosters = new Map<string, TripStudentItem[]>()
 let idempotentSuccesses = new Map<string, CheckInSuccess>()
 
@@ -47,6 +75,8 @@ export function resetBoardingMocks(): void {
   rosters = new Map([
     [MOCK_ACTIVE_TRIP_ID, initialRoster()],
     [MOCK_INACTIVE_TRIP_ID, initialRoster()],
+    [MOCK_EMPTY_ROSTER_TRIP_ID, []],
+    [MOCK_LARGE_ROSTER_TRIP_ID, largeRoster()],
   ])
   idempotentSuccesses = new Map()
 }
@@ -212,6 +242,18 @@ export const boardingHandlers = [
         403,
         'DRIVER_NOT_ASSIGNED',
         'Motorista não é o responsável por esta viagem',
+      )
+    }
+
+    // Falha de servidor determinística: o único jeito de exercitar os estados 6
+    // (erro sem cache) e 7 (erro com a lista ainda em cache) da Story 3.5b sem
+    // derrubar a rede. Não é 400 — o contrato deste endpoint só declara
+    // 401/403/404, e o cliente trata qualquer status >= 500 como "dado velho".
+    if (tripId === MOCK_ROSTER_ERROR_TRIP_ID) {
+      return errorResponse(
+        500,
+        'INTERNAL_ERROR',
+        'Erro interno ao carregar a lista de alunos',
       )
     }
 

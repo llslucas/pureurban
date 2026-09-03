@@ -39,6 +39,17 @@ export default function TripScreen() {
     retry: 2,
   })
 
+  // Contagem real de embarque (FR25), lida da MESMA query key do roster da tela
+  // de alunos com `select`: uma key própria aqui duplicaria o cache e as duas
+  // telas divergiriam (Bloqueador 1 da Story 3.5b, pela outra ponta).
+  const { data: studentsSummary } = useQuery({
+    queryKey: ['trip', activeTrip?.id, 'students'],
+    queryFn: () => tripService.getTripStudents(activeTrip!.id),
+    enabled: Boolean(activeTrip?.id),
+    staleTime: 15_000,
+    select: (r) => r.summary,
+  })
+
   const startMutation = useMutation({
     mutationFn: ({ type, relatedTripId }: { type: 'OUTBOUND' | 'RETURN'; relatedTripId?: string }) =>
       tripService.startTrip(PLACEHOLDER_ROUTE_ID, type, relatedTripId),
@@ -143,7 +154,11 @@ export default function TripScreen() {
           <TripTypeLabel type={activeTrip.type} />
           <TripStatusChip status={activeTrip.status} />
           <Text style={styles.infoText}>Rota: {activeTrip.routeId}</Text>
-          <Text style={styles.infoText}>Alunos: 0/0 (em breve)</Text>
+          {/* '—' enquanto `studentsSummary` é undefined: um zero inventado
+              durante o carregamento é indistinguível de um zero verdadeiro. */}
+          <Text style={styles.infoText}>
+            Alunos: {studentsSummary ? `${studentsSummary.boarded}/${studentsSummary.total}` : '—'}
+          </Text>
           <Text style={styles.infoText}>
             Início: {new Date(activeTrip.startedAt).toLocaleTimeString('pt-BR')}
           </Text>
@@ -163,6 +178,19 @@ export default function TripScreen() {
         icon="qrcode-scan"
       >
         Escanear QR Code
+      </Button>
+      {/* `mode="outlined"` para não competir com a ação primária de escanear.
+          `navigate`, não `push` (finding da 3.2b). */}
+      <Button
+        mode="outlined"
+        onPress={() => router.navigate('/(driver)/student-list')}
+        disabled={isMutating}
+        style={styles.primaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.buttonLabel}
+        icon="account-group"
+      >
+        Alunos da Viagem
       </Button>
       <Button
         mode="contained"
