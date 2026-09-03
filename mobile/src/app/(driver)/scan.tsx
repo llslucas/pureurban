@@ -1,9 +1,10 @@
 import * as Crypto from 'expo-crypto'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState, Linking, StyleSheet, View } from 'react-native'
 import { ActivityIndicator, Button, Text } from 'react-native-paper'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useIsFocused } from '@react-navigation/native'
 import { useCameraPermissions } from 'expo-camera'
 
 import { QrScanner } from '@/components/qr-scanner'
@@ -72,6 +73,12 @@ const TONE_COLOR: Record<Tone, string> = {
 
 export default function ScanScreen() {
   const { user, logout } = useAuthStore()
+  const queryClient = useQueryClient()
+  // Gate de foco do Bloqueador 2 da Story 3.5b: navegar scan → student-list
+  // EMPILHA uma tela; sem desmontar o <QrScanner>, o CameraView segura o
+  // hardware e drena bateria a viagem inteira. `isPaused` não fecha a câmera —
+  // só não renderizar o componente fecha.
+  const isFocused = useIsFocused()
   const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
   const [boardedCount, setBoardedCount] = useState(0)
@@ -142,6 +149,15 @@ export default function ScanScreen() {
     setResult({ kind: 'idle' })
   }, [])
 
+  // Task 5.5 da Story 3.5b: ao voltar o foco (retorno da lista de alunos), a
+  // câmera reabre pronta para ler, nunca congelada num overlay de resultado
+  // antigo. Sem isto, voltar da lista deixa a tela travada no último resultado.
+  useFocusEffect(
+    useCallback(() => {
+      resume()
+    }, [resume]),
+  )
+
   // Persiste o embarque na `offline_queue` e devolve o feedback a exibir. O `id`
   // do item É a `X-Idempotency-Key` da tentativa, então o dreno reenvia como
   // replay e o servidor nunca vê uma operação nova.
@@ -178,6 +194,11 @@ export default function ScanScreen() {
         attempt.idempotencyKey,
       )
       lastSuccessStudentId.current = attempt.studentId
+      // AC #4 da Story 3.5b: a lista de alunos reflete este embarque sem o
+      // motorista recarregar a tela. Invalidação, não `setQueryData` otimista —
+      // `summary` é agregado do servidor (AC #2). `void`: a tela de scan não
+      // aguarda o roster; a rede trabalha enquanto o overlay de sucesso aparece.
+      void queryClient.invalidateQueries({ queryKey: ['trip', attempt.tripId, 'students'] })
       setBoardedCount((n) => n + 1)
       setResult({
         kind: 'success',
@@ -232,7 +253,7 @@ export default function ScanScreen() {
     } finally {
       isSubmitting.current = false
     }
-  }, [enqueue])
+  }, [enqueue, queryClient])
 
   const handleScan = useCallback(
     (raw: string) => {
@@ -425,14 +446,36 @@ export default function ScanScreen() {
 
   return (
     <View style={styles.container}>
-      <QrScanner onScan={handleScan} isPaused={isPaused} onMountError={setCameraError} />
+      {isFocused ? (
+        <QrScanner onScan={handleScan} isPaused={isPaused} onMountError={setCameraError} />
+      ) : (
+        // Fora de foco: moldura preta estática. O que importa é o CameraView
+        // DESMONTAR — a câmera fica livre enquanto o motorista está na lista.
+        <View style={styles.offscreen} />
+      )}
 
-      <View style={styles.counterBar} pointerEvents="none">
+      {/* `box-none`: a barra não intercepta toques (a câmera continua atrás),
+          mas o botão "Ver lista" dentro dela sim. */}
+      <View style={styles.counterBar} pointerEvents="box-none">
         <Text variant="titleMedium" style={styles.counterText}>
           {boardedCount === 1
             ? '1 embarque nesta sessão'
             : `${boardedCount} embarques nesta sessão`}
         </Text>
+        {/* `navigate`, nunca `push`: dois toques rápidos empilhavam duas telas
+            (finding da 3.2b). */}
+        <Button
+          mode="contained"
+          compact
+          buttonColor="rgba(255, 255, 255, 0.16)"
+          textColor="#FFFFFF"
+          onPress={() => router.navigate('/(driver)/student-list')}
+          style={styles.listButton}
+          contentStyle={styles.listButtonContent}
+          labelStyle={styles.listButtonLabel}
+        >
+          Ver lista
+        </Button>
       </View>
 
       {result.kind === 'checking' ? (
@@ -586,6 +629,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  offscreen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -619,6 +666,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     textAlign: 'center',
+    fontWeight: '700',
+  },
+  listButton: {
+    marginTop: 10,
+    alignSelf: 'center',
+    borderRadius: 10,
+  },
+  listButtonContent: {
+    height: 44,
+    paddingHorizontal: 12,
+  },
+  listButtonLabel: {
+    fontSize: 15,
     fontWeight: '700',
   },
   // Overlay de resultado cobrindo a tela inteira: em movimento, o motorista não
