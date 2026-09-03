@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-09-01T09:45:49+00:00"
+last_updated: "2026-09-03T00:00:00+00:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -134,7 +134,7 @@ development_status:
   # `QueueStorage`; só o SQL da `offline_queue` fica para a verificação no browser.
   3-4b-check-in-offline-com-fila-de-sincronizacao: done
   3-5a-lista-de-alunos-da-viagem-com-status: done
-  3-5b-lista-de-alunos-e-status-de-embarque: backlog
+  3-5b-lista-de-alunos-e-status-de-embarque: review
   3-6-integracao-e-e2e-do-epico-3: backlog
   epic-3-retrospective: optional
 

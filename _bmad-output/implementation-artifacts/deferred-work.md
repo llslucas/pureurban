@@ -225,3 +225,7 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md`
   summary: Um dreno bem-sucedido não invalida nenhuma query do TanStack Query.
   evidence: `runDrain` atualiza só os próprios contadores. Depois que embarques enfileirados chegam ao servidor, a lista de alunos da viagem (3.5a) e o `activeTrip` seguem servindo dados vencidos até o `staleTime` expirar.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-5b-lista-de-alunos-e-status-de-embarque.md`
+  summary: A escada de 12 guardas de `(driver)/student-list.tsx`, a contagem real de `trip.tsx` e a invalidação do roster no `submit` de `scan.tsx` não têm nenhum teste que rode — só `student-card.test.tsx` (o leaf) é coberto.
+  evidence: Decisão consciente da story (Testing Requirements + Questão Aberta #1): um render da tela puxa MMKV/persister e o MSW não está ligado ao jest hoje. Mas a própria story chama a Tabela de Verdade de "referência única" que "quebra a Story 3.6" se divergir. Reordenar as guardas, inverter `showStaleBanner`, trocar `summary` por `students.length` ou renomear a query key `['trip', id, 'students']` (repetida como literal em 3 arquivos) regride em silêncio com `npm test` verde. Precisa de decisão do Lucas sobre infra de teste de tela (QueryClientProvider + MSW-em-jest, ou extrair a key para um helper e testá-la).
