@@ -16,6 +16,7 @@ import { tripService, type Trip } from '@/services/trip.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { enqueueCheckIn, isTransportFailure } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
+import { registerE2eScanHook } from '@/utils/e2e-scan-hook'
 import {
   describeFailure,
   feedbackIcon,
@@ -317,6 +318,18 @@ export default function ScanScreen() {
     },
     [activeTrip, submit],
   )
+
+  // Ref para o `handleScan` corrente: o backdoor de scan do E2E (abaixo) lê
+  // sempre a última versão sem se re-registrar a cada render.
+  const handleScanRef = useRef(handleScan)
+  useEffect(() => {
+    handleScanRef.current = handleScan
+  })
+
+  // Backdoor SÓ-TESTE do E2E do Épico 3 (Story 3.6). Registra
+  // `globalThis.__E2E_INJECT_SCAN__` sob `__DEV__ && EXPO_PUBLIC_E2E === '1'`;
+  // no-op fora de teste. Lógica e testes em `@/utils/e2e-scan-hook`.
+  useEffect(() => registerE2eScanHook(() => handleScanRef.current), [])
 
   const handleRetry = useCallback(() => {
     const attempt = lastAttempt.current
