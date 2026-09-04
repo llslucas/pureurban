@@ -18,12 +18,13 @@
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
-    "test:pw": "npx playwright test",
+    "test:pw": "npx playwright test --workers=1",
     "test:pw:api": "npx playwright test --project=api",
-    "test:pw:e2e": "npx playwright test --project=e2e",
-    "test:pw:headed": "npx playwright test --headed",
+    "test:pw:e2e": "npx playwright test --project=e2e --workers=1",
+    "test:pw:headed": "npx playwright test --headed --workers=1",
     "test:pw:debug": "npx playwright test --debug",
-    "openapi:export": "nest build && node dist/scripts/export-openapi.js"
+    "openapi:export": "nest build && node dist/scripts/export-openapi.js",
+    "openapi:check": "npm run openapi:export && git diff --exit-code HEAD -- openapi.json"
   },
   "dependencies": {
     "@effect/schema": "^0.75.5",

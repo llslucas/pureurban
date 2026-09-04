@@ -14,3 +14,5 @@ export {
   type User,
   type UserRole,
 } from './user.factory';
+export { createRouteInput, type RouteInput } from './route.factory';
+export { createPersonInput, type PersonInput } from './student.factory';

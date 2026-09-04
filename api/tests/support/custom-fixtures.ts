@@ -1,42 +1,26 @@
 /**
  * Custom Playwright fixtures para PureUrban.
  *
- * Fixtures customizadas com auto-seed e auto-cleanup.
- * Usar test.extend() para adicionar fixtures ao test object.
+ * `epic3`: semeia um cenário completo do Épico 3 (empresa + admin + motorista +
+ * alunos + rota vinculada, motorista logado) via API antes do teste. Sem
+ * cleanup — ver `seedEpic3Scenario` e as Design Notes da Story 3.6.
  *
- * @see knowledge/fixture-architecture.md
+ * Para um número customizado de alunos (NFR4), chame `seedEpic3Scenario`
+ * diretamente no spec em vez de usar esta fixture.
  */
 import { test as base } from '@playwright/test';
-import { createCompany, type Company } from './factories/company.factory';
-import { createUser, type User } from './factories/user.factory';
+import {
+  seedEpic3Scenario,
+  type Epic3Scenario,
+} from './helpers/seed-helpers';
 
 type PureUrbanFixtures = {
-  /** Empresa de teste com auto-cleanup */
-  testCompany: Company;
-  /** Usuário admin de teste com auto-cleanup */
-  testAdmin: User;
+  epic3: Epic3Scenario;
 };
 
 export const test = base.extend<PureUrbanFixtures>({
-  testCompany: async ({ request }, use) => {
-    const company = createCompany();
-
-    // TODO: Seed via API quando endpoint POST /api/v1/auth/register existir
-    // const response = await request.post('/api/v1/auth/register', { data: company });
-
-    await use(company);
-
-    // TODO: Cleanup via API quando endpoint DELETE existir
-  },
-
-  testAdmin: async ({ request }, use) => {
-    const admin = createUser({ role: 'admin' });
-
-    // TODO: Seed via API quando endpoint existir
-    // const response = await request.post('/api/v1/users', { data: admin });
-
-    await use(admin);
-
-    // TODO: Cleanup via API
+  epic3: async ({ request }, use) => {
+    const scenario = await seedEpic3Scenario(request);
+    await use(scenario);
   },
 });
