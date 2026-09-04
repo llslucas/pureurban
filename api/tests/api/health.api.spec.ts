@@ -16,8 +16,10 @@ test.describe('Health Check API', () => {
     // When: faço GET na raiz
     const response = await request.get('/');
 
-    // Then: resposta é 200 com corpo "Hello World!"
+    // Then: resposta é 200; o corpo passa pelo ResponseWrapperInterceptor
+    // global e sai como { data, meta } — envelope padrão de toda a API.
     expect(response.status()).toBe(200);
-    expect(await response.text()).toBe('Hello World!');
+    const body = (await response.json()) as { data: string };
+    expect(body.data).toBe('Hello World!');
   });
 });
