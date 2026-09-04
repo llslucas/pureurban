@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-09-03T00:00:00+00:00"
+last_updated: "2026-09-04T00:00:00+00:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -135,7 +135,15 @@ development_status:
   3-4b-check-in-offline-com-fila-de-sincronizacao: done
   3-5a-lista-de-alunos-da-viagem-com-status: done
   3-5b-lista-de-alunos-e-status-de-embarque: review
-  3-6-integracao-e-e2e-do-epico-3: backlog
+  # E2E do Épico 3 verdes contra a API real (sem MSW): caminho feliz, QR inválido /
+  # aluno não permitido, offline→reconexão→sync sem duplicata, NFR1 (~70ms) e NFR4
+  # (~15ms). Drift check `npm run openapi:check` adicionado e verde (contrato em dia).
+  # Injeção de scan via `globalThis.__E2E_INJECT_SCAN__` gated por `__DEV__ &&
+  # EXPO_PUBLIC_E2E`. Sem `webServer` no Playwright (API + Expo Web sobem à mão;
+  # specs auto-skipam sem a infra) — ver api/tests/README.md.
+  # Épico ainda NÃO fechável: 3-5b segue em `review`. Lint pré-existente da API
+  # (147 erros em src/ e test/, presente na baseline) fora do escopo desta story.
+  3-6-integracao-e-e2e-do-epico-3: review
   epic-3-retrospective: optional
 
   # === Epic 4: Notificação de Ausência e Comunicação ===

@@ -229,3 +229,15 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/3-5b-lista-de-alunos-e-status-de-embarque.md`
   summary: A escada de 12 guardas de `(driver)/student-list.tsx`, a contagem real de `trip.tsx` e a invalidação do roster no `submit` de `scan.tsx` não têm nenhum teste que rode — só `student-card.test.tsx` (o leaf) é coberto.
   evidence: Decisão consciente da story (Testing Requirements + Questão Aberta #1): um render da tela puxa MMKV/persister e o MSW não está ligado ao jest hoje. Mas a própria story chama a Tabela de Verdade de "referência única" que "quebra a Story 3.6" se divergir. Reordenar as guardas, inverter `showStaleBanner`, trocar `summary` por `students.length` ou renomear a query key `['trip', id, 'students']` (repetida como literal em 3 arquivos) regride em silêncio com `npm test` verde. Precisa de decisão do Lucas sobre infra de teste de tela (QueryClientProvider + MSW-em-jest, ou extrair a key para um helper e testá-la).
+
+- source_spec: `_bmad-output/implementation-artifacts/3-6-integracao-e-e2e-do-epico-3.md`
+  summary: A suíte E2E do Épico 3 (`test:pw:e2e`), o `openapi:check` e a cobertura de render do `ScanScreen` só rodam se um humano lembrar de executá-los — não há CI.
+  evidence: `CLAUDE.md` declara "Não há CI configurado". Os specs de `tests/e2e/boarding-*` auto-skipam sem os dois servidores de pé (a não ser sob `E2E_SERVERS_UP=1`, setado em lugar nenhum), `openapi:check` roda um `nest build` completo e não está preso a nenhum script de `test`/`lint`/pre-commit, e o `mobile npm test` não renderiza o `ScanScreen`. Uma regressão do fluxo do épico entra na main com o board verde. Fecha quando o projeto ganhar CI (ver 1.7 / pipeline planejado).
+
+- source_spec: `_bmad-output/implementation-artifacts/3-6-integracao-e-e2e-do-epico-3.md`
+  summary: `api/tests/api/health.api.spec.ts` afirmava `response.text() === 'Hello World!'` mas o `ResponseWrapperInterceptor` global envelopa a resposta em `{data,meta}` desde a Story 2.4 — o teste não podia passar há meses.
+  evidence: A Story 3.6 corrigiu a asserção (era gate da AC "test:pw:api continua verde"), mas o fato de ter ficado vermelho/inexecutado tanto tempo indica que o projeto `api` do Playwright não vinha sendo rodado. Sem CI, nada força. Mesma raiz do item acima.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-6-integracao-e-e2e-do-epico-3.md`
+  summary: `cd api && npm run lint` está vermelho na baseline (~147 erros, ~56 warnings), todos em `src/`/`test/` pré-existentes.
+  evidence: Achado do subagente de implementação da 3.6, confirmado com as mudanças da story fora da árvore (`git stash`). O código novo da story (Playwright em `tests/`) nem entra no glob do ESLint da API. A AC da 3.6 sobre lint cobre só o mobile por isso. Candidato a story técnica de higiene do lint da API.
