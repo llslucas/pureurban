@@ -114,6 +114,25 @@ context:
 **Manual checks:**
 - `cd mobile && EXPO_PUBLIC_USE_MOCKS=0 EXPO_PUBLIC_API_URL=http://localhost:3000 npm run web` com a API de pé: console **não** mostra `[mocks] MSW ativo`; login do motorista → iniciar viagem → check-in real 201; lista e contagem atualizam.
 
+**Smoke manual — registro (2026-09-06):**
+Executado no alvo web (Expo Web :8081, `EXPO_PUBLIC_USE_MOCKS=0`,
+`EXPO_PUBLIC_API_URL=http://localhost:3001`, `EXPO_PUBLIC_E2E=1`) contra a API real
+em :3001 + Postgres/Redis do compose, dirigido pelo chromium do pacote `playwright`
+(o MCP exige `channel: chrome`, ausente — ver memória `mobile-web-runtime-verification`).
+Seed do cenário via endpoints do Épico 2 + `POST /trips` (a tela de Viagem inicia
+com `PLACEHOLDER_ROUTE_ID` — defer da 3.1 —, então a viagem entra por API e a UI a
+reflete via `GET /trips/active`). 9/9 checks verdes:
+- login do motorista → "Gestão de Viagem" com viagem ativa, `Alunos: 0/3`.
+- scan de QR injetado → `POST /api/v1/boarding/check-in` **201**, ~20 ms de rede (NFR1 < 2s).
+- overlay "Embarque confirmado".
+- "Alunos da Viagem" → `1/3 embarcados`, aluno com status "Embarcou".
+- `GET /trips/:id/students` → 1 `CHECKED_IN`, `summary.boarded = 1`.
+- console **sem** `[mocks] MSW ativo`; **todas** as chamadas `/api/v1` para `localhost:3001` (nenhum handler MSW).
+
+Não coberto pelo smoke (fora do escopo, já exercitado alhures): caminho real
+câmera→`BarcodeDetector` (3.3b), cenário offline headless (spec `boarding-offline-sync`),
+início de viagem pela UI (bloqueado pelo `PLACEHOLDER_ROUTE_ID` da 3.1).
+
 ## Suggested Review Order
 
 **Fluxo ponta a ponta (comece aqui)**
