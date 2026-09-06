@@ -10,6 +10,10 @@ import { QueryClient, QueryObserver, onlineManager } from '@tanstack/react-query
 // vira true. O fix é `networkMode: 'always'` na query do roster. Este teste
 // tranca esse comportamento: se alguém remover o `networkMode`, o segundo caso
 // volta a passar como o primeiro e a regressão fica visível aqui.
+//
+// Vive em `src/lib/` e não ao lado de `student-list.tsx`: o Expo Router trata
+// TODO arquivo sob `src/app/` como rota e o empacota no app — um `.test.ts` lá
+// quebra o bundle web com `ReferenceError: describe is not defined`.
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 10))
 
