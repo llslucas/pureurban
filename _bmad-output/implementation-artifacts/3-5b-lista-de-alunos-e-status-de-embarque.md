@@ -413,27 +413,35 @@ a flag (`EXPO_PUBLIC_*` entra no bundle em build time).
   da 1.10/3.4b intactas (`role-routes`, `qr-payload`, `offline-queue`, `offline-banner`,
   `connectivity`, `scan-feedback`, `smoke-render`).
 - [x] 7.4 `npx expo export --platform web` → completa sem erro (AC #8; Architecture §8, regra 16).
-- [ ] 7.5 Roteiro manual — **cada linha é uma AC**:
-  - [ ] `motorista@pureurban.com` → "Iniciar Viagem" → "Alunos da Viagem": lista com 4 alunos,
+- [ ] 7.5 Roteiro manual — **cada linha é uma AC** (Lucas, verificação manual, PR #17 pós-merge):
+  - [x] `motorista@pureurban.com` → "Iniciar Viagem" → "Alunos da Viagem": lista com 4 alunos,
     contagem `0/4 embarcados`, Diego Alves em "Não vai voltar" (estados 9, 9b, 9c) — AC #1, #2
-  - [ ] Voltar → "Escanear QR Code" → escanear o QR de `aluno@pureurban.com` (segundo browser
+  - [x] Voltar → "Escanear QR Code" → escanear o QR de `aluno@pureurban.com` (segundo browser
     ou segundo perfil) → "Ver lista" **sem recarregar a página**: Ana Souza aparece "Embarcou"
     com horário e a contagem vira `1/4` — **AC #4 e AC #5**
-  - [ ] Na mesma navegação: confirmar no DevTools que a câmera foi liberada ao entrar na lista
+  - [x] Na mesma navegação: confirmar no DevTools que a câmera foi liberada ao entrar na lista
     (o indicador de câmera do browser apaga) — **Bloqueador 2**
-  - [ ] Voltar da lista para o scan: a câmera reabre e a tela está pronta para ler, sem overlay
+  - [x] Voltar da lista para o scan: a câmera reabre e a tela está pronta para ler, sem overlay
     congelado — Task 5.5
-  - [ ] `motorista-turma-vazia@` → estado 8 ("Nenhum aluno vinculado", `0/0`)
-  - [ ] `motorista-turma-grande@` → 60 alunos, rolagem fluida, contagem correta (NFR4)
-  - [ ] `motorista-lista-erro@` → estado 6 (erro sem cache) → "Tentar novamente"
+  - [x] `motorista-turma-vazia@` → estado 8 ("Nenhum aluno vinculado", `0/0`)
+  - [x] `motorista-turma-grande@` → 60 alunos, rolagem fluida, contagem correta (NFR4)
+  - [x] `motorista-lista-erro@` → estado 6 (erro sem cache) → "Tentar novamente"
   - [ ] Com a lista carregada, DevTools → Network → **Offline**, pull-to-refresh: estado 7 —
-    a lista **continua na tela** com o `Banner` de dado desatualizado — **AC #3 / FR24**
-  - [ ] Ainda offline, **F5**: a lista volta do cache persistido em MMKV (Tier 1) — AC #3
-  - [ ] `motorista-outra-viagem@` → estado 10 (403 `DRIVER_NOT_ASSIGNED`)
-  - [ ] `motorista-sem-viagem@` → estado 4 ("Nenhuma viagem ativa")
-  - [ ] `aluno@pureurban.com` digitando `/student-list` na barra de endereços → o shell da 1.8
+    a lista **continua na tela** com o `Banner` de dado desatualizado — **AC #3 / FR24**.
+    **Finding da verificação manual (2026-09-06):** o Banner não aparecia no alvo web —
+    a query pausava (`fetchStatus: 'paused'`) em vez de errar, `isError` ficava `false`.
+    **Corrigido** na branch `fix/3-5b-stale-banner-offline` (`networkMode: 'always'` na query
+    do roster; ver Completion Notes). Aguarda **revalidação do Lucas no browser** após o fix.
+  - [ ] Ainda offline, **F5**: a lista volta do cache persistido em MMKV (Tier 1) — AC #3.
+    **Diferida para verificação em device** (ver `deferred-work.md`): F5 no alvo web rebaixa
+    o bundle do dev server do Metro em `localhost:8081` e `web.output: "single"` não gera
+    service worker — a página não recarrega offline por limitação do ambiente de dev, não
+    do código. Comprovável só num build standalone ou em device.
+  - [x] `motorista-outra-viagem@` → estado 10 (403 `DRIVER_NOT_ASSIGNED`)
+  - [x] `motorista-sem-viagem@` → estado 4 ("Nenhuma viagem ativa")
+  - [x] `aluno@pureurban.com` digitando `/student-list` na barra de endereços → o shell da 1.8
     redireciona para `/(student)/home` (o estado 1 é a rede de segurança, não o caminho normal)
-  - [ ] Trocar de conta e reabrir a lista: nenhum aluno vem `CHECKED_IN` de uma sessão anterior
+  - [x] Trocar de conta e reabrir a lista: nenhum aluno vem `CHECKED_IN` de uma sessão anterior
     — **Bloqueador 4**
 - [x] 7.6 Sem regressão em `api/`: **nada é tocado lá**. Não rode nem altere nada na API.
 
@@ -756,6 +764,12 @@ claude-sonnet-5 (bmad-build / auto)
 - `cd mobile && npm test` → 8 suítes, 96 testes, verde (inclui o novo `student-card.test.tsx`; suítes da 1.10/3.4b intactas)
 - `cd mobile && npx expo export --platform web` → completa sem erro (dist removido após verificação)
 
+**Fix da verificação manual (branch `fix/3-5b-stale-banner-offline`, 2026-09-06):**
+- `cd mobile && npx tsc --noEmit` → 0 erros
+- `cd mobile && npm run lint` → limpo (exit 0)
+- `cd mobile && npm test` → 10 suítes, 106 testes, verde (inclui o novo `student-list.stale-banner.test.ts`)
+- `cd mobile && npx expo export --platform web` → completa sem erro (`dist/` removido)
+
 ### Completion Notes List
 
 - **Task 1–3, 5, 6 completas.** `getTripStudents` + 3 aliases no `trip.service.ts`; `student-card.tsx` (apresentação pura, `STATUS_PRESENTATION` exportado, `React.memo`) + teste; `student-list.tsx` reescrita com as 12 guardas da Tabela de Verdade na ordem; `scan.tsx` com invalidação online do roster, gate de foco (`useIsFocused` — `<QrScanner>` desmonta fora de foco), `useFocusEffect(resume)` e botão "Ver lista" na `counterBar` (`box-none`); `trip.tsx` com botão "Alunos da Viagem" (`outlined`) e contagem real via `select` na mesma query key (`Alunos: —` enquanto `undefined`).
@@ -766,12 +780,49 @@ claude-sonnet-5 (bmad-build / auto)
 - `package.json` com diff vazio. Nenhum arquivo em `api/` tocado. `stores/boarding.store.ts` não criado (Decisões já tomadas).
 - Os diffs em `sprint-status.yaml` e no cabeçalho deste spec já estavam no working tree quando o dev começou (preparação da branch) — não são desta implementação.
 
+**Fix da verificação manual da Task 7.5 (branch `fix/3-5b-stale-banner-offline`, 2026-09-06):**
+- **O finding.** A verificação manual do PM (Task 7.5) encontrou que o estado 7 da Tabela de
+  Verdade (AC #3 / FR24) **não era demonstrável no alvo web**. `showStaleBanner` é
+  `roster.isError && roster.data`; no alvo web o `OnlineManager` padrão do TanStack engancha
+  os eventos `online`/`offline` do `window`, então o DevTools "Offline" o coloca offline e um
+  refetch com o `networkMode: 'online'` default **pausa** (`fetchStatus: 'paused'`) em vez de
+  errar. `roster.isError` fica `false` e o Banner nunca aparece. No device nativo o
+  `onlineManager` nunca foi ligado ao NetInfo (defer da 3.2b), então lá a query erra e o
+  Banner aparece — o comportamento divergia entre web e o alvo contra o qual se verifica.
+- **O fix.** `networkMode: 'always'` na query do roster (`['trip', tripId, 'students']`), em
+  `student-list.tsx` (`:37`, a query principal) **e** em `trip.tsx` (`:50`, o observer de
+  contagem via `select` — mesma entrada de cache, deve falhar/retomar igual). O refetch passa
+  a tentar mesmo "offline", falha no transporte (o `api-client` propaga o `TypeError` cru do
+  `fetch`), cai em `isError` mantendo o `roster.data` do cache → Banner aparece. Consistente
+  entre web e nativo.
+- **O que NÃO mudou, com raciocínio.** (a) `['activeTrip']` fica com o `networkMode` default:
+  se errasse offline, a guarda `tripStatus === 'error'` (estado 3) renderizaria "Não foi
+  possível carregar a viagem" **antes** de a escada chegar no roster, mascarando o estado 7 —
+  e a key é compartilhada com `scan.tsx`, cujo comportamento offline não é escopo aqui.
+  (b) `lib/query-client.ts` (networkMode global) fica intocado — mudança sistêmica que toca
+  todas as telas; o escopo mínimo (a query do roster) resolve o finding.
+  (c) A condição `roster.isError && roster.data` fica como está (decisão travada na tabela
+  "Decisões já tomadas"): com `networkMode: 'always'` o roster nunca pausa, então reforçar
+  para `|| fetchStatus === 'paused'` seria código morto.
+- **Cobertura.** `src/app/(driver)/student-list.stale-banner.test.ts` (novo) tranca o
+  mecanismo: uma query com `networkMode: 'always'` offline **erra** e mantém o cache
+  (`isError && data`); a mesma com o `networkMode` default **pausa** e `isError` nunca vira
+  true. Um teste de render da tela inteira continua fora de escopo (puxa MMKV/persister —
+  Questão Aberta #1 e o defer da 3.5b registram isso).
+- **Diferido.** A linha "F5 offline volta do cache" da Task 7.5 vira **verificação em device**
+  (registrada em `deferred-work.md`): é limitação do dev server do Metro (F5 rebaixa o bundle
+  de `localhost:8081`) + `web.output: "single"` sem service worker, não do código.
+- **Revalidação pendente do Lucas:** a linha do Banner offline (estado 7) no browser, após
+  este fix. Nada mais da Task 7.5 mudou de estado por esta branch.
+- `package.json` com diff vazio. Nenhum arquivo em `api/` tocado.
+
 ### File List
 
 - `mobile/src/services/trip.service.ts` (M)
 - `mobile/src/components/student-card.tsx` (A)
 - `mobile/src/components/student-card.test.tsx` (A)
 - `mobile/src/app/(driver)/student-list.tsx` (M)
+- `mobile/src/app/(driver)/student-list.stale-banner.test.ts` (A) — fix 2026-09-06
 - `mobile/src/app/(driver)/scan.tsx` (M)
 - `mobile/src/app/(driver)/trip.tsx` (M)
 - `mobile/src/mocks/handlers/auth.handlers.ts` (M)
@@ -787,6 +838,7 @@ claude-sonnet-5 (bmad-build / auto)
 | 2026-09-02 | 0.2 | Revalidada contra a `main` pós-merge da 3.4b: âncoras de linha refeitas em todas as tasks; seção de testes reescrita (runner da 1.10 existe — Task 2.9 nova); Previous Story Intelligence + Git Intelligence + nota de `onlineManager` atualizadas para 3.3b/3.4b `done`; Bloqueadores 1-4 reconferidos e mantidos; Questão Aberta #1 fechada, #5 adicionada | bmad-build |
 | 2026-09-02 | 0.3 | Implementação: Tasks 1–6 completas; Task 7.1–7.4 verdes (`tsc`/`lint`/`jest 96✓`/`expo export`); Task 7.5 (roteiro manual no browser) não executada — ambiente non-interactive | bmad-build (dev) |
 | 2026-09-03 | 0.4 | Code review: 5 patches aplicados — fallback de `STATUS_PRESENTATION`, guarda de data inválida e `accessibilityLabel` único no `student-card`; predicado de `retry` que não retenta 4xx de negócio e `refetchTrip()` no pull-to-refresh no `student-list`. tsc/lint/jest(99✓)/expo export verdes | bmad-build (dev) |
+| 2026-09-06 | 0.5 | Fix do finding da verificação manual (Task 7.5): estado 7 / AC #3 não demonstrável no alvo web. `networkMode: 'always'` na query do roster em `student-list.tsx` e `trip.tsx`; `['activeTrip']` e `query-client.ts` intocados (raciocínio nas Completion Notes). +`student-list.stale-banner.test.ts`. Linha "F5 offline" da Task 7.5 diferida para device. tsc/lint/jest(106✓)/expo export verdes. Branch `fix/3-5b-stale-banner-offline` | bmad-build (dev) |
 
 ---
 
