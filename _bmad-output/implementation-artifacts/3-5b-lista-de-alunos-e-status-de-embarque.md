@@ -774,7 +774,7 @@ componentes, alias `@/*` obrigatório em imports internos, indentação de 2 esp
    (e qualquer outro handler) não pode ser testado sob o `jest-expo` hoje: `import … from 'msw'`
    puxa `rettime` em ESM não transformado (`transformIgnorePatterns`), e `msw/node` é mapeado
    para `null` pelo resolver do React Native. O lado cliente do fix (`networkMode: 'always'` →
-   `isError` offline) está coberto por `student-list.stale-banner.test.ts` com `QueryObserver`
+   `isError` offline) está coberto por `src/lib/roster-stale-banner.test.ts` com `QueryObserver`
    direto, sem MSW. Ligar MSW ao jest exigiria estender o `transformIgnorePatterns` com toda a
    cadeia ESM do msw — é a mesma decisão de infra "MSW-em-jest" que o `deferred-work.md` já
    registra (entrada da review da 3.5b). Decisão sua.
@@ -797,7 +797,7 @@ claude-sonnet-5 (bmad-build / auto)
 **Fix da verificação manual (branch `fix/3-5b-stale-banner-offline`, 2026-09-06):**
 - `cd mobile && npx tsc --noEmit` → 0 erros
 - `cd mobile && npm run lint` → limpo (exit 0)
-- `cd mobile && npm test` → 10 suítes, 106 testes, verde (inclui o novo `src/app/(driver)/student-list.stale-banner.test.ts`)
+- `cd mobile && npm test` → 10 suítes, 106 testes, verde (inclui o novo `src/lib/roster-stale-banner.test.ts`)
 - `cd mobile && npx expo export --platform web` → completa sem erro (`dist/` removido)
 
 ### Completion Notes List
@@ -834,7 +834,7 @@ claude-sonnet-5 (bmad-build / auto)
   (c) A condição `roster.isError && roster.data` fica como está (decisão travada na tabela
   "Decisões já tomadas"): com `networkMode: 'always'` o roster nunca pausa, então reforçar
   para `|| fetchStatus === 'paused'` seria código morto.
-- **Cobertura (lado cliente).** `src/app/(driver)/student-list.stale-banner.test.ts` (novo)
+- **Cobertura (lado cliente).** `src/lib/roster-stale-banner.test.ts` (novo)
   tranca o mecanismo: uma query com `networkMode: 'always'` offline **erra** e mantém o cache
   (`isError && data`); a mesma com o `networkMode` default **pausa** e `isError` nunca vira
   true. Um teste de render da tela inteira continua fora de escopo (puxa MMKV/persister —
@@ -875,7 +875,7 @@ claude-sonnet-5 (bmad-build / auto)
 - `mobile/src/components/student-card.tsx` (A)
 - `mobile/src/components/student-card.test.tsx` (A)
 - `mobile/src/app/(driver)/student-list.tsx` (M) — `networkMode: 'always'` no roster (fix 2026-09-06)
-- `mobile/src/app/(driver)/student-list.stale-banner.test.ts` (A) — fix 2026-09-06
+- `mobile/src/lib/roster-stale-banner.test.ts` (A) — fix 2026-09-06
 - `mobile/src/app/(driver)/scan.tsx` (M)
 - `mobile/src/app/(driver)/trip.tsx` (M) — `networkMode: 'always'` no observer de contagem (fix 2026-09-06)
 - `mobile/src/mocks/handlers/auth.handlers.ts` (M) — +`motorista-lista-instavel@` (fix 2026-09-06)
@@ -891,7 +891,7 @@ claude-sonnet-5 (bmad-build / auto)
 | 2026-09-02 | 0.2 | Revalidada contra a `main` pós-merge da 3.4b: âncoras de linha refeitas em todas as tasks; seção de testes reescrita (runner da 1.10 existe — Task 2.9 nova); Previous Story Intelligence + Git Intelligence + nota de `onlineManager` atualizadas para 3.3b/3.4b `done`; Bloqueadores 1-4 reconferidos e mantidos; Questão Aberta #1 fechada, #5 adicionada | bmad-build |
 | 2026-09-02 | 0.3 | Implementação: Tasks 1–6 completas; Task 7.1–7.4 verdes (`tsc`/`lint`/`jest 96✓`/`expo export`); Task 7.5 (roteiro manual no browser) não executada — ambiente non-interactive | bmad-build (dev) |
 | 2026-09-03 | 0.4 | Code review: 5 patches aplicados — fallback de `STATUS_PRESENTATION`, guarda de data inválida e `accessibilityLabel` único no `student-card`; predicado de `retry` que não retenta 4xx de negócio e `refetchTrip()` no pull-to-refresh no `student-list`. tsc/lint/jest(99✓)/expo export verdes | bmad-build (dev) |
-| 2026-09-06 | 0.5 | Fix do finding da verificação manual (Task 7.5), parte 1: estado 7 / AC #3 não demonstrável no alvo web. `networkMode: 'always'` na query do roster em `student-list.tsx` e `trip.tsx`; `['activeTrip']` e `query-client.ts` intocados (raciocínio nas Completion Notes). +`src/app/(driver)/student-list.stale-banner.test.ts`. Linha "F5 offline" da Task 7.5 diferida para device. tsc/lint/jest(106✓)/expo export verdes. Branch `fix/3-5b-stale-banner-offline` | bmad-build (dev) |
+| 2026-09-06 | 0.5 | Fix do finding da verificação manual (Task 7.5), parte 1: estado 7 / AC #3 não demonstrável no alvo web. `networkMode: 'always'` na query do roster em `student-list.tsx` e `trip.tsx`; `['activeTrip']` e `query-client.ts` intocados (raciocínio nas Completion Notes). +`src/lib/roster-stale-banner.test.ts`. Linha "F5 offline" da Task 7.5 diferida para device. tsc/lint/jest(106✓)/expo export verdes. Branch `fix/3-5b-stale-banner-offline` | bmad-build (dev) |
 | 2026-09-06 | 0.6 | Fix parte 2 (após revalidação do Lucas): o Banner seguia sem aparecer — o MSW responde 200 mesmo com o DevTools "Offline" (patcha o `fetch` antes da rede) e `MOCK_ROSTER_ERROR_TRIP_ID` erra desde a 1ª chamada (só estado 6). +sentinela `MOCK_FLAKY_ROSTER_TRIP_ID` (200 na 1ª leitura, 500 depois) + conta `motorista-lista-instavel@` (Task 4.8). Comentário de `MOCK_ROSTER_ERROR_TRIP_ID` corrigido. Roteiro 7.5 do estado 7 reescrito. Teste de handler não é possível (msw não carrega no jest-expo — Questão Aberta). tsc/lint/jest(106✓)/expo export verdes | bmad-build (dev) |
 
 ---
