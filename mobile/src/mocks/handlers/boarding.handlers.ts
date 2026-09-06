@@ -28,6 +28,14 @@ export const MOCK_OTHER_DRIVER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440102'
 export const MOCK_EMPTY_ROSTER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440103'
 export const MOCK_LARGE_ROSTER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440104'
 export const MOCK_ROSTER_ERROR_TRIP_ID = '770e8400-e29b-41d4-a716-446655440105'
+// Estado 7 (erro COM cache): serve o roster 200 na 1ª chamada e 500 nas
+// seguintes. `MOCK_ROSTER_ERROR_TRIP_ID` erra desde a 1ª chamada — só produz o
+// estado 6. Aqui há sempre um sucesso em cache quando o erro chega, que é a
+// definição do estado 7. Necessário porque o DevTools "Offline" não afeta o
+// MSW: `setupServer` de `msw/native` patcha o `fetch` no nível do JS, então
+// "offline" no browser não impede o handler de responder — a verificação manual
+// do estado 7 na trilha MSW só é possível com um sentinela que erra sozinho.
+export const MOCK_FLAKY_ROSTER_TRIP_ID = '770e8400-e29b-41d4-a716-446655440106'
 
 // Espelha MAX_KEY_LENGTH do @IdempotencyKey() da API.
 const MAX_IDEMPOTENCY_KEY_LENGTH = 200
@@ -70,6 +78,8 @@ const largeRoster = (): TripStudentItem[] =>
 
 let rosters = new Map<string, TripStudentItem[]>()
 let idempotentSuccesses = new Map<string, CheckInSuccess>()
+// Contador do sentinela flaky (estado 7): a 1ª chamada passa, as seguintes erram.
+let flakyRosterCalls = 0
 
 export function resetBoardingMocks(): void {
   rosters = new Map([
@@ -77,8 +87,10 @@ export function resetBoardingMocks(): void {
     [MOCK_INACTIVE_TRIP_ID, initialRoster()],
     [MOCK_EMPTY_ROSTER_TRIP_ID, []],
     [MOCK_LARGE_ROSTER_TRIP_ID, largeRoster()],
+    [MOCK_FLAKY_ROSTER_TRIP_ID, initialRoster()],
   ])
   idempotentSuccesses = new Map()
+  flakyRosterCalls = 0
 }
 
 resetBoardingMocks()
@@ -245,16 +257,34 @@ export const boardingHandlers = [
       )
     }
 
-    // Falha de servidor determinística: o único jeito de exercitar os estados 6
-    // (erro sem cache) e 7 (erro com a lista ainda em cache) da Story 3.5b sem
-    // derrubar a rede. Não é 400 — o contrato deste endpoint só declara
-    // 401/403/404, e o cliente trata qualquer status >= 500 como "dado velho".
+    // Falha de servidor determinística desde a 1ª chamada: exercita o estado 6
+    // (erro SEM cache) da Story 3.5b sem derrubar a rede. Como nunca há um
+    // sucesso antes, o estado 7 (erro COM cache) NÃO é alcançável por aqui —
+    // esse é o `MOCK_FLAKY_ROSTER_TRIP_ID` abaixo. Não é 400: o contrato deste
+    // endpoint só declara 401/403/404, e o cliente trata >= 500 como "dado velho".
     if (tripId === MOCK_ROSTER_ERROR_TRIP_ID) {
       return errorResponse(
         500,
         'INTERNAL_ERROR',
         'Erro interno ao carregar a lista de alunos',
       )
+    }
+
+    // Sentinela do estado 7 (erro COM cache): 200 na 1ª chamada, 500 nas
+    // seguintes. O motorista carrega a lista uma vez (fica em cache), volta, e
+    // ao reabrir a tela o refetch de remontagem falha — `roster.isError` fica
+    // true com `roster.data` ainda presente → o Banner "Dados podem estar
+    // desatualizados" aparece sobre a lista cacheada. Contador resetado por
+    // `resetBoardingMocks()` (login), então a sequência recomeça a cada sessão.
+    if (tripId === MOCK_FLAKY_ROSTER_TRIP_ID) {
+      flakyRosterCalls += 1
+      if (flakyRosterCalls > 1) {
+        return errorResponse(
+          500,
+          'INTERNAL_ERROR',
+          'Erro interno ao carregar a lista de alunos',
+        )
+      }
     }
 
     const roster = rosters.get(tripId)

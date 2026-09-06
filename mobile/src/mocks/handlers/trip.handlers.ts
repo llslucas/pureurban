@@ -4,6 +4,7 @@ import type { Trip } from '@/services/trip.service'
 import {
   MOCK_ACTIVE_TRIP_ID,
   MOCK_EMPTY_ROSTER_TRIP_ID,
+  MOCK_FLAKY_ROSTER_TRIP_ID,
   MOCK_INACTIVE_TRIP_ID,
   MOCK_LARGE_ROSTER_TRIP_ID,
   MOCK_OTHER_DRIVER_TRIP_ID,
@@ -37,6 +38,9 @@ const ENDED_TRIP_EMAIL = 'motorista-viagem-encerrada@pureurban.com'
 const EMPTY_ROSTER_EMAIL = 'motorista-turma-vazia@pureurban.com'
 const LARGE_ROSTER_EMAIL = 'motorista-turma-grande@pureurban.com'
 const ROSTER_ERROR_EMAIL = 'motorista-lista-erro@pureurban.com'
+// Estado 7 da lista (erro COM cache): o roster carrega uma vez e falha nas
+// leituras seguintes — ver `MOCK_FLAKY_ROSTER_TRIP_ID` em `boarding.handlers.ts`.
+const FLAKY_ROSTER_EMAIL = 'motorista-lista-instavel@pureurban.com'
 
 function makeTrip(overrides: Partial<Trip> = {}): Trip {
   return {
@@ -123,6 +127,10 @@ export const tripHandlers = [
 
     if (email === ROSTER_ERROR_EMAIL) {
       return envelope<Trip | null>(makeTrip({ id: MOCK_ROSTER_ERROR_TRIP_ID }))
+    }
+
+    if (email === FLAKY_ROSTER_EMAIL) {
+      return envelope<Trip | null>(makeTrip({ id: MOCK_FLAKY_ROSTER_TRIP_ID }))
     }
 
     return envelope<Trip | null>(makeTrip())

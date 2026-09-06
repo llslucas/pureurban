@@ -92,6 +92,16 @@ const MOCK_USERS: Record<string, AuthUser> = {
     email: 'motorista-lista-erro@pureurban.com',
     role: 'DRIVER',
   },
+  // Estado 7 da lista: roster 200 na 1ª leitura, 500 nas seguintes — a lista
+  // fica em cache e o Banner "dados desatualizados" aparece ao reabrir a tela.
+  // É o único sentinela que produz erro-COM-cache; o DevTools "Offline" não
+  // serve na trilha MSW (o mock intercepta o fetch antes da rede).
+  'motorista-lista-instavel@pureurban.com': {
+    id: '550e8400-e29b-41d4-a716-446655440008',
+    name: 'Larissa Vieira',
+    email: 'motorista-lista-instavel@pureurban.com',
+    role: 'DRIVER',
+  },
 }
 
 // Refresh tokens rotacionam de verdade: `attemptTokenRefresh` grava os dois

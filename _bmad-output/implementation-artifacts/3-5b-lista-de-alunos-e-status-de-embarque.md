@@ -309,7 +309,17 @@ correto. O que falta é poder chegar nos estados 6, 7, 8, 10 e no cenário de 50
     status** (~1/3 `CHECKED_IN` com `checkedInAt` preenchido). É o cenário de NFR4/FlatList.
 - [x] 4.3 Acrescentar uma sentinela de falha: quando `:id` for `MOCK_ROSTER_ERROR_TRIP_ID`
   (`770e8400-…440105`), responder `500` com `{ error: { code: 'INTERNAL_ERROR', message: … } }`
-  — é o único jeito de exercitar os estados 6 e 7 sem derrubar a rede.
+  — é o único jeito de exercitar o estado 6 sem derrubar a rede. ~~e 7~~ **(correção
+  2026-09-06: este sentinela erra desde a 1ª chamada, então só produz o estado 6; o estado 7
+  ganhou o `MOCK_FLAKY_ROSTER_TRIP_ID` na subtask 4.8.)**
+- [x] 4.8 **(fix da verificação manual, 2026-09-06)** Sentinela do **estado 7** (erro COM
+  cache): `MOCK_FLAKY_ROSTER_TRIP_ID` (`770e8400-…440106`) responde 200 com o roster na 1ª
+  leitura e `500 INTERNAL_ERROR` nas seguintes — contador em memória zerado por
+  `resetBoardingMocks()`. Conta `motorista-lista-instavel@pureurban.com` (`550e8400-…440008`,
+  `DRIVER`) em `auth.handlers.ts`, e-mail `FLAKY_ROSTER_EMAIL` + ramo ACTIVE em
+  `trip.handlers.ts`. Necessário porque o DevTools "Offline" não afeta o MSW (patcha o `fetch`
+  antes da rede) — sem um sucesso em cache antes do erro, o estado 7 era inalcançável na
+  trilha MSW. `.env.example` atualizado (id `…440106` + a conta nova).
 - [x] 4.4 Em `src/mocks/handlers/trip.handlers.ts`, declarar os três e-mails como `const` no
   topo (padrão de `NO_TRIP_EMAIL`/`OTHER_DRIVER_EMAIL`/`ENDED_TRIP_EMAIL`, `trip.handlers.ts:28-30`)
   e ligá-los aos três ids novos dentro de `GET /trips/active`, **depois** da guarda
@@ -426,12 +436,23 @@ a flag (`EXPO_PUBLIC_*` entra no bundle em build time).
   - [x] `motorista-turma-vazia@` → estado 8 ("Nenhum aluno vinculado", `0/0`)
   - [x] `motorista-turma-grande@` → 60 alunos, rolagem fluida, contagem correta (NFR4)
   - [x] `motorista-lista-erro@` → estado 6 (erro sem cache) → "Tentar novamente"
-  - [ ] Com a lista carregada, DevTools → Network → **Offline**, pull-to-refresh: estado 7 —
-    a lista **continua na tela** com o `Banner` de dado desatualizado — **AC #3 / FR24**.
-    **Finding da verificação manual (2026-09-06):** o Banner não aparecia no alvo web —
-    a query pausava (`fetchStatus: 'paused'`) em vez de errar, `isError` ficava `false`.
-    **Corrigido** na branch `fix/3-5b-stale-banner-offline` (`networkMode: 'always'` na query
-    do roster; ver Completion Notes). Aguarda **revalidação do Lucas no browser** após o fix.
+  - [ ] Estado 7 (erro COM cache) — **AC #3 / FR24**. **Não usar DevTools → Offline na trilha
+    MSW:** o `setupServer` de `msw/native` patcha o `fetch` no nível do JS (`@mswjs/interceptors`),
+    então a requisição nunca chega na camada de rede e o throttling "Offline" do browser não a
+    afeta — o handler responde 200 e `roster.isError` nunca vira true. Roteiro correto (conta
+    sentinela nova): logar como `motorista-lista-instavel@pureurban.com` → a viagem já está
+    ATIVA → "Alunos da Viagem" (carrega, 200, lista de 4 + `0/4`) → **pull-to-refresh** (força
+    o refetch ignorando o `staleTime`; alternativa: voltar para "Viagem", esperar ~15s e
+    reabrir a lista) → o refetch pega o **500** e a lista **continua na tela** com o `Banner`
+    "Dados podem estar desatualizados"; o botão "Atualizar" do Banner tenta de novo (segue 500).
+    `INTERNAL_ERROR` (500) não bate em nenhum `if (code === ...)` do bloco 10/11/12 de
+    `student-list.tsx`, então cai direto no `showStaleBanner`.
+    **Histórico:** a verificação de 2026-09-06 no alvo web (via DevTools-offline) não mostrou o
+    Banner — dois motivos: (a) `networkMode: 'online'` pausava a query em vez de errar
+    (**corrigido** com `networkMode: 'always'`, que é o certo para o caminho da API real); (b) o
+    MSW respondia 200 mesmo "offline" e o sentinela `motorista-lista-erro@` erra desde a 1ª
+    chamada (só produz o estado **6**, nunca há cache). O sentinela flaky fecha (b).
+    Aguarda **revalidação do Lucas no browser** com a conta nova.
   - [ ] Ainda offline, **F5**: a lista volta do cache persistido em MMKV (Tier 1) — AC #3.
     **Diferida para verificação em device** (ver `deferred-work.md`): F5 no alvo web rebaixa
     o bundle do dev server do Metro em `localhost:8081` e `web.output: "single"` não gera
@@ -749,6 +770,15 @@ componentes, alias `@/*` obrigatório em imports internos, indentação de 2 esp
    escopo desta story, que não toca a fila) ou fica para a 3.6. Recomendação: registrar no
    `deferred-work.md` nomeando a 3.6.
 
+6. **(fix 2026-09-06) Os handlers MSW não têm teste que rode.** O sentinela flaky do estado 7
+   (e qualquer outro handler) não pode ser testado sob o `jest-expo` hoje: `import … from 'msw'`
+   puxa `rettime` em ESM não transformado (`transformIgnorePatterns`), e `msw/node` é mapeado
+   para `null` pelo resolver do React Native. O lado cliente do fix (`networkMode: 'always'` →
+   `isError` offline) está coberto por `student-list.stale-banner.test.ts` com `QueryObserver`
+   direto, sem MSW. Ligar MSW ao jest exigiria estender o `transformIgnorePatterns` com toda a
+   cadeia ESM do msw — é a mesma decisão de infra "MSW-em-jest" que o `deferred-work.md` já
+   registra (entrada da review da 3.5b). Decisão sua.
+
 ---
 
 ## Dev Agent Record
@@ -767,7 +797,7 @@ claude-sonnet-5 (bmad-build / auto)
 **Fix da verificação manual (branch `fix/3-5b-stale-banner-offline`, 2026-09-06):**
 - `cd mobile && npx tsc --noEmit` → 0 erros
 - `cd mobile && npm run lint` → limpo (exit 0)
-- `cd mobile && npm test` → 10 suítes, 106 testes, verde (inclui o novo `roster-stale-banner.test.ts`)
+- `cd mobile && npm test` → 10 suítes, 106 testes, verde (inclui o novo `src/app/(driver)/student-list.stale-banner.test.ts`)
 - `cd mobile && npx expo export --platform web` → completa sem erro (`dist/` removido)
 
 ### Completion Notes List
@@ -804,16 +834,39 @@ claude-sonnet-5 (bmad-build / auto)
   (c) A condição `roster.isError && roster.data` fica como está (decisão travada na tabela
   "Decisões já tomadas"): com `networkMode: 'always'` o roster nunca pausa, então reforçar
   para `|| fetchStatus === 'paused'` seria código morto.
-- **Cobertura.** `src/lib/roster-stale-banner.test.ts` (novo) tranca o
-  mecanismo: uma query com `networkMode: 'always'` offline **erra** e mantém o cache
+- **Cobertura (lado cliente).** `src/app/(driver)/student-list.stale-banner.test.ts` (novo)
+  tranca o mecanismo: uma query com `networkMode: 'always'` offline **erra** e mantém o cache
   (`isError && data`); a mesma com o `networkMode` default **pausa** e `isError` nunca vira
   true. Um teste de render da tela inteira continua fora de escopo (puxa MMKV/persister —
   Questão Aberta #1 e o defer da 3.5b registram isso).
+
+**2ª iteração (2026-09-06, após revalidação do Lucas no browser):**
+- **O Banner ainda não aparecia** com o `networkMode: 'always'`. Segunda causa, ortogonal à
+  primeira: **o MSW responde independentemente do DevTools "Offline"**. `setupServer` de
+  `msw/native` patcha o `fetch` no nível do JS (`@mswjs/interceptors`), então a requisição
+  nunca chega na camada de rede e o throttling do browser não a afeta — `GET /trips/:id/students`
+  devolve 200 mesmo "offline", `roster.isError` nunca vira true. (O "connection refused" que o
+  Lucas viu nos logs era requisição não-tratada escapando para `localhost:3001`, não o roster.)
+  Além disso, `MOCK_ROSTER_ERROR_TRIP_ID` (`motorista-lista-erro@`) erra **desde a 1ª chamada**
+  → só produz o estado **6**; nunca há um sucesso em cache para o estado 7.
+- **O fix.** Novo sentinela `MOCK_FLAKY_ROSTER_TRIP_ID` (`770e8400-…440106`) + conta
+  `motorista-lista-instavel@pureurban.com` (`550e8400-…440008`): o handler serve o roster 200
+  na 1ª leitura e `500 INTERNAL_ERROR` nas seguintes (contador em memória, zerado por
+  `resetBoardingMocks()`). Roteiro: login → viagem já ATIVA → "Alunos da Viagem" (200, lista +
+  `0/4`) → voltar → reabrir "Alunos da Viagem" → o `refetchOnMount` pega o 500 → `showStaleBanner`
+  true → Banner + lista em cache. `INTERNAL_ERROR` não bate em nenhum `if (code === …)` do bloco
+  10/11/12, cai direto no `showStaleBanner`. Comentário de `MOCK_ROSTER_ERROR_TRIP_ID`
+  corrigido (cobre só o estado 6).
+- **Sem teste de handler.** Um teste do sentinela flaky importaria `boarding.handlers.ts` →
+  `msw`, que **não carrega sob o jest-expo hoje** (o `import` de `msw` puxa `rettime`/ESM não
+  transformado; `msw/node` é mapeado para null pelo resolver RN). É a mesma infra "MSW-em-jest"
+  que o `deferred-work.md` registra como decisão do Lucas. O lado cliente (o que o fix mudou de
+  fato) está coberto pelo teste acima. Registrado em Questões Abertas.
 - **Diferido.** A linha "F5 offline volta do cache" da Task 7.5 vira **verificação em device**
   (registrada em `deferred-work.md`): é limitação do dev server do Metro (F5 rebaixa o bundle
   de `localhost:8081`) + `web.output: "single"` sem service worker, não do código.
-- **Revalidação pendente do Lucas:** a linha do Banner offline (estado 7) no browser, após
-  este fix. Nada mais da Task 7.5 mudou de estado por esta branch.
+- **Revalidação pendente do Lucas:** o estado 7 no browser com `motorista-lista-instavel@`,
+  após este fix. Nada mais da Task 7.5 mudou de estado por esta branch.
 - `package.json` com diff vazio. Nenhum arquivo em `api/` tocado.
 
 ### File List
@@ -821,14 +874,14 @@ claude-sonnet-5 (bmad-build / auto)
 - `mobile/src/services/trip.service.ts` (M)
 - `mobile/src/components/student-card.tsx` (A)
 - `mobile/src/components/student-card.test.tsx` (A)
-- `mobile/src/app/(driver)/student-list.tsx` (M)
-- `mobile/src/lib/roster-stale-banner.test.ts` (A) — fix 2026-09-06
+- `mobile/src/app/(driver)/student-list.tsx` (M) — `networkMode: 'always'` no roster (fix 2026-09-06)
+- `mobile/src/app/(driver)/student-list.stale-banner.test.ts` (A) — fix 2026-09-06
 - `mobile/src/app/(driver)/scan.tsx` (M)
-- `mobile/src/app/(driver)/trip.tsx` (M)
-- `mobile/src/mocks/handlers/auth.handlers.ts` (M)
-- `mobile/src/mocks/handlers/boarding.handlers.ts` (M)
-- `mobile/src/mocks/handlers/trip.handlers.ts` (M)
-- `mobile/.env.example` (M)
+- `mobile/src/app/(driver)/trip.tsx` (M) — `networkMode: 'always'` no observer de contagem (fix 2026-09-06)
+- `mobile/src/mocks/handlers/auth.handlers.ts` (M) — +`motorista-lista-instavel@` (fix 2026-09-06)
+- `mobile/src/mocks/handlers/boarding.handlers.ts` (M) — +`MOCK_FLAKY_ROSTER_TRIP_ID` (fix 2026-09-06)
+- `mobile/src/mocks/handlers/trip.handlers.ts` (M) — +ramo `FLAKY_ROSTER_EMAIL` (fix 2026-09-06)
+- `mobile/.env.example` (M) — +sentinela flaky (fix 2026-09-06)
 
 ### Change Log
 
@@ -838,7 +891,8 @@ claude-sonnet-5 (bmad-build / auto)
 | 2026-09-02 | 0.2 | Revalidada contra a `main` pós-merge da 3.4b: âncoras de linha refeitas em todas as tasks; seção de testes reescrita (runner da 1.10 existe — Task 2.9 nova); Previous Story Intelligence + Git Intelligence + nota de `onlineManager` atualizadas para 3.3b/3.4b `done`; Bloqueadores 1-4 reconferidos e mantidos; Questão Aberta #1 fechada, #5 adicionada | bmad-build |
 | 2026-09-02 | 0.3 | Implementação: Tasks 1–6 completas; Task 7.1–7.4 verdes (`tsc`/`lint`/`jest 96✓`/`expo export`); Task 7.5 (roteiro manual no browser) não executada — ambiente non-interactive | bmad-build (dev) |
 | 2026-09-03 | 0.4 | Code review: 5 patches aplicados — fallback de `STATUS_PRESENTATION`, guarda de data inválida e `accessibilityLabel` único no `student-card`; predicado de `retry` que não retenta 4xx de negócio e `refetchTrip()` no pull-to-refresh no `student-list`. tsc/lint/jest(99✓)/expo export verdes | bmad-build (dev) |
-| 2026-09-06 | 0.5 | Fix do finding da verificação manual (Task 7.5): estado 7 / AC #3 não demonstrável no alvo web. `networkMode: 'always'` na query do roster em `student-list.tsx` e `trip.tsx`; `['activeTrip']` e `query-client.ts` intocados (raciocínio nas Completion Notes). +`roster-stale-banner.test.ts` (em `src/lib/`, fora de `src/app/` — ver commit). Linha "F5 offline" da Task 7.5 diferida para device. tsc/lint/jest(106✓)/expo export verdes. Branch `fix/3-5b-stale-banner-offline` | bmad-build (dev) |
+| 2026-09-06 | 0.5 | Fix do finding da verificação manual (Task 7.5), parte 1: estado 7 / AC #3 não demonstrável no alvo web. `networkMode: 'always'` na query do roster em `student-list.tsx` e `trip.tsx`; `['activeTrip']` e `query-client.ts` intocados (raciocínio nas Completion Notes). +`src/app/(driver)/student-list.stale-banner.test.ts`. Linha "F5 offline" da Task 7.5 diferida para device. tsc/lint/jest(106✓)/expo export verdes. Branch `fix/3-5b-stale-banner-offline` | bmad-build (dev) |
+| 2026-09-06 | 0.6 | Fix parte 2 (após revalidação do Lucas): o Banner seguia sem aparecer — o MSW responde 200 mesmo com o DevTools "Offline" (patcha o `fetch` antes da rede) e `MOCK_ROSTER_ERROR_TRIP_ID` erra desde a 1ª chamada (só estado 6). +sentinela `MOCK_FLAKY_ROSTER_TRIP_ID` (200 na 1ª leitura, 500 depois) + conta `motorista-lista-instavel@` (Task 4.8). Comentário de `MOCK_ROSTER_ERROR_TRIP_ID` corrigido. Roteiro 7.5 do estado 7 reescrito. Teste de handler não é possível (msw não carrega no jest-expo — Questão Aberta). tsc/lint/jest(106✓)/expo export verdes | bmad-build (dev) |
 
 ---
 
