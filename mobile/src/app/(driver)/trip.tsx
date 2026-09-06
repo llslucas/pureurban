@@ -47,6 +47,11 @@ export default function TripScreen() {
     queryFn: () => tripService.getTripStudents(activeTrip!.id),
     enabled: Boolean(activeTrip?.id),
     staleTime: 15_000,
+    // Mesmo `networkMode` que a query do roster em `student-list.tsx`: as duas
+    // observam a mesma entrada de cache e devem falhar/retomar igual offline.
+    // Aqui o efeito prático é menor (só a contagem), mas divergir seria pegadinha
+    // futura.
+    networkMode: 'always',
     select: (r) => r.summary,
   })
 

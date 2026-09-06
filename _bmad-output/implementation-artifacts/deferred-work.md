@@ -241,3 +241,13 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/3-6-integracao-e-e2e-do-epico-3.md`
   summary: `cd api && npm run lint` está vermelho na baseline (~147 erros, ~56 warnings), todos em `src/`/`test/` pré-existentes.
   evidence: Achado do subagente de implementação da 3.6, confirmado com as mudanças da story fora da árvore (`git stash`). O código novo da story (Playwright em `tests/`) nem entra no glob do ESLint da API. A AC da 3.6 sobre lint cobre só o mobile por isso. Candidato a story técnica de higiene do lint da API.
+
+## Deferred from: fix of 3-5b (verificação manual da Task 7.5) — stale-roster banner offline (2026-09-06)
+
+- source_spec: `_bmad-output/implementation-artifacts/3-5b-lista-de-alunos-e-status-de-embarque.md`
+  summary: A linha "Ainda offline, F5: a lista volta do cache persistido em MMKV" da Task 7.5 (AC #3) não é verificável no alvo web de desenvolvimento — fica para verificação em device ou build standalone.
+  evidence: No alvo web servido pelo dev server do Metro (`npm run web`, `http://localhost:8081`), um F5 offline rebaixa o próprio bundle JS — o browser não consegue rebaixar `localhost:8081` sem rede — e `web.output: "single"` (config do Expo) não gera service worker que sirva o app do cache HTTP. A persistência do TanStack Query via `mmkvPersister` reidrata o cache **depois** que o app carrega, então ela só ajuda se o app carregar. É limitação do ambiente de dev, não do código: o cache offline (Tier 1) em si está provado pela própria linha do Banner (estado 7) e pelo `roster-stale-banner.test.ts`. Comprovável num `expo export` servido estaticamente com service worker, ou em device (Story 1.7).
+
+- source_spec: `_bmad-output/implementation-artifacts/3-5b-lista-de-alunos-e-status-de-embarque.md`
+  summary: O estado 7 (Banner de dado desatualizado) só é demonstrável offline porque a query do roster força `networkMode: 'always'` — enquanto o `onlineManager` do TanStack não for ligado a um provedor de conectividade real, toda query offline-first do app precisa dessa escolha explícita por query.
+  evidence: O fix da Task 7.5 pôs `networkMode: 'always'` na query `['trip', tripId, 'students']` (em `student-list.tsx` e `trip.tsx`) para que o refetch offline erre em vez de pausar. É o mesmo item já registrado no defer da 3.2b ("`onlineManager` nunca conectado ao NetInfo"): sem a conexão, `networkMode: 'online'` no alvo web pausa a query no evento `offline` do `window` e nenhum estado de erro é alcançável. A correção sistêmica (conectar o `onlineManager`, ou `networkMode` global no `query-client.ts`) continua adiada; cada tela offline-first paga a escolha por query até lá.
