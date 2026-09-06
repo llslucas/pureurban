@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-09-04T00:00:00+00:00"
+last_updated: "2026-09-06T00:00:00+00:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -134,15 +134,24 @@ development_status:
   # `QueueStorage`; só o SQL da `offline_queue` fica para a verificação no browser.
   3-4b-check-in-offline-com-fila-de-sincronizacao: done
   3-5a-lista-de-alunos-da-viagem-com-status: done
-  3-5b-lista-de-alunos-e-status-de-embarque: review
+  # Verificação manual (Task 7.5) executada no alvo web em 06/09/2026. Achado do
+  # estado 7 (Banner de dado velho / AC #3 / FR24 não demonstrável offline)
+  # corrigido pelo PR #19: `networkMode: 'always'` na query do roster +
+  # sentinela MSW `motorista-lista-instavel@` (200 na 1ª leitura, 500 depois),
+  # já que o DevTools "Offline" não afeta o MSW. Linha "F5 offline" diferida
+  # para device (limitação do dev server do Metro) — ver deferred-work.md.
+  3-5b-lista-de-alunos-e-status-de-embarque: done
   # E2E do Épico 3 verdes contra a API real (sem MSW): caminho feliz, QR inválido /
   # aluno não permitido, offline→reconexão→sync sem duplicata, NFR1 (~70ms) e NFR4
   # (~15ms). Drift check `npm run openapi:check` adicionado e verde (contrato em dia).
   # Injeção de scan via `globalThis.__E2E_INJECT_SCAN__` gated por `__DEV__ &&
   # EXPO_PUBLIC_E2E`. Sem `webServer` no Playwright (API + Expo Web sobem à mão;
   # specs auto-skipam sem a infra) — ver api/tests/README.md.
-  # Épico ainda NÃO fechável: 3-5b segue em `review`. Lint pré-existente da API
-  # (147 erros em src/ e test/, presente na baseline) fora do escopo desta story.
+  # 3-5b fechada em 06/09/2026. Épico ainda NÃO fechável: 3-1 nunca passou por
+  # code review (implementada antes do Épico 2; `PLACEHOLDER_ROUTE_ID` no mobile
+  # aguarda decisão de produto) e o smoke manual da 3-6 (app web contra a API
+  # real, mocks off) ainda não foi registrado. Lint pré-existente da API
+  # (147 erros em src/ e test/, presente na baseline) fora do escopo da 3-6.
   3-6-integracao-e-e2e-do-epico-3: review
   epic-3-retrospective: optional
 
