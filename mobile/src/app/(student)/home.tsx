@@ -25,7 +25,7 @@ interface StudentAbsenceCache {
 // não está aqui: não é erro nesta tela, vira estado registrado (onError).
 const ERROR_MESSAGES: Record<string, string> = {
   STUDENT_NOT_ON_TRIP: 'Você não pertence à rota desta viagem.',
-  TRIP_NOT_ACTIVE: 'A viagem não está mais ativa. Atualize e tente de novo.',
+  TRIP_NOT_ACTIVE: 'A viagem não está mais ativa.',
   ALREADY_CHECKED_IN: 'Você já embarcou nesta viagem. Fale com o motorista.',
 }
 
@@ -81,15 +81,17 @@ export default function StudentHomeScreen() {
         attemptKeyRef.current,
       )
     },
-    onSuccess: (absence) => {
+    onSuccess: (absence, currentTripId) => {
+      // Cache sob o tripId que a mutation recebeu, não o do render: o escopo
+      // pode ter mudado (viagem encerrada/aberta) enquanto o envio voava.
       queryClient.setQueryData<StudentAbsenceCache>(
-        ['studentAbsence', tripId],
+        ['studentAbsence', currentTripId],
         { registered: true, absence },
       )
       attemptKeyRef.current = null
       setDialogVisible(false)
     },
-    onError: (error: unknown) => {
+    onError: (error, currentTripId) => {
       attemptKeyRef.current = null
       setDialogVisible(false)
 
@@ -98,7 +100,7 @@ export default function StudentHomeScreen() {
         // registrar de novo "falhou" — mas para o aluno é sucesso consolidado,
         // sem countdown (a janela de 2 min certamente expirou).
         queryClient.setQueryData<StudentAbsenceCache>(
-          ['studentAbsence', tripId],
+          ['studentAbsence', currentTripId],
           { registered: true, absence: null },
         )
         return
@@ -137,8 +139,12 @@ export default function StudentHomeScreen() {
   }
 
   const handleDismissDialog = () => {
-    // Dialog abandonado encerra a tentativa: a próxima abre com chave nova.
-    attemptKeyRef.current = null
+    // Enquanto o envio está em curso, a tentativa continua viva: descartar o
+    // dialog não descarta a mutation, e manter a MESMA key faz um re-confirmo
+    // reenviar o que já saiu em vez de registrar ausência duas vezes.
+    if (!notifyMutation.isPending) {
+      attemptKeyRef.current = null
+    }
     setDialogVisible(false)
   }
 
@@ -155,50 +161,55 @@ export default function StudentHomeScreen() {
         Olá, {user?.name ?? 'aluno'}
       </Text>
 
-      {registered ? (
-        <Card mode="elevated" style={styles.absenceCard}>
-          <Card.Content style={styles.absenceContent}>
-            <Text variant="titleMedium">Ausência registrada</Text>
-            <Text variant="bodyMedium" style={styles.absenceHint}>
-              O motorista já foi avisado de que você não vai voltar.
-            </Text>
-            {windowExpired ? null : (
-              <Text variant="titleMedium" style={styles.countdown}>
-                Cancelar disponível por {formatCountdown((expiryMs ?? 0) - nowMs)}
-              </Text>
-            )}
-          </Card.Content>
-        </Card>
-      ) : (
-        <View>
-          {/* Contagem de toques da AC #5: login leva a home (0 toques) → 1 toque aqui → QR na tela. */}
-          <Button
-            mode="contained"
-            contentStyle={styles.buttonContent}
-            // navigate, não push: dois toques rápidos empilhavam duas telas de QR
-            // (duas queries, dois backs) antes da transição terminar.
-            onPress={() => router.navigate('/(student)/qr-code')}
-          >
-            Meu QR Code
-          </Button>
+      <View>
+        {/* Contagem de toques da AC #5: login leva a home (0 toques) → 1 toque aqui → QR na tela. */}
+        <Button
+          mode="contained"
+          contentStyle={styles.buttonContent}
+          // navigate, não push: dois toques rápidos empilhavam duas telas de QR
+          // (duas queries, dois backs) antes da transição terminar.
+          onPress={() => router.navigate('/(student)/qr-code')}
+        >
+          Meu QR Code
+        </Button>
 
-          <Button
-            mode="contained-tonal"
-            contentStyle={styles.buttonContent}
-            icon="bus-alert"
-            disabled={!tripId}
-            onPress={() => setDialogVisible(true)}
-            style={styles.absenceButton}
-          >
-            Não vou voltar
-          </Button>
-          {!tripId ? (
-            <Text variant="bodySmall" style={styles.tripHint}>
-              {tripHint}
-            </Text>
-          ) : null}
-        </View>
-      )}
+        {registered ? (
+          <Card mode="elevated" style={styles.absenceCard}>
+            <Card.Content style={styles.absenceContent}>
+              <Text variant="titleMedium">Ausência registrada</Text>
+              <Text variant="bodyMedium" style={styles.absenceHint}>
+                O motorista já foi avisado de que você não vai voltar.
+              </Text>
+              {windowExpired ? null : (
+                // Rótulo factual: o cancelamento em si chega na 4.3 — aqui a
+                // janela só informa até quando ele será possível.
+                <Text variant="titleMedium" style={styles.countdown}>
+                  Janela de cancelamento{' '}
+                  {formatCountdown((expiryMs ?? 0) - nowMs)}
+                </Text>
+              )}
+            </Card.Content>
+          </Card>
+        ) : (
+          <>
+            <Button
+              mode="contained-tonal"
+              contentStyle={styles.buttonContent}
+              icon="bus-alert"
+              disabled={!tripId || notifyMutation.isPending}
+              onPress={() => setDialogVisible(true)}
+              style={styles.absenceButton}
+            >
+              Não vou voltar
+            </Button>
+            {!tripId ? (
+              <Text variant="bodySmall" style={styles.tripHint}>
+                {tripHint}
+              </Text>
+            ) : null}
+          </>
+        )}
+      </View>
 
       <Portal>
         <Dialog visible={dialogVisible} onDismiss={handleDismissDialog}>
@@ -206,7 +217,7 @@ export default function StudentHomeScreen() {
           <Dialog.Content>
             <Text variant="bodyMedium">
               O motorista será avisado agora de que você não vai voltar no
-              ônibus. Dá para cancelar nos primeiros 2 minutos.
+              ônibus.
             </Text>
           </Dialog.Content>
           <Dialog.Actions>

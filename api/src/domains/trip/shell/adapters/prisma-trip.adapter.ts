@@ -159,6 +159,10 @@ export class PrismaTripAdapter implements TripRepositoryApi {
               type: 'RETURN',
               routeId: { in: links.map((l) => l.routeId) },
             },
+            // Duas viagens de retorno ativas (resquício de seed/corrige-dado)
+            // não podem deixar a escolha ao findFirst: a mais recente é a que
+            // o aluno está vivendo.
+            orderBy: { startedAt: 'desc' },
           });
         },
         catch: toInfraError('Erro ao buscar viagem de retorno ativa do aluno'),

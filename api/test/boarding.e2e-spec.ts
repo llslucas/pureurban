@@ -564,7 +564,7 @@ describe('BoardingController (e2e)', () => {
       return req;
     };
 
-    it('STUDENT: POST /not-returning registra a ausência com 201 (lógica na 4.1)', async () => {
+    it('STUDENT: POST /not-returning registra a ausência com 201', async () => {
       const tripId = await seedActiveTrip('RETURN');
       const response = await notReturning(studentToken, tripId).expect(201);
 

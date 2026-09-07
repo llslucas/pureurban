@@ -62,7 +62,9 @@ const ABSENCE: NotReturningResponse = {
   tripId: RETURN_TRIP.id,
   status: 'NOT_RETURNING',
   notifiedAt: '2026-09-07T18:10:00.000Z',
-  // 2 minutos à frente de notifiedAt — valor do servidor, nunca recalculado.
+  // 90s à frente de AGORA (não de notifiedAt, que é só o eco fixo do registro):
+  // janela aberta o bastante para o countdown de 1:xx aparecer e não zerar
+  // durante o teste. É o valor do servidor — a tela nunca recalcula.
   cancellableUntil: new Date(Date.now() + 90 * 1000).toISOString(),
 }
 
@@ -178,8 +180,11 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     expect(
       screen.getByText('O motorista já foi avisado de que você não vai voltar.'),
     ).toBeTruthy()
-    // Countdown no formato m:ss alimentado pelo cancellableUntil do servidor.
-    expect(screen.getByText(/Cancelar disponível por 1:\d{2}/)).toBeTruthy()
+    // Janela factual no formato m:ss alimentada pelo cancellableUntil do
+    // servidor — o botão de cancelar em si é da 4.3.
+    expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
+    // Registro da ausência não esconde o embarque: o QR continua na tela.
+    expect(screen.getByText('Meu QR Code')).toBeTruthy()
     expect(screen.queryByText('Não vou voltar')).toBeNull()
 
     await waitFor(() =>
@@ -201,7 +206,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     fireEvent.press(await openDialog())
 
     expect(await screen.findByText('Ausência registrada')).toBeTruthy()
-    expect(screen.queryByText(/Cancelar disponível por/)).toBeNull()
+    expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
   })
 
   it('ALREADY_NOT_RETURNING: vira estado registrado, não erro', async () => {
@@ -220,7 +225,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     // Estado "registrado" SEM countdown — o servidor não devolveu a janela.
     expect(await screen.findByText('Ausência registrada')).toBeTruthy()
-    expect(screen.queryByText(/Cancelar disponível por/)).toBeNull()
+    expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
 
     await waitFor(() =>
       expect(queryClient.getQueryData(['studentAbsence', RETURN_TRIP.id])).toEqual(
@@ -294,7 +299,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     })
 
     expect(await screen.findByText('Ausência registrada')).toBeTruthy()
-    expect(screen.getByText(/Cancelar disponível por 1:\d{2}/)).toBeTruthy()
+    expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
   })
 })
