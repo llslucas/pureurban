@@ -1372,6 +1372,324 @@
           "boarding"
         ]
       }
+    },
+    "/api/v1/boarding/not-returning": {
+      "post": {
+        "description": "O aluno autenticado (studentId do JWT) avisa que não vai voltar na viagem ativa. Idempotência: mesma X-Idempotency-Key retorna o mesmo resultado com 201, sem duplicar. cancellableUntil (janela de cancelamento) é calculado pelo servidor — o cliente nunca calcula, só exibe o countdown.",
+        "operationId": "BoardingController_notReturning",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação notify_not_returning). Mesma key reenviada retorna o mesmo resultado sem duplicar a ausência.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotReturningRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ausência registrada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/NotReturningResponseDto"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "STUDENT_NOT_ON_TRIP — aluno não pertence à rota da viagem.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Contrato declarado na Story 4.0 — implementação na Story 4.1.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar ausência \"não vou voltar\"",
+        "tags": [
+          "boarding"
+        ]
+      }
+    },
+    "/api/v1/boarding/cancel-absence": {
+      "post": {
+        "description": "O aluno autenticado (studentId do JWT) desfaz a ausência registrada. Só é aceito dentro da janela cancellableUntil (notifiedAt + 2 minutos, calculada pelo servidor). Idempotência: mesma X-Idempotency-Key retorna o mesmo resultado com 200.",
+        "operationId": "BoardingController_cancelAbsence",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação cancel_absence). Mesma key reenviada retorna o mesmo resultado.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelAbsenceRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ausência cancelada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CancelAbsenceResponseDto"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "STUDENT_NOT_ON_TRIP — aluno não pertence à rota da viagem.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ABSENCE_NOT_FOUND — ausência inexistente ou já cancelada, enviada com X-Idempotency-Key diferente. Reenvio da MESMA key da chamada original retorna o resultado original com 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Contrato declarado na Story 4.0 — implementação na Story 4.3.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar ausência dentro da janela de segurança",
+        "tags": [
+          "boarding"
+        ]
+      }
+    },
+    "/api/v1/boarding/events": {
+      "get": {
+        "description": "Canal em tempo real do motorista para a viagem ativa. Cada mensagem do stream traz a linha `event:` com o tipo (boarding.not_returning | boarding.absence_cancelled | boarding.checkin_reminder) e a linha `data:` com o payload JSON. A conexão é encerrada elegantemente quando a viagem termina; a reconexão após queda de rede é responsabilidade do cliente (EventSource), sem duplicar entradas na lista.",
+        "operationId": "BoardingController_events",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Stream `text/event-stream` — uma mensagem por evento, com `event:` carregando o tipo e `data:` o payload JSON (oneOf dos três schemas).",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/BoardingNotReturningEventDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BoardingAbsenceCancelledEventDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BoardingCheckinReminderEventDto"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN — role DRIVER exigida; somente o motorista atribuído à rota abre o stream daquela viagem.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE — motorista autenticado sem viagem ativa (inexistente, encerrada ou de outra empresa).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Contrato declarado na Story 4.0 — implementação na Story 4.2.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stream SSE de eventos de embarque da viagem do motorista",
+        "tags": [
+          "boarding"
+        ]
+      }
     }
   },
   "info": {
@@ -1629,6 +1947,203 @@
         "required": [
           "studentId",
           "tripId"
+        ]
+      },
+      "NotReturningResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID do registro de ausência",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440004"
+          },
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno que registrou a ausência (vem do JWT, nunca do body)",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que a ausência foi registrada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status do aluno após o registro da ausência",
+            "enum": [
+              "NOT_RETURNING"
+            ],
+            "example": "NOT_RETURNING"
+          },
+          "notifiedAt": {
+            "type": "string",
+            "description": "Momento do registro da ausência (ISO 8601 UTC). Base do cálculo de cancellableUntil.",
+            "example": "2026-09-07T21:10:00.000Z"
+          },
+          "cancellableUntil": {
+            "type": "string",
+            "description": "Fim da janela de cancelamento (ISO 8601 UTC), calculado pelo servidor como notifiedAt + 2 minutos. O cliente nunca calcula a janela — só exibe o countdown e esconde o cancelamento quando expira.",
+            "example": "2026-09-07T21:12:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "studentId",
+          "tripId",
+          "status",
+          "notifiedAt",
+          "cancellableUntil"
+        ]
+      },
+      "NotReturningRequestDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem ativa em que o aluno registra a ausência",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          }
+        },
+        "required": [
+          "tripId"
+        ]
+      },
+      "CancelAbsenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno que cancelou a ausência (vem do JWT, nunca do body)",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que a ausência foi cancelada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status do aluno após o cancelamento — volta a aguardar check-in",
+            "enum": [
+              "NOT_CHECKED_IN"
+            ],
+            "example": "NOT_CHECKED_IN"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "description": "Momento do cancelamento (ISO 8601 UTC)",
+            "example": "2026-09-07T21:11:00.000Z"
+          }
+        },
+        "required": [
+          "studentId",
+          "tripId",
+          "status",
+          "cancelledAt"
+        ]
+      },
+      "CancelAbsenceRequestDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que a ausência será cancelada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          }
+        },
+        "required": [
+          "tripId"
+        ]
+      },
+      "BoardingNotReturningEventDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que a ausência foi registrada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno que registrou a ausência",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "notifiedAt": {
+            "type": "string",
+            "description": "Momento do registro da ausência (ISO 8601 UTC) — eco do notifiedAt da ausência",
+            "example": "2026-09-07T21:10:00.000Z"
+          }
+        },
+        "description": "Evento SSE `boarding.not_returning`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido ao motorista da viagem quando um aluno registra ausência (POST /not-returning, Story 4.1) — o status na lista muda para \"NÃO VAI VOLTAR\" e a contagem resumida se ajusta. O nome do aluno é resolvido pelo cliente a partir do roster.",
+        "required": [
+          "tripId",
+          "studentId",
+          "notifiedAt"
+        ]
+      },
+      "BoardingAbsenceCancelledEventDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que a ausência foi cancelada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno que cancelou a ausência",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "description": "Momento do cancelamento (ISO 8601 UTC) — eco do cancelledAt do cancelamento",
+            "example": "2026-09-07T21:11:00.000Z"
+          }
+        },
+        "description": "Evento SSE `boarding.absence_cancelled`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido ao motorista da viagem quando o aluno cancela a ausência dentro da janela (POST /cancel-absence, Story 4.3) — status e contagem resumida voltam ao estado anterior. O nome do aluno é resolvido pelo cliente a partir do roster.",
+        "required": [
+          "tripId",
+          "studentId",
+          "cancelledAt"
+        ]
+      },
+      "BoardingCheckinReminderEventDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem de retorno em curso",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "studentId": {
+            "type": "string",
+            "description": "ID do aluno que deve ser lembrado do check-in",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "remindedAt": {
+            "type": "string",
+            "description": "Momento do disparo do lembrete (ISO 8601 UTC)",
+            "example": "2026-09-07T22:15:00.000Z"
+          }
+        },
+        "description": "Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster.",
+        "required": [
+          "tripId",
+          "studentId",
+          "remindedAt"
         ]
       }
     }
