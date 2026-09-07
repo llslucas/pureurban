@@ -151,9 +151,10 @@ export const tripHandlers = [
       return errorResponse(409, 'TRIP_ALREADY_ACTIVE', 'Já existe uma viagem ativa para esta rota')
     }
 
-    // `routeId` é ecoado sem validar formato: `(driver)/trip.tsx` ainda manda
-    // 'route-placeholder-id' (Story 3.1, em review). Rejeitar aqui deixaria a
-    // tela de viagem inutilizável em mocks por um problema que não é desta story.
+    // `routeId` is echoed back without revalidating its format: this mock has no
+    // route registry, and `routes.handlers.ts` only ever serves valid ids, so
+    // echoing mirrors the real API, which returns the trip once
+    // `isDriverAssignedToRoute` passes.
     currentTrip = makeTrip({
       routeId: body.routeId,
       type: body.type ?? 'OUTBOUND',

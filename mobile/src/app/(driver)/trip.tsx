@@ -1,13 +1,18 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import { router } from 'expo-router'
 import { View, StyleSheet, ScrollView, Alert } from 'react-native'
-import { Button, Card, Text, ActivityIndicator, Chip } from 'react-native-paper'
+import {
+  Button,
+  Card,
+  Text,
+  ActivityIndicator,
+  Chip,
+  SegmentedButtons,
+} from 'react-native-paper'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tripService } from '@/services/trip.service'
-import type { Trip } from '@/services/trip.service'
-
-// Placeholder: substituir pelo ID de rota real do motorista quando Epic 2 estiver pronto
-const PLACEHOLDER_ROUTE_ID = 'route-placeholder-id'
+import type { Trip, TripType } from '@/services/trip.service'
+import { routesService, type AssignedRoute } from '@/services/routes.service'
 
 function TripStatusChip({ status }: { status: 'ACTIVE' | 'COMPLETED' }) {
   return (
@@ -29,8 +34,129 @@ function TripTypeLabel({ type }: { type: 'OUTBOUND' | 'RETURN' }) {
   )
 }
 
+function resolveRouteId(
+  routes: AssignedRoute[] | undefined,
+  selectedRouteId: string | null,
+): string | null {
+  if (routes && routes.length === 1) return routes[0].id
+  if (selectedRouteId && routes?.some((route) => route.id === selectedRouteId)) {
+    return selectedRouteId
+  }
+  return null
+}
+
+interface StartOutboundSectionProps {
+  routes: AssignedRoute[] | undefined
+  isPending: boolean
+  isError: boolean
+  isFetching: boolean
+  onRetry: () => void
+  selectedRouteId: string | null
+  onSelectRoute: (routeId: string) => void
+  resolvedRouteId: string | null
+  isMutating: boolean
+  onStart: () => void
+}
+
+// "Iniciar Viagem" area when there is no active trip. The routeId comes from
+// GET /routes/mine (Epic 2): one route -> auto-selected; two or more -> selector
+// before the button; none -> button disabled with guidance. A network error is
+// never rendered as "no route" -- distinct message and retry, like
+// (driver)/routes.tsx.
+function StartOutboundSection({
+  routes,
+  isPending,
+  isError,
+  isFetching,
+  onRetry,
+  selectedRouteId,
+  onSelectRoute,
+  resolvedRouteId,
+  isMutating,
+  onStart,
+}: StartOutboundSectionProps) {
+  const noRoutes = !routes || routes.length === 0
+
+  // Hold the loading indicator until the routes query has actually resolved
+  // once: while it is still pending (or disabled) `noRoutes` is true only
+  // because there is no data yet, so the "no routes" empty state must not show.
+  if (isPending || (isFetching && noRoutes && !isError)) {
+    return (
+      <View style={styles.routesLoading}>
+        <ActivityIndicator />
+        <Text style={styles.loadingText}>Carregando rotas...</Text>
+      </View>
+    )
+  }
+
+  if (isError && noRoutes) {
+    return (
+      <View style={styles.routesMessage}>
+        <Text style={styles.routesErrorText}>Não foi possível carregar suas rotas.</Text>
+        <Text style={styles.routesHint}>Verifique sua conexão e tente novamente.</Text>
+        <Button
+          mode="contained"
+          onPress={onRetry}
+          loading={isFetching}
+          style={styles.primaryButton}
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.buttonLabel}
+        >
+          Tentar novamente
+        </Button>
+      </View>
+    )
+  }
+
+  if (noRoutes) {
+    return (
+      <View style={styles.routesMessage}>
+        <Text style={styles.routesHint}>Peça ao administrador para vincular uma rota.</Text>
+        <Button
+          mode="contained"
+          disabled
+          style={styles.primaryButton}
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.buttonLabel}
+          icon="bus"
+        >
+          Iniciar Viagem
+        </Button>
+      </View>
+    )
+  }
+
+  return (
+    <>
+      {routes.length > 1 && (
+        <View style={styles.selectorBlock}>
+          <Text style={styles.selectorLabel}>Escolha a rota da viagem</Text>
+          <SegmentedButtons
+            value={selectedRouteId ?? ''}
+            onValueChange={onSelectRoute}
+            buttons={routes.map((route) => ({ value: route.id, label: route.name }))}
+          />
+        </View>
+      )}
+      <Button
+        mode="contained"
+        onPress={onStart}
+        loading={isMutating}
+        disabled={isMutating || !resolvedRouteId}
+        style={styles.primaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.buttonLabel}
+        icon="bus"
+      >
+        Iniciar Viagem
+      </Button>
+    </>
+  )
+}
+
 export default function TripScreen() {
   const queryClient = useQueryClient()
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
 
   const { data: activeTrip, isLoading: isLoadingTrip } = useQuery<Trip | null>({
     queryKey: ['activeTrip'],
@@ -38,6 +164,35 @@ export default function TripScreen() {
     staleTime: 10_000,
     retry: 2,
   })
+
+  // Driver's routes (Epic 2), from the SAME query key as (driver)/routes.tsx.
+  // Fetches only once the active trip has resolved: during a trip the routeId
+  // comes from `activeTrip` and /routes/mine would be a dead call on the common
+  // path (Design Notes, NFR19). Also fetches for a COMPLETED RETURN trip left in
+  // the session cache after ending it, so the screen falls back to the route
+  // selector instead of a false "no routes" state. Waiting on `isLoadingTrip`
+  // avoids firing the fetch on the first frame, before /trips/active answers.
+  const {
+    data: routes,
+    isPending: isRoutesPending,
+    isError: isRoutesError,
+    isFetching: isFetchingRoutes,
+    refetch: refetchRoutes,
+  } = useQuery<AssignedRoute[]>({
+    queryKey: ['routes', 'mine'],
+    queryFn: routesService.getMyRoutes,
+    staleTime: 30_000,
+    retry: 2,
+    enabled:
+      !isLoadingTrip &&
+      (!activeTrip || (activeTrip.status === 'COMPLETED' && activeTrip.type === 'RETURN')),
+  })
+
+  // Single route auto-selected; a chosen route is kept only while it is still in
+  // the current list (a refetch can drop it, and a stale id would send POST
+  // /trips with an unassigned route -> 403). Derived in render, not via
+  // `useEffect`, to save a render (Design Notes).
+  const resolvedRouteId = resolveRouteId(routes, selectedRouteId)
 
   // Contagem real de embarque (FR25), lida da MESMA query key do roster da tela
   // de alunos com `select`: uma key própria aqui duplicaria o cache e as duas
@@ -56,8 +211,15 @@ export default function TripScreen() {
   })
 
   const startMutation = useMutation({
-    mutationFn: ({ type, relatedTripId }: { type: 'OUTBOUND' | 'RETURN'; relatedTripId?: string }) =>
-      tripService.startTrip(PLACEHOLDER_ROUTE_ID, type, relatedTripId),
+    mutationFn: ({
+      routeId,
+      type,
+      relatedTripId,
+    }: {
+      routeId: string
+      type: TripType
+      relatedTripId?: string
+    }) => tripService.startTrip(routeId, type, relatedTripId),
     onSuccess: (trip) => {
       queryClient.setQueryData(['activeTrip'], trip)
     },
@@ -77,12 +239,17 @@ export default function TripScreen() {
   })
 
   const handleStartOutbound = useCallback(() => {
-    startMutation.mutate({ type: 'OUTBOUND' })
-  }, [startMutation])
+    if (!resolvedRouteId) return
+    startMutation.mutate({ routeId: resolvedRouteId, type: 'OUTBOUND' })
+  }, [startMutation, resolvedRouteId])
 
   const handleStartReturn = useCallback(() => {
     if (activeTrip) {
-      startMutation.mutate({ type: 'RETURN', relatedTripId: activeTrip.id })
+      startMutation.mutate({
+        routeId: activeTrip.routeId,
+        type: 'RETURN',
+        relatedTripId: activeTrip.id,
+      })
     }
   }, [startMutation, activeTrip])
 
@@ -137,18 +304,20 @@ export default function TripScreen() {
             Iniciar Retorno
           </Button>
         ) : (
-          <Button
-            mode="contained"
-            onPress={handleStartOutbound}
-            loading={isMutating}
-            disabled={isMutating}
-            style={styles.primaryButton}
-            contentStyle={styles.buttonContent}
-            labelStyle={styles.buttonLabel}
-            icon="bus"
-          >
-            Iniciar Viagem
-          </Button>
+          <StartOutboundSection
+            routes={routes}
+            isPending={isRoutesPending}
+            isError={isRoutesError}
+            isFetching={isFetchingRoutes}
+            onRetry={() => {
+              void refetchRoutes()
+            }}
+            selectedRouteId={selectedRouteId}
+            onSelectRoute={setSelectedRouteId}
+            resolvedRouteId={resolvedRouteId}
+            isMutating={isMutating}
+            onStart={handleStartOutbound}
+          />
         )}
       </ScrollView>
     )
@@ -273,6 +442,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#555',
     marginTop: 6,
+  },
+  routesLoading: {
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 24,
+  },
+  routesMessage: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  routesErrorText: {
+    fontSize: 16,
+    color: '#444',
+    fontWeight: '600',
+  },
+  routesHint: {
+    fontSize: 14,
+    color: '#888',
+    lineHeight: 20,
+  },
+  selectorBlock: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  selectorLabel: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '600',
   },
   // NFR18: botões grandes, mínimo 48dp, operação com uma mão
   primaryButton: {

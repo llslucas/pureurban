@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-09-06T12:00:00+00:00"
+last_updated: "2026-09-06T18:00:00+00:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -111,16 +111,23 @@ development_status:
 
   # === Epic 3: Gestão de Viagens e Embarque Digital ===
   # 1 story entregue (3.1, full-stack legado) + 8 stories (1 contrato, 2 backend, 4 mobile, 1 integração)
-  epic-3: in-progress
+  # FECHADO em 06/09/2026: a última pendência (3-1) foi resolvida por
+  # `spec-3-1-rota-real-do-motorista.md` — `(driver)/trip.tsx` resolve o routeId
+  # real de `GET /routes/mine` no lugar do `PLACEHOLDER_ROUTE_ID`. Sem mudança de
+  # backend. Persistência de "Iniciar Retorno" entre reloads segue diferida
+  # (decisão de contrato de API — ver deferred-work.md).
+  epic-3: done
   3-0-contrato-de-api-embarque-digital: done
   # Code review feito em 06/09/2026 (branch fix/3-1-review, 3 camadas): 8 patches
   # aplicados (RETURN sem relatedTripId, update() sem companyId, end de viagem alheia
   # como 404, gaps de teste de endedAt/RETURN/get-active, dead code), 37 unit + 27 e2e
-  # verdes. Fica em `review`, não `done`: o `PLACEHOLDER_ROUTE_ID` do mobile trava o
-  # fluxo de iniciar viagem pela UI e o "iniciar retorno" some no reload — as duas
-  # dependem de uma decisão de produto sobre de onde vem o routeId do motorista.
-  # Ver a seção "Code Review (2026-09-06)" na story e deferred-work.md.
-  3-1-iniciar-e-encerrar-viagem: review
+  # verdes. Fechada em 06/09/2026 por `spec-3-1-rota-real-do-motorista.md`: o
+  # `PLACEHOLDER_ROUTE_ID` saiu, a tela lê `GET /api/v1/routes/mine` (auto-seleção
+  # com 1 rota, seletor com 2+, desabilitado sem rota, retry no erro) e `trip.test.tsx`
+  # (8 casos) cobre a I/O Matrix. Único toque em api/: um comentário em
+  # `boarding-happy-path.e2e.spec.ts`. Ver a seção "Code Review (2026-09-06)" e a
+  # decisão de produto RESOLVIDA na story, mais deferred-work.md.
+  3-1-iniciar-e-encerrar-viagem: done
   3-2b-geracao-e-exibicao-de-qr-code-do-aluno: done
   3-3a-check-in-de-embarque: done
   # 3-3b em diante: o ambiente de execução web (Story 1.6) EXISTE e está verificado, e os
@@ -158,11 +165,11 @@ development_status:
   # Expo Web mocks-off contra a API real (:3001), seed via Épico 2 + POST /trips,
   # 9/9 checks verdes — login → viagem ativa → scan → check-in 201 (~20ms, NFR1) →
   # "1/3 embarcados"/"Embarcou", console sem [mocks] MSW ativo. Ver a seção
-  # "Smoke manual — registro" na story. Início de viagem pela UI fica bloqueado
-  # pelo PLACEHOLDER_ROUTE_ID (defer da 3.1), por isso a viagem entra por API.
-  # Épico ainda NÃO fechável: 3-1 nunca passou por code review (implementada antes
-  # do Épico 2; PLACEHOLDER_ROUTE_ID no mobile aguarda decisão de produto). Lint
-  # pré-existente da API (147 erros em src/ e test/, na baseline) fora do escopo da 3-6.
+  # "Smoke manual — registro" na story. No smoke de 06/09 a viagem entrava por API
+  # porque o PLACEHOLDER_ROUTE_ID travava o início pela UI; isso foi resolvido em
+  # 06/09/2026 por `spec-3-1-rota-real-do-motorista.md` (routeId real de
+  # `GET /routes/mine`), o que fechou a 3-1 e o Épico 3. Lint pré-existente da API
+  # (147 erros em src/ e test/, na baseline) fora do escopo da 3-6.
   3-6-integracao-e-e2e-do-epico-3: done
   epic-3-retrospective: optional
 

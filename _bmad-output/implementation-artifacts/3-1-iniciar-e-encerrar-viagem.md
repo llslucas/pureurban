@@ -1,6 +1,15 @@
 # Story 3.1: Iniciar e Encerrar Viagem (Backend + Mobile Motorista)
 
-Status: review
+Status: done
+
+> **Fechada em 2026-09-06** por `spec-3-1-rota-real-do-motorista.md`: a tela
+> `(driver)/trip.tsx` deixou de mandar `PLACEHOLDER_ROUTE_ID` e passou a resolver
+> o `routeId` de `GET /api/v1/routes/mine` (uma rota → auto-seleção; duas ou mais
+> → seletor; nenhuma → ação desabilitada com aviso; erro → retry). Nenhum arquivo
+> de `api/` mudou (só um comentário em `boarding-happy-path.e2e.spec.ts`).
+> `mobile/src/trip-screen.test.tsx` (novo) cobre a I/O Matrix. Com isso o Épico 3 fecha. A
+> persistência de "Iniciar Retorno" entre reloads segue **diferida** (exige
+> decisão de contrato de API — ver `deferred-work.md`, seção 2026-09-06).
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,6 +34,13 @@ Para que o sistema saiba quando o transporte está ativo.
 3. **Given** viagem encerrada (OUTBOUND)
    **When** motorista toca "Iniciar Retorno"
    **Then** POST `/api/v1/trips` cria nova viagem com `type = RETURN`, `status = ACTIVE`, `relatedTripId` apontando para a viagem de ida
+
+   > **AC #3 — carve-out (2026-09-06):** atendida *na sessão* (encerrar a ida → botão
+   > "Iniciar Retorno" via `setQueryData`, mesma rota, `relatedTripId` = id da ida). A
+   > **persistência do botão entre reloads do app** fica diferida — `GET /trips/active` só
+   > devolve viagens `ACTIVE`, então um reload após encerrar a ida some com o botão. Exige
+   > decisão de contrato de API. Ver `spec-3-1-rota-real-do-motorista.md` (Decisions) e
+   > `deferred-work.md` (seção 2026-09-06).
 
 4. **Given** use case de trip executado
    **When** viagem é iniciada ou encerrada
@@ -627,7 +643,15 @@ Gemini 2.5 Pro (Antigravity)
 - ✅ Build limpo: 0 erros TypeScript
 - ✅ Eventos de domínio `trip.started` e `trip.ended` emitidos via `WithEvents` + `runAndDispatch`
 - ⚠️ JwtAuthGuard comentado no controller — TODO: habilitar quando Epic 2 (Auth) for implementado
-- ⚠️ PLACEHOLDER_ROUTE_ID no mobile — substituir por seleção de rota real no Epic 2
+- ✅ **2026-09-06 (`spec-3-1-rota-real-do-motorista.md`):** `PLACEHOLDER_ROUTE_ID` removido.
+  `(driver)/trip.tsx` resolve o `routeId` de `GET /api/v1/routes/mine` (query key
+  `['routes','mine']`, `enabled` sem viagem ativa ou com RETURN COMPLETED na sessão) —
+  auto-seleção com 1 rota, seletor com 2+, desabilitado sem rota resolvida (rota escolhida
+  descartada se sumir num refetch), retry no erro. `mobile/src/trip-screen.test.tsx` novo
+  (9 casos, cobre a I/O Matrix; fica fora de `src/app/` para não virar rota do Expo Router).
+  Único toque em `api/`: comentário de `boarding-happy-path.e2e.spec.ts`. Story → `done`;
+  Épico 3 → `done`. Persistência de "Iniciar Retorno" entre reloads segue diferida (AC #3
+  carve-out acima).
 
 ### File List
 
@@ -654,10 +678,15 @@ Gemini 2.5 Pro (Antigravity)
 
 **Novos (Mobile):**
 - `mobile/src/services/trip.service.ts`
+- `mobile/src/trip-screen.test.tsx` (spec-3-1, 2026-09-06 — fora de `src/app/`)
 - ~~`mobile/src/stores/trip.store.ts`~~ (removido no code review — dead code, ver abaixo)
 
 **Modificados (Mobile):**
 - `mobile/src/app/(driver)/trip.tsx`
+- `mobile/src/mocks/handlers/trip.handlers.ts` (spec-3-1 — só comentário do `POST /trips`)
+
+**Modificados (Backend) — spec-3-1:**
+- `api/tests/e2e/boarding-happy-path.e2e.spec.ts` (só comentário)
 
 ## Code Review (2026-09-06)
 
@@ -692,15 +721,19 @@ Depois: **37 unidade + 27 e2e**, `tsc` limpo (api e mobile), lint da api de 148 
 - `trip.tsx` sem teste de render (máquina de 4 estados, `isError` não distinguido de "sem viagem").
 - `test/route-assignment.e2e-spec.ts` vermelho na baseline (login `.expect(200)` vs 201) — incidental, fora do escopo.
 
-### ⚠️ Decisão de produto pendente — bloqueia o fechamento da story
+### ✅ Decisão de produto — RESOLVIDA (Lucas, 2026-09-06)
 
-`PLACEHOLDER_ROUTE_ID = 'route-placeholder-id'` em `trip.tsx` é passado em toda chamada de
-`startTrip`. Não é UUID (o DTO rejeita com 400) e, mesmo sendo, cairia no `RouteAccess`
-(403 `DRIVER_NOT_ASSIGNED`). **O fluxo de iniciar viagem pela UI não funciona.** Precisa de
-decisão: de onde vem o `routeId` do motorista? (rota vinculada única auto-selecionada / seletor
-de rota / `GET /drivers/me/routes` novo). O fluxo "iniciar retorno" (defer acima) depende da
-mesma decisão. Até lá a story fica em `review`, não `done` — a viagem só entra por API (como
-no smoke da 3.6).
+De onde vem o `routeId` do motorista: **das rotas vinculadas em `GET /api/v1/routes/mine`**
+(endpoint do Épico 2, já consumido por `(driver)/routes.tsx`). Uma rota → auto-seleção;
+duas ou mais → seletor (`SegmentedButtons`) antes de "Iniciar Viagem"; nenhuma → ação
+desabilitada com "Peça ao administrador para vincular uma rota"; erro de carga → mensagem
+distinta + "Tentar novamente" (nunca tratado como "sem rota"). Sem mudança de backend.
+Implementado por `spec-3-1-rota-real-do-motorista.md`; `PLACEHOLDER_ROUTE_ID` removido.
+
+O fluxo "Iniciar Retorno" continua atendido **na sessão** (encerrar a ida → botão via
+`setQueryData`, mesma rota, `relatedTripId` = id da ida). A **persistência entre reloads**
+do app fica diferida — exige decisão de contrato de API (endpoint novo, ou `/trips/active`
+devolver a ida recém-encerrada num TTL). Registrado em `deferred-work.md`, seção 2026-09-06.
 
 ## Suggested Review Order
 

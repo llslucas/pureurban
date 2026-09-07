@@ -35,8 +35,8 @@ test.describe('Épico 3 — caminho feliz', () => {
     request,
     epic3,
   }) => {
-    // Viagem semeada via API — a tela de Viagem do mobile ainda usa um routeId
-    // placeholder (Story 3.1 não refatiada); o app apenas reflete `GET /trips/active`.
+    // Viagem semeada via API para manter o teste determinístico e independente
+    // do estado de rotas do seed; o app apenas reflete `GET /trips/active`.
     const tripRes = await request.post('/api/v1/trips', {
       data: { routeId: epic3.routeId, type: 'OUTBOUND' },
       headers: { Authorization: `Bearer ${epic3.driverToken}` },
