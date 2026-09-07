@@ -2,7 +2,7 @@
 title: 'Story 4.2: Canal SSE de Embarque e Recebimento em Tempo Real (Fatia Vertical)'
 type: 'feature'
 created: '2026-09-07'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 14f34d04ad1713299ea2aa1e53d7a2e013eec697
@@ -198,6 +198,36 @@ em guard (antes do stream) e a conexão é encerrada elegantemente quando a viag
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Achado (camada) | Veredito | Evidência |
+|---|-----------------|----------|-----------|
+| 1 | BH: reconexão SSE não reconcilia o roster — refetch só acontece por evento recebido; ausência ocorrida durante a queda nunca reconcilia (matriz I/O "Queda de rede": "roster reconciliado por refetch") | medium | Real: `open` no serviço só zera `attempts`; a tela só invalida por evento. `refetchOnWindowFocus` mitiga parcialmente, mas tela focada não refetch. Desvio da linha congelada da matriz → patch |
+| 2 | BH: `JSON.parse` sem guarda em `handleMessage` — mensagem malformada em canal ativo derruba o processo (listener ioredis) | medium | Real: parse sem try/catch chamado do handler `'message'`; exceção em listener de EventEmitter é uncaught. Mobile já defende o caso análogo (`parsePayload`). Publicador malicioso/buggy no canal (sem ACL no Redis) derruba a API → patch |
+| 3 | ECH: mesmo achado do #2, com guard_snippet | medium | Mesma causa raiz do #2 → agrupado no patch |
+| 4 | VG (pré-verificado): mesmo achado do #2, citando que o spec unit só cobre o caminho "canal sem inscritos", nunca o parse em canal ativo | medium | Mesma causa raiz do #2 → agrupado no patch (com o caso de teste faltante) |
+| 5 | BH: subscribe Redis falho/pendurado deixa stream zumbi (falha só logada; `maxRetriesPerRequest: null` enfileira sem rejeitar) | low | Cenário de outage de Redis: degradação silenciosa limitada à duração do outage — o roster REST e o pull-to-refresh continuam como caminho primário. Fix exige máquina de erro/retry nova → rejeitado |
+| 6 | BH: sem health handling na conexão de pub/sub; publish pendura em outage (NFR3 sem sinal) | low | Mesma família do #5: degradação só sob outage de infra, com fallback REST existente; NFR3 é medido contra API sadia no e2e → rejeitado |
+| 7 | BH: shutdown gracioso pendura com streams abertos (`onModuleDestroy` não completa subjects) | false | `main.ts` não chama `enableShutdownHooks` — não existe caminho de shutdown gracioso no app; `app.close()` só roda no `afterAll` dos e2e, onde os streams são abortados/aguardados. O desfecho pendurado não é alcançável hoje |
+| 8 | BH: só 409 é terminal no cliente mobile; 403/404/400 entram no backoff infinito | low | Churn limitado (≤1 req/30s), auto-curável (cada tentativa relê token/papel); 403 de papel revogado em plena viagem é cenário irreal no produto. Fix exige política de max-attempts nova, fora do contrato → rejeitado |
+| 9 | BH: tela não reage a close definitivo (sem callback onClosed; roster da viagem encerrada continua renderizado) | low | Pós-fim de viagem o card é moot (mesma triagem #7 da 4.1); foco/retorno à `trip.tsx` refetcha `['activeTrip']` e a tela já tem estados de viagem inativa da 3.5b → rejeitado |
+| 10 | BH: assimetria LWW — `applyNotReturningToRoster` não recusa `CHECKED_IN` (o handler de cancelamento recusa); evento atrasado vira badge/toast errados até o refetch | low | Real e alcançável na corrida ausência-em-voo → check-in (janela de ms, auto-corrigida pelo invalidate imediato, mas o toast errado confunde). Fix é guarda de 1 linha simétrica à do cancelamento → patch |
+| 11 | BH: toasts sucessivos se sobrescrevem (snackbar único) | low | Badge e contagem carregam o sinal primário de cada aluno; o toast é complemento. Fila de snackbars é complexidade nova sem benefício demonstrado → rejeitado |
+| 12 | BH: sem e2e de `absence_cancelled` no stream | low | O evento não tem emissor até a 4.3 (Never da spec); o caminho de forwarding está coberto no unit (fake Redis entrega `absence_cancelled`); prova wire-level chega com 4.3 e é exigida pela 4.5 (E2E do épico) → rejeitado |
+| 13 | BH: guard sem unit spec + `boardingTripId` opcional no guard vs required no controller | low | O comportamento (409 + attach) é provado por e2e (409 e happy path com stream correto); a assimetria de tipo é invisível em runtime. Fix principal é um arquivo de spec novo, além de correção direta → rejeitado |
+| 14 | BH: e2e NFR3 wall-clock flaky + `firstMessage` sem reject (pendura até o timeout) | low | O <3s é a própria métrica do NFR, com folga de ~75x medida (39ms); no pior caso falha no timeout de 30s configurado. Ergonomia de teste, não defeito → rejeitado |
+| 15 | BH: Change Log / Triage Log vazios enquanto Implementation Notes registra mudanças pós-auditoria | false | Os logs são populados por este review (Triage) e pelo step-04 em loopbacks (Change Log); Implementation Notes é a seção correta para o ciclo de verificação do orquestrador — ownership definido no template |
+| 16 | BH: scaffolding de teste frágil (`flush()` com 6 microtasks, poke no registry) + branches sem cobertura (cache ausente, troca de tripId) | low | Brittleness interna de teste com comportamento provado; branches omitidos são guardas de 2 linhas com comportamento vizinho coberto (studentId desconhecido → refetch). Adicionar suítes excede correção direta → rejeitado |
+| 17 | ECH: `REDIS_URL` com fallback silencioso para localhost (fail-slow, não fail-fast) | low | Projeto sem deploy de produção (NFR/deploy diferidos; action items retro 7/8 são os donos da política fail-fast); `.env.example` documenta; o próprio `PrismaService` não tem fallback — inconsistência menor. Fix cria validação de startup nova → rejeitado |
+| 18 | BH: união dos 3 tipos declarada (`TypedEventSource`) mas re-inlinada na construção | low | Real e cosmético; drift só seria possível se o contrato mudasse (congelado). Fix de 1 linha, sem superfície → patch |
+| 19 | ECH: forward do stream sem whitelist (qualquer `type` publicado no canal é encaminhado) | low | Inalcançável pela aplicação: o único publicador é o próprio serviço, whitelisted nos 3 listeners; exige acesso Redis externo (mesmo pressuposto do #2, resolvido no parse). Filtro redundante no forward → rejeitado |
+| 20 | ECH: rejeição de subscribe deixa entrada morta reutilizada por clientes seguintes | low | Mesma família do #5 (outage); `maxRetriesPerRequest: null` enfileira em vez de rejeitar no caso principal → rejeitado |
+| 21 | ECH: sentinel publicado entre o guard e o subscribe é perdido — stream nunca completa na viagem encerrada | low | Janela de milissegundos entre `canActivate` e o subscribe no mesmo request; dano limitado (conexão idle até o unmount — o use case de ausência exige viagem ativa, sem eventos fluem) → rejeitado |
+| 22 | ECH: segundo erro durante o await do refresh abre conexão duplicada | low | Requer dois erros do XHR antes do `close()` síncrono (janela rara); pior caso é conexão redundante com handlers idempotentes (replay-safe provado) → rejeitado |
+| 23 | ECH: status permanentes (403) → churn infinito | low | Mesma causa raiz do #8 → agrupado/rejeitado |
+| 24 | ECH: mesmo achado do #10 com guard_snippet | low | Mesma causa raiz do #10 → agrupado no patch |
+| 25 | ECH: `maxRetriesPerRequest: null` → fila de comandos sem limite em outage prolongado | low | Mesma família do #6; taxa de publish é baixíssima (eventos de ausência), memória negligível em viagens de MVP → rejeitado |
+| 26 | VG (outro): decorators `@OnEvent` de `absence_cancelled`/`checkin_reminder` nunca executados em teste | low | Inalcançável por design nesta fatia (sem emissor até 4.3/4.4 — observação da própria VG); um typo seria apanhado imediatamente pelos testes/e2e das stories seguintes → rejeitado |
+| 27 | VG screening: sem gaps de verificação — cobertura mapeada linha a linha (e2e stream/NFR3/409/terminal, matriz de roles, tela, cliente mobile, whitelist) | — | Camada pré-verificada não acusou nenhum gap; achados "Other" viraram as linhas 4 e 26 |
 
 ## Design Notes
 
