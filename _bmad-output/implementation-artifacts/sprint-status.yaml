@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-07-2026 10:43"
+last_updated: "09-07-2026 11:42"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -91,7 +91,15 @@ development_status:
   # Decisão do Lucas: story técnica própria, antes do Épico 4. Ver deferred-work.md.
   # RENUMERADA de 1-8 para 1-9 em 28/08/2026, liberando o número 1.8 ao shell de navegação
   # (que executa antes). Conteúdo e posição na sequência inalterados.
-  1-9-corrigir-seed-do-banco-sob-prisma-7: backlog
+  # RESOLVIDA em 07/09/2026 por `spec-1-9-corrigir-seed-do-banco-sob-prisma-7.md` (rota
+  # oneshot): `prisma.config.ts` declara `migrations.seed: "tsx prisma/seed.ts"`, `npm run
+  # seed` existe (`prisma db seed`) e o `seed.ts` usa o adapter `PrismaPg` + `dotenv`. O
+  # runner é `tsx` (novo devDependency) — `ts-node` em CJS não resolve o import `.js` do
+  # cliente gerado; `ts-node`/`tsconfig-paths` sem uso foram removidos. Verificado em
+  # execução: dev DB → skip; banco novo → migrate + seed criam Company+Admin, bcrypt do
+  # admin confere, 206 unit verdes. Pré-requisito do Épico 4 CUMPRIDO. 2 defers do review
+  # (gate de idempotência; AGENTS.md sem `npm run seed`) em deferred-work.md.
+  1-9-corrigir-seed-do-banco-sob-prisma-7: review
   # Adição de meio de sprint (30/08/2026). Story técnica: instala o test runner do
   # mobile (jest-expo + @testing-library/react-native), ausente desde a 1.5, e prova
   # o harness com uma suíte inicial sobre lógica pura (role-routes, qr-payload) mais
