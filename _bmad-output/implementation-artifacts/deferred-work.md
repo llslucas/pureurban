@@ -304,3 +304,34 @@ comparativa em vez de afirmação de viabilidade sem controle.
   evidence: Verificado no AGENTS.md (Comandos → API constam start:dev, test, e2e, playwright,
     lint, format, openapi:export; nada de seed). O loop de review do bmad-build não edita
     AGENTS.md; fica para edição avulsa aprovada pelo Lucas.
+
+## Deferred from: review of 4-0-contrato-de-api-ausencia (2026-09-07)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-0-contrato-de-api-ausencia.md`
+  summary: Bordas do ciclo de vida da ausência não declaradas no contrato — o que acontece quando
+    o aluno já fez check-in e registra ausência (regra last-write-wins), re-registro com nova key
+    após cancelamento, e a fronteira exata de `cancellableUntil` (inclusiva/exclusiva).
+  evidence: Review (BH/ECH) da 4.0. A regra "check-in do motorista tem autoridade sobre a
+    ausência" vive no epic-4-context, mas o contrato não declara o desfecho HTTP; a semântica
+    exata (erro vs aceitar; fronteira do relógio) é decisão das fatias 4.1/4.3, com relógio
+    injetado. Fechar na spec de 4.1 e, se nascer código de erro novo, ajustar o contrato no
+    mesmo PR (drift discipline, Architecture §12).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-0-contrato-de-api-ausencia.md`
+  summary: Transporte de autenticação do SSE não decidido — EventSource nativo (web) não envia
+    header Authorization; contrato declara bearer sem dizer como o token chega ao stream.
+  evidence: Review (BH/ECH) da 4.0. No nativo há polyfills de EventSource com suporte a header;
+    no alvo web do Expo é preciso query param ou fetch-event-source. É decisão de design da
+    Story 4.2 (e pode exigir ajuste consciente do contrato — ex.: token por query param — no
+    mesmo PR da fatia).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-0-contrato-de-api-ausencia.md`
+  summary: Semântica de replay de ERRO sob idempotência não especificada (409/404 ficam pinados
+    na key? cancelamento reenviado com a key original após expirar a janela retorna 200 ou 409?).
+  evidence: Review (BH) da 4.0. Mesmo tema do action item `epic-3-retro-item-3` (desfecho da
+    fila offline, incluindo expiração alinhada à janela de 24h do occurredAt). Decidir na
+    implementação da 4.1/4.3 junto com a fila offline e documentar nas descriptions.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-0-contrato-de-api-ausencia.md`
+  summary: Premissa de viagem única ativa por motorista herdada por `GET /events` — seleção de
+    stream indefinida se um driver tiver 2 viagens ativas.
+  evidence: Review (ECH) da 4.0. Preexistente: `get-active-trip` (Story 3.1) já assume uma
+    viagem ativa por motorista. Se o produto um dia permitir 2 rotas simultâneas, o fix é no
+    domínio trip (não no contrato de boarding); nada a fazer na 4.0.
