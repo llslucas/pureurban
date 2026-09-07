@@ -42,8 +42,19 @@ const runWith = <A, E>(
   Effect.runPromise(effect.pipe(Effect.provideService(TripRepository, repo)));
 
 describe('endTrip', () => {
-  it('encerra viagem ativa com sucesso', async () => {
-    const repo = makeRepo();
+  it('encerra viagem ativa: manda status COMPLETED e endedAt ao repositório (AC2)', async () => {
+    let captured:
+      | { id: string; patch: Partial<TripData>; tenantId: string }
+      | undefined;
+    const update = vi.fn(
+      (id: string, patch: Partial<TripData>, tenantId: string) => {
+        captured = { id, patch, tenantId };
+        return Effect.succeed(
+          makeTripData({ status: 'COMPLETED', endedAt: new Date() }),
+        );
+      },
+    );
+    const repo = makeRepo({ update });
     const [result] = await runWith(
       endTrip({
         tripId: 'trip-1',
@@ -53,6 +64,10 @@ describe('endTrip', () => {
       repo,
     );
     expect(result.status).toBe('COMPLETED');
+    expect(captured?.id).toBe('trip-1');
+    expect(captured?.tenantId).toBe('company-1');
+    expect(captured?.patch.status).toBe('COMPLETED');
+    expect(captured?.patch.endedAt).toBeInstanceOf(Date);
   });
 
   it('emite evento trip.ended', async () => {
@@ -69,11 +84,13 @@ describe('endTrip', () => {
     expect(events[0].type).toBe('trip.ended');
   });
 
-  it('falha com InvalidTripTransition quando viagem não pertence ao motorista', async () => {
+  it('viagem de outro motorista responde como inexistente (TripNotFound, não-disclosure)', async () => {
+    const update = vi.fn(() => Effect.succeed(makeTripData()));
     const repo = makeRepo({
       findById: vi.fn(() =>
         Effect.succeed(makeTripData({ driverId: 'outro-driver' })),
       ),
+      update,
     });
     const result = await Effect.runPromise(
       endTrip({
@@ -84,9 +101,10 @@ describe('endTrip', () => {
     );
     expect(result._tag).toBe('Left');
     if (result._tag === 'Left') {
-      expect(result.left._tag).toBe('InvalidTripTransition');
-      expect(result.left.code).toBe('TRIP_NOT_OWNED');
+      expect(result.left._tag).toBe('TripNotFound');
+      expect(result.left.code).toBe('TRIP_NOT_FOUND');
     }
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('falha com InvalidTripTransition quando viagem já está COMPLETED', async () => {

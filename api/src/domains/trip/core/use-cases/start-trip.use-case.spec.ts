@@ -155,14 +155,15 @@ describe('startTrip', () => {
     expect(events[0].type).toBe('trip.started');
   });
 
-  it('cria viagem RETURN com relatedTripId', async () => {
+  it('cria viagem RETURN repassando relatedTripId e status ACTIVE ao repositório', async () => {
     const createdTripData = makeTripData({
       type: 'RETURN',
       relatedTripId: 'trip-0',
     });
+    const create = vi.fn(() => Effect.succeed(createdTripData));
     const repo = makeRepo({
       findActiveByDriver: vi.fn(() => Effect.succeed(null)),
-      create: vi.fn(() => Effect.succeed(createdTripData)),
+      create,
     });
     const program = startTrip({
       driverId: 'driver-1',
@@ -173,6 +174,56 @@ describe('startTrip', () => {
     });
     const [result] = await runWith(program, repo);
     expect(result.type).toBe('RETURN');
-    expect(result.relatedTripId).toBe('trip-0');
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: 'company-1',
+        routeId: 'route-1',
+        driverId: 'driver-1',
+        type: 'RETURN',
+        status: 'ACTIVE',
+        relatedTripId: 'trip-0',
+      }),
+    );
+  });
+
+  it('recusa RETURN sem relatedTripId com InvalidTripTransition (AC3)', async () => {
+    const create = vi.fn(() => Effect.succeed(makeTripData()));
+    const repo = makeRepo({ create });
+    const program = startTrip({
+      driverId: 'driver-1',
+      routeId: 'route-1',
+      tenantId: 'company-1',
+      type: 'RETURN',
+    });
+    const result = await Effect.runPromise(
+      provide(program, repo).pipe(Effect.either),
+    );
+    expect(result._tag).toBe('Left');
+    if (result._tag === 'Left') {
+      expect(result.left._tag).toBe('InvalidTripTransition');
+      expect((result.left as { code: string }).code).toBe(
+        'RETURN_REQUIRES_RELATED_TRIP',
+      );
+    }
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('descarta relatedTripId num OUTBOUND — não há viagem de ida a atrelar', async () => {
+    const create = vi.fn(() => Effect.succeed(makeTripData()));
+    const repo = makeRepo({
+      findActiveByDriver: vi.fn(() => Effect.succeed(null)),
+      create,
+    });
+    const program = startTrip({
+      driverId: 'driver-1',
+      routeId: 'route-1',
+      tenantId: 'company-1',
+      type: 'OUTBOUND',
+      relatedTripId: 'trip-0',
+    });
+    await runWith(program, repo);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'OUTBOUND', relatedTripId: undefined }),
+    );
   });
 });

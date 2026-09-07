@@ -251,3 +251,29 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/3-5b-lista-de-alunos-e-status-de-embarque.md`
   summary: O estado 7 (Banner de dado desatualizado) só é demonstrável offline porque a query do roster força `networkMode: 'always'` — enquanto o `onlineManager` do TanStack não for ligado a um provedor de conectividade real, toda query offline-first do app precisa dessa escolha explícita por query.
   evidence: O fix da Task 7.5 pôs `networkMode: 'always'` na query `['trip', tripId, 'students']` (em `student-list.tsx` e `trip.tsx`) para que o refetch offline erre em vez de pausar. É o mesmo item já registrado no defer da 3.2b ("`onlineManager` nunca conectado ao NetInfo"): sem a conexão, `networkMode: 'online'` no alvo web pausa a query no evento `offline` do `window` e nenhum estado de erro é alcançável. A correção sistêmica (conectar o `onlineManager`, ou `networkMode` global no `query-client.ts`) continua adiada; cada tela offline-first paga a escolha por query até lá.
+
+## Deferred from: code review of 3-1-iniciar-e-encerrar-viagem.md (2026-09-06)
+
+- source_spec: `_bmad-output/implementation-artifacts/3-1-iniciar-e-encerrar-viagem.md`
+  summary: `startTrip` valida que uma RETURN traz `relatedTripId`, mas não que esse id aponta para uma viagem real da mesma empresa, do mesmo motorista, `type = OUTBOUND` e `status = COMPLETED`.
+  evidence: Um `relatedTripId` arbitrário (mas UUID) passa pelo use case e chega ao banco. A FK `trips_relatedTripId_fkey` barra um id inexistente e a unique `trips_relatedTripId_key` barra reuso, mas ambos viram 500 via `Effect.orDie` no adapter, não 400/404. Vincular a volta a uma ida de outro motorista/rota também não é barrado. Precisa de um método novo no `TripRepository` (buscar a ida elegível) — mais que um patch trivial.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-1-iniciar-e-encerrar-viagem.md`
+  summary: A invariante "uma viagem ativa por motorista" é um check-then-create sem transação nem índice único parcial.
+  evidence: `startTrip` chama `findActiveByDriver` e depois `create`; `@@index([driverId, status])` não é único. Dois POST /trips quase simultâneos (retry de cliente, dois aparelhos) podem passar os dois pela checagem e criar duas viagens ACTIVE. `get-active-trip` então usa `findFirst` sem `orderBy` e devolve uma arbitrária. Correção pede índice único parcial (`WHERE status = 'ACTIVE'`), que o Prisma não expressa no schema — migração com SQL cru. Risco real baixo no MVP (botão desabilita durante a mutação, um aparelho por motorista).
+
+- source_spec: `_bmad-output/implementation-artifacts/3-1-iniciar-e-encerrar-viagem.md`
+  summary: O fluxo "Iniciar Retorno" da tela `(driver)/trip.tsx` só funciona na janela de ~10s após encerrar a ida, e some em qualquer reload do app.
+  evidence: `GET /trips/active` → `findActiveByDriver` filtra `status: 'ACTIVE'` apenas. Depois que `endMutation` grava a ida COMPLETED no cache via `setQueryData`, o próximo refetch (`staleTime: 10_000`) devolve `null` e o branch `isReturn` (`activeTrip?.status === 'COMPLETED' && type === 'OUTBOUND'`) fica inalcançável — a tela volta a "Iniciar Viagem". Não há endpoint para buscar a última viagem encerrada. AC #2/#3 "iniciar retorno" precisa de decisão de contrato de API (endpoint novo, ou `/trips/active` devolver a recém-encerrada dentro de um TTL, ou outro fluxo). Amarrado à decisão do `PLACEHOLDER_ROUTE_ID` abaixo.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-1-iniciar-e-encerrar-viagem.md`
+  summary: Não existe DTO de resposta para `POST /trips` nem `PATCH /trips/:id/end`; `openapi.json` documenta essas rotas sem corpo de resposta e o `interface Trip` do mobile é escrito à mão.
+  evidence: O controller retorna o objeto do service sem `@ApiResponse({ type })` e não há `TripResponseDto`. `mobile/src/services/trip.service.ts` declara `Trip` manualmente (já diverge de `TripData` do port — sem `createdAt`/`updatedAt`), contradizendo o comentário no próprio arquivo que diz que os tipos vêm do contrato gerado. `npm run openapi:types` não tem o que gerar. Alinha com a regra 11 da architecture.md.
+
+- source_spec: `_bmad-output/implementation-artifacts/3-1-iniciar-e-encerrar-viagem.md`
+  summary: A tela `(driver)/trip.tsx` não tem teste de render, apesar do runner do mobile existir desde a 1.10 — a máquina de 4 estados, os chips de status/tipo e o tratamento de erro de query não são cobertos.
+  evidence: `mobile/src/` não tem `trip*.test.tsx`. A query `['activeTrip']` não distingue `isError` de "sem viagem": um erro de rede renderiza "Iniciar Viagem" e o motorista pode disparar uma viagem duplicada (o backend barra com 409, mas a tela mostra o alerta de erro em vez do estado certo). Mesma raiz do defer de infra de teste de tela da 3.5b (QueryClientProvider + MSW-em-jest).
+
+- source_spec: `_bmad-output/implementation-artifacts/3-1-iniciar-e-encerrar-viagem.md`
+  summary: `test/route-assignment.e2e-spec.ts` está vermelho na baseline — o `beforeAll` faz `POST /api/v1/auth/login` com `.expect(200)`, mas a rota responde 201; as 19 asserts do arquivo ficam skipped.
+  evidence: Surgiu incidentalmente ao rodar `npm run test:e2e` na revisão da 3.1. `POST /auth/login` retorna 201 (sem `@HttpCode(200)`) — quirk pré-existente que o próprio `trip.e2e-spec.ts` documenta e contorna. Correção de 1 caractere (`200` → `201` na linha 78), mas fora do escopo da 3.1. Mesma raiz do defer "sem CI" da 3.6: nada força a suíte e2e a rodar verde.

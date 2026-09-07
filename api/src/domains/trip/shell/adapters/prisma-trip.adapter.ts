@@ -79,15 +79,31 @@ export class PrismaTripAdapter implements TripRepositoryApi {
   ): Effect.Effect<TripData, TripNotFound, never> {
     const prisma = this.prisma;
     return Effect.gen(function* () {
-      const existing = yield* pipe(
+      // $transaction (findFirst tenant-scoped + update por id) — mesmo padrão do
+      // prisma-route.adapter. `trip.update` só aceita campo único no `where`,
+      // então o companyId entra na leitura dentro da transação; fora dela havia
+      // janela TOCTOU e a escrita não era isolada por tenant.
+      const updated = yield* pipe(
         Effect.tryPromise({
           try: () =>
-            prisma.trip.findFirst({ where: { id, companyId: tenantId } }),
-          catch: toInfraError(`Erro ao buscar viagem ${id}`),
+            prisma.$transaction(async (tx) => {
+              const existing = await tx.trip.findFirst({
+                where: { id, companyId: tenantId },
+              });
+              if (!existing) return null;
+              return tx.trip.update({
+                where: { id },
+                data: {
+                  ...(data.status !== undefined && { status: data.status }),
+                  ...(data.endedAt !== undefined && { endedAt: data.endedAt }),
+                },
+              });
+            }),
+          catch: toInfraError(`Erro ao atualizar viagem ${id}`),
         }),
         Effect.orDie,
       );
-      if (!existing) {
+      if (!updated) {
         return yield* Effect.fail(
           // Sem `details`: o tripId já está no path e na mensagem, e o corpo
           // precisa ser `{ error: { code, message } }` puro para bater com o
@@ -100,20 +116,6 @@ export class PrismaTripAdapter implements TripRepositoryApi {
           }),
         );
       }
-      const updated = yield* pipe(
-        Effect.tryPromise({
-          try: () =>
-            prisma.trip.update({
-              where: { id },
-              data: {
-                ...(data.status !== undefined && { status: data.status }),
-                ...(data.endedAt !== undefined && { endedAt: data.endedAt }),
-              },
-            }),
-          catch: toInfraError(`Erro ao atualizar viagem ${id}`),
-        }),
-        Effect.orDie,
-      );
       return updated as TripData;
     });
   }

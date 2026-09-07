@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsUUID, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum TripTypeDto {
@@ -25,12 +25,12 @@ export class CreateTripDto {
     description: 'ID da viagem de ida (obrigatório para RETURN)',
     example: '550e8400-e29b-41d4-a716-446655440001',
   })
-  @IsOptional()
+  // Obrigatório num RETURN; num OUTBOUND só é validado se algum valor vier no
+  // payload (senão seria ignorado silenciosamente). O core reforça a mesma regra.
+  @ValidateIf(
+    (o: CreateTripDto) =>
+      o.type === TripTypeDto.RETURN || o.relatedTripId !== undefined,
+  )
   @IsUUID()
   relatedTripId?: string;
-}
-
-export class EndTripDto {
-  // DTO vazio — encerrar viagem não requer body payload.
-  // Mantido para extensibilidade futura (ex: motorista confirmar destino).
 }

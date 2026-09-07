@@ -24,12 +24,14 @@ export const endTrip = (
     // Buscar viagem e validar que pertence ao driver e está ACTIVE
     const trip = yield* repo.findById(input.tripId, input.tenantId);
 
+    // Viagem de outro motorista responde como inexistente: um 404 não revela a
+    // um motorista que a viagem existe, e "não é sua" não é uma transição de
+    // estado inválida (era 400 antes) — é falta de autorização.
     if (trip.driverId !== input.driverId) {
       return yield* Effect.fail(
-        new InvalidTripTransition({
-          code: 'TRIP_NOT_OWNED',
-          message: 'Viagem não pertence a este motorista',
-          details: { tripId: trip.id },
+        new TripNotFound({
+          code: 'TRIP_NOT_FOUND',
+          message: `Viagem com id ${input.tripId} não encontrada`,
         }),
       );
     }

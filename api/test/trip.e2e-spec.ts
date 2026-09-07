@@ -313,6 +313,99 @@ describe('TripController (e2e)', () => {
         .send({ routeId: 'nao-e-uuid', type: 'OUTBOUND' })
         .expect(400);
     });
+
+    it('type RETURN sem relatedTripId ⇒ 400 (AC3)', async () => {
+      await post('/api/v1/trips')
+        .set('Authorization', `Bearer ${driverToken}`)
+        .send({ routeId, type: 'RETURN' })
+        .expect(400);
+    });
+  });
+
+  describe('Ciclo de vida da viagem — encerrar e iniciar retorno (AC2, AC3)', () => {
+    // Motorista e rota próprios: o ciclo ida→fim→volta precisa de um motorista
+    // sem viagem ativa, e os outros testes deixam viagens ACTIVE penduradas nos
+    // motoristas compartilhados.
+    let lifecycleToken: string;
+    let lifecycleRouteId: string;
+    let lifecycleDriverId: string;
+
+    beforeAll(async () => {
+      const email = `driver-lifecycle-${stamp}@empresa.com`;
+      lifecycleDriverId = await createUser('/api/v1/drivers', {
+        name: 'Motorista Ciclo de Vida E2E Trip',
+        email,
+        password: 'senha12345',
+      });
+      lifecycleToken = await login(email, 'senha12345');
+
+      const routeRes = await post('/api/v1/routes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: `Rota Ciclo de Vida ${randomUUID()}`,
+          originCity: 'Viçosa',
+          destinationCity: 'Belo Horizonte',
+        })
+        .expect(201);
+      lifecycleRouteId = (routeRes.body as ApiResponse).data.id as string;
+
+      await post(`/api/v1/routes/${lifecycleRouteId}/drivers`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ driverId: lifecycleDriverId })
+        .expect(201);
+    });
+
+    it('PATCH /:id/end grava endedAt ~agora, além de status COMPLETED', async () => {
+      const trip = await prisma.trip.create({
+        data: {
+          companyId,
+          routeId: lifecycleRouteId,
+          driverId: lifecycleDriverId,
+          type: 'OUTBOUND',
+          status: 'ACTIVE',
+        },
+      });
+
+      const before = Date.now();
+      const response = await request(app.getHttpServer())
+        .patch(`/api/v1/trips/${trip.id}/end`)
+        .set('Authorization', `Bearer ${lifecycleToken}`)
+        .expect(200);
+
+      const data = (response.body as ApiResponse).data;
+      expect(data.status).toBe('COMPLETED');
+      expect(data.endedAt).toBeTruthy();
+      const endedAt = new Date(data.endedAt as string).getTime();
+      expect(endedAt).toBeGreaterThanOrEqual(before - 1000);
+      expect(endedAt).toBeLessThanOrEqual(Date.now() + 1000);
+    });
+
+    it('POST type RETURN com relatedTripId cria a volta atrelada à ida', async () => {
+      const outbound = await prisma.trip.create({
+        data: {
+          companyId,
+          routeId: lifecycleRouteId,
+          driverId: lifecycleDriverId,
+          type: 'OUTBOUND',
+          status: 'COMPLETED',
+          endedAt: new Date(),
+        },
+      });
+
+      const response = await post('/api/v1/trips')
+        .set('Authorization', `Bearer ${lifecycleToken}`)
+        .send({
+          routeId: lifecycleRouteId,
+          type: 'RETURN',
+          relatedTripId: outbound.id,
+        })
+        .expect(201);
+
+      const data = (response.body as ApiResponse).data;
+      expect(data.type).toBe('RETURN');
+      expect(data.status).toBe('ACTIVE');
+      expect(data.relatedTripId).toBe(outbound.id);
+    });
   });
 
   describe('GET /api/v1/trips/:id/students — autenticação e autorização', () => {

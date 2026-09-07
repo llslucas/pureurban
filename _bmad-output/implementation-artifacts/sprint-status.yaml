@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "2026-09-06T00:00:00+00:00"
+last_updated: "2026-09-06T12:00:00+00:00"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -113,6 +113,13 @@ development_status:
   # 1 story entregue (3.1, full-stack legado) + 8 stories (1 contrato, 2 backend, 4 mobile, 1 integração)
   epic-3: in-progress
   3-0-contrato-de-api-embarque-digital: done
+  # Code review feito em 06/09/2026 (branch fix/3-1-review, 3 camadas): 8 patches
+  # aplicados (RETURN sem relatedTripId, update() sem companyId, end de viagem alheia
+  # como 404, gaps de teste de endedAt/RETURN/get-active, dead code), 37 unit + 27 e2e
+  # verdes. Fica em `review`, não `done`: o `PLACEHOLDER_ROUTE_ID` do mobile trava o
+  # fluxo de iniciar viagem pela UI e o "iniciar retorno" some no reload — as duas
+  # dependem de uma decisão de produto sobre de onde vem o routeId do motorista.
+  # Ver a seção "Code Review (2026-09-06)" na story e deferred-work.md.
   3-1-iniciar-e-encerrar-viagem: review
   3-2b-geracao-e-exibicao-de-qr-code-do-aluno: done
   3-3a-check-in-de-embarque: done

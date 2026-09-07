@@ -115,7 +115,11 @@ export default function TripScreen() {
               <TripTypeLabel type={activeTrip.type} />
               <TripStatusChip status={activeTrip.status} />
               <Text style={styles.infoText}>Rota: {activeTrip.routeId}</Text>
-              <Text style={styles.infoText}>Alunos: 0/0 (em breve)</Text>
+              {/* '—' enquanto indefinido: um zero durante o carregamento é
+                  indistinguível de "ninguém embarcou". Mesma regra do card ativo. */}
+              <Text style={styles.infoText}>
+                Alunos: {studentsSummary ? `${studentsSummary.boarded}/${studentsSummary.total}` : '—'}
+              </Text>
             </Card.Content>
           </Card>
         )}

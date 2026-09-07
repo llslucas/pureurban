@@ -2,7 +2,11 @@ import { Effect } from 'effect';
 import { TripRepository } from '../ports/trip-repository.port.js';
 import { RouteAccess } from '../ports/route-access.port.js';
 import { withEvents } from '../../../shared/core/events/with-events.js';
-import { TripAlreadyActive, DriverNotAssigned } from '../errors/trip.errors.js';
+import {
+  TripAlreadyActive,
+  DriverNotAssigned,
+  InvalidTripTransition,
+} from '../errors/trip.errors.js';
 import type { WithEvents } from '../../../shared/core/events/index.js';
 import type { TripData } from '../ports/trip-repository.port.js';
 
@@ -18,7 +22,7 @@ export const startTrip = (
   input: StartTripInput,
 ): Effect.Effect<
   WithEvents<TripData>,
-  TripAlreadyActive | DriverNotAssigned,
+  TripAlreadyActive | DriverNotAssigned | InvalidTripTransition,
   TripRepository | RouteAccess
 > =>
   Effect.gen(function* () {
@@ -39,6 +43,21 @@ export const startTrip = (
         new DriverNotAssigned({
           code: 'DRIVER_NOT_ASSIGNED',
           message: 'Motorista não está vinculado a esta rota',
+        }),
+      );
+    }
+
+    // AC3: uma viagem de retorno só existe atrelada à viagem de ida. Sem o
+    // vínculo, uma RETURN vira uma OUTBOUND disfarçada — o campo `relatedTripId`
+    // é o único mecanismo que liga ida ↔ volta. `relatedTripId` num OUTBOUND é
+    // descartado: não há a que atrelar.
+    const relatedTripId =
+      input.type === 'RETURN' ? input.relatedTripId : undefined;
+    if (input.type === 'RETURN' && !relatedTripId) {
+      return yield* Effect.fail(
+        new InvalidTripTransition({
+          code: 'RETURN_REQUIRES_RELATED_TRIP',
+          message: 'Viagem de retorno exige o id da viagem de ida',
         }),
       );
     }
@@ -65,7 +84,7 @@ export const startTrip = (
       type: input.type,
       status: 'ACTIVE',
       startedAt: new Date(),
-      relatedTripId: input.relatedTripId,
+      relatedTripId,
     });
 
     return withEvents(trip, [
