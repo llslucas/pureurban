@@ -40,6 +40,23 @@ export class PrismaBoardingAdapter implements BoardingRepositoryApi {
     );
   }
 
+  findCheckInByTripAndStudent(
+    tripId: string,
+    studentId: string,
+    companyId: string,
+  ): Effect.Effect<BoardingRecordData | null> {
+    return pipe(
+      Effect.tryPromise({
+        try: () =>
+          this.prisma.boardingRecord.findFirst({
+            where: { tripId, studentId, companyId },
+          }),
+        catch: toInfraError('Falha ao buscar check-in do aluno na viagem'),
+      }),
+      Effect.orDie,
+    );
+  }
+
   recordCheckIn(data: {
     companyId: string;
     tripId: string;

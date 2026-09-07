@@ -27,6 +27,15 @@ export interface BoardingRepositoryApi {
     companyId: string,
   ): Effect.Effect<BoardingRecordData | null>;
 
+  // Existência de check-in do aluno na viagem, independente da key. Usado pela
+  // ausência (4.1): o check-in do motorista presente tem autoridade sobre a
+  // notificação de ausência — ALREADY_CHECKED_IN.
+  findCheckInByTripAndStudent(
+    tripId: string,
+    studentId: string,
+    companyId: string,
+  ): Effect.Effect<BoardingRecordData | null>;
+
   recordCheckIn(data: {
     companyId: string;
     tripId: string;

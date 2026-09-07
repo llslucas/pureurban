@@ -20,6 +20,7 @@ describe('BoardingController (e2e)', () => {
   let driverToken: string;
   let otherDriverToken: string;
   let studentToken: string;
+  let outsiderStudentToken: string;
   let routeId: string;
   let driverId: string;
   let companyId: string;
@@ -139,6 +140,12 @@ describe('BoardingController (e2e)', () => {
     studentToken = await login(
       allowedStudentData.email,
       allowedStudentData.password,
+    );
+    // Token do aluno FORA da rota: prova que STUDENT_NOT_ON_TRIP é regra de
+    // negócio (403 do core), não isolamento de tenant disfarçado.
+    outsiderStudentToken = await login(
+      outsiderStudentData.email,
+      outsiderStudentData.password,
     );
 
     const routeRes = await post('/api/v1/routes')
@@ -526,17 +533,21 @@ describe('BoardingController (e2e)', () => {
     });
   });
 
-  // Story 4.0: contrato declarado, lógica ainda não (stubs 501). A matriz de
+  // Story 4.0 declarou o contrato; a 4.1 implementa o POST /not-returning — os
+  // stubs 501 de cancel-absence (4.3) e events (4.2) permanecem. A matriz de
   // roles fica travada aqui porque o override por handler (@Roles STUDENT nos
   // POSTs, DRIVER no stream) vence o ['DRIVER'] da classe — perdê-lo é falha
   // silenciosa de autorização.
-  describe('Story 4.0 — stubs 501 (not-returning, cancel-absence, events)', () => {
-    const notReturning = (token: string | null) => {
-      const req = post('/api/v1/boarding/not-returning').send({
-        tripId: randomUUID(),
-      });
+  describe('Story 4.0/4.1 — matriz de roles (not-returning, cancel-absence, events)', () => {
+    const notReturning = (
+      token: string | null,
+      tripId: string = randomUUID(),
+      key: string | null = randomUUID(),
+    ) => {
+      const req = post('/api/v1/boarding/not-returning').send({ tripId });
       if (token !== null) req.set('Authorization', `Bearer ${token}`);
-      return req.set('X-Idempotency-Key', randomUUID());
+      if (key !== null) req.set('X-Idempotency-Key', key);
+      return req;
     };
 
     const cancelAbsence = (token: string | null) => {
@@ -553,11 +564,19 @@ describe('BoardingController (e2e)', () => {
       return req;
     };
 
-    it('STUDENT: POST /not-returning retorna 501 NOT_IMPLEMENTED (lógica na 4.1)', async () => {
-      const response = await notReturning(studentToken).expect(501);
-      expect((response.body as ApiResponse).error?.code).toBe(
-        'NOT_IMPLEMENTED',
-      );
+    it('STUDENT: POST /not-returning registra a ausência com 201', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const response = await notReturning(studentToken, tripId).expect(201);
+
+      const body = response.body as ApiResponse;
+      expect(body.data).toMatchObject({
+        studentId: allowedStudentId,
+        tripId,
+        status: 'NOT_RETURNING',
+      });
+      expect(body.data).toHaveProperty('id');
+      expect(body.data).toHaveProperty('notifiedAt');
+      expect(body.data).toHaveProperty('cancellableUntil');
     });
 
     it('STUDENT: POST /cancel-absence retorna 501 NOT_IMPLEMENTED (lógica na 4.3)', async () => {
@@ -587,6 +606,285 @@ describe('BoardingController (e2e)', () => {
       await notReturning(null).expect(401);
       await cancelAbsence(null).expect(401);
       await events(null).expect(401);
+    });
+  });
+
+  describe('POST /api/v1/boarding/not-returning — validação e regras de negócio (Story 4.1)', () => {
+    const notReturning = (
+      token: string,
+      body: Record<string, unknown> = { tripId: randomUUID() },
+      key: string | null = randomUUID(),
+    ) => {
+      const req = post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${token}`)
+        .send(body);
+      if (key !== null) req.set('X-Idempotency-Key', key);
+      return req;
+    };
+
+    it('body sem tripId (ou não-UUID) deve virar VALIDATION_ERROR (400), não erro de infra', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const response = await notReturning(
+        studentToken,
+        {},
+        randomUUID(),
+      ).expect(400);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'VALIDATION_ERROR',
+      );
+
+      const malformed = await notReturning(studentToken, {
+        tripId: 'not-a-uuid',
+      }).expect(400);
+      expect((malformed.body as ApiResponse).error?.code).toBe(
+        'VALIDATION_ERROR',
+      );
+
+      // Viagem válida inutilizada por este teste: encerra para não vazar estado.
+      await prisma.trip.update({
+        where: { id: tripId },
+        data: { status: 'COMPLETED' },
+      });
+    });
+
+    it('header X-Idempotency-Key ausente/vazio ⇒ MISSING_IDEMPOTENCY_KEY; gigante ⇒ INVALID_IDEMPOTENCY_KEY', async () => {
+      const missing = await notReturning(
+        studentToken,
+        { tripId: randomUUID() },
+        null,
+      ).expect(400);
+      expect((missing.body as ApiResponse).error?.code).toBe(
+        'MISSING_IDEMPOTENCY_KEY',
+      );
+
+      const giant = await notReturning(
+        studentToken,
+        { tripId: randomUUID() },
+        'a'.repeat(5000),
+      ).expect(400);
+      expect((giant.body as ApiResponse).error?.code).toBe(
+        'INVALID_IDEMPOTENCY_KEY',
+      );
+    });
+
+    it('viagem inexistente, encerrada ou de outra empresa ⇒ 409 TRIP_NOT_ACTIVE', async () => {
+      const nonexistent = await notReturning(studentToken, {
+        tripId: '00000000-0000-4000-8000-000000000000',
+      }).expect(409);
+      expect((nonexistent.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+
+      const completed = await notReturning(studentToken, {
+        tripId: completedTripId,
+      }).expect(409);
+      expect((completed.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+
+      const otherCompany = await notReturning(studentToken, {
+        tripId: otherCompanyTripId,
+      }).expect(409);
+      expect((otherCompany.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+    });
+
+    it('aluno fora da rota da viagem ⇒ 403 STUDENT_NOT_ON_TRIP', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const response = await notReturning(outsiderStudentToken, {
+        tripId,
+      }).expect(403);
+
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'STUDENT_NOT_ON_TRIP',
+      );
+    });
+
+    it('caminho feliz: 201 persiste a ausência; cancellableUntil = notifiedAt + 2 min; sem vazamento de campos internos', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+
+      const response = await notReturning(studentToken, { tripId }).expect(201);
+
+      const body = response.body as ApiResponse;
+      const data = body.data as Record<string, string>;
+      expect(data.status).toBe('NOT_RETURNING');
+      expect(data.studentId).toBe(allowedStudentId);
+      expect(data.tripId).toBe(tripId);
+      expect(
+        Date.parse(data.cancellableUntil) - Date.parse(data.notifiedAt),
+      ).toBe(2 * 60 * 1000);
+      expect(data).not.toHaveProperty('companyId');
+      expect(data).not.toHaveProperty('idempotencyKey');
+
+      const stored = await prisma.boardingAbsence.findFirst({
+        where: { tripId, studentId: allowedStudentId },
+      });
+      expect(stored).not.toBeNull();
+      expect(stored!.notifiedAt.toISOString()).toBe(data.notifiedAt);
+    });
+
+    it('ausência duplicada com key diferente ⇒ 409 ALREADY_NOT_RETURNING e nenhuma segunda linha ativa', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      await notReturning(studentToken, { tripId }).expect(201);
+
+      const response = await notReturning(studentToken, { tripId }).expect(409);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'ALREADY_NOT_RETURNING',
+      );
+
+      const activeRows = await prisma.boardingAbsence.findMany({
+        where: { tripId, studentId: allowedStudentId, cancelledAt: null },
+      });
+      expect(activeRows).toHaveLength(1);
+    });
+
+    it('aluno já CHECKED_IN ⇒ 409 ALREADY_CHECKED_IN — o check-in do motorista tem autoridade', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      await checkIn(driverToken, randomUUID(), {
+        studentId: allowedStudentId,
+        tripId,
+      }).expect(201);
+
+      const response = await notReturning(studentToken, { tripId }).expect(409);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'ALREADY_CHECKED_IN',
+      );
+
+      const absences = await prisma.boardingAbsence.findMany({
+        where: { tripId, studentId: allowedStudentId },
+      });
+      expect(absences).toHaveLength(0);
+    });
+  });
+
+  describe('POST /api/v1/boarding/not-returning — idempotência (Story 4.1)', () => {
+    const notReturning = (
+      token: string,
+      body: Record<string, unknown>,
+      key: string,
+    ) =>
+      post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Idempotency-Key', key)
+        .send(body);
+
+    it('replay: reenviar a mesma X-Idempotency-Key retorna 201 com o resultado original, sem duplicar', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const key = randomUUID();
+      const payload = { tripId };
+
+      const first = await notReturning(studentToken, payload, key).expect(201);
+      const second = await notReturning(studentToken, payload, key).expect(201);
+
+      expect((second.body as ApiResponse).data).toEqual(
+        (first.body as ApiResponse).data,
+      );
+
+      const count = await prisma.boardingAbsence.count({ where: { tripId } });
+      expect(count).toBe(1);
+    });
+
+    it('mesma key para outra viagem ⇒ 409 IDEMPOTENCY_KEY_CONFLICT', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const key = randomUUID();
+
+      await notReturning(studentToken, { tripId }, key).expect(201);
+
+      const otherTripId = await seedActiveTrip('RETURN');
+      const response = await notReturning(
+        studentToken,
+        { tripId: otherTripId },
+        key,
+      ).expect(409);
+
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'IDEMPOTENCY_KEY_CONFLICT',
+      );
+    });
+
+    it('replay continua funcionando depois da viagem ser encerrada — o item não pode ficar preso na fila', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const key = randomUUID();
+      const payload = { tripId };
+
+      const first = await notReturning(studentToken, payload, key).expect(201);
+
+      await prisma.trip.update({
+        where: { id: tripId },
+        data: { status: 'COMPLETED' },
+      });
+
+      const second = await notReturning(studentToken, payload, key).expect(201);
+      expect((second.body as ApiResponse).data).toEqual(
+        (first.body as ApiResponse).data,
+      );
+    });
+  });
+
+  describe('GET /api/v1/trips/:id/students — roster pós-ausência (Story 4.1)', () => {
+    it('aluno com ausência ativa aparece NOT_RETURNING e o total do resumo o exclui', async () => {
+      // Rota com um único aluno vinculado: "0/0" prova a exclusão do total.
+      const tripId = await seedActiveTrip('RETURN');
+      await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/trips/${tripId}/students`)
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(200);
+
+      const body = response.body as unknown as {
+        data: {
+          students: Array<{
+            studentId: string;
+            status: string;
+            checkedInAt: string | null;
+          }>;
+          summary: { boarded: number; total: number };
+        };
+      };
+
+      expect(body.data.students).toHaveLength(1);
+      const student = body.data.students[0];
+      expect(student.studentId).toBe(allowedStudentId);
+      expect(student.status).toBe('NOT_RETURNING');
+      expect(student.checkedInAt).toBeNull();
+      expect(body.data.summary).toEqual({ boarded: 0, total: 0 });
+    });
+
+    it('check-in E ausência ⇒ CHECKED_IN prevalece e o aluno volta a contar no total', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId })
+        .expect(201);
+
+      // O motorista presente embarcou o aluno DEPOIS do aviso de ausência:
+      // last-write-wins do épico — o check-in vence.
+      await checkIn(driverToken, randomUUID(), {
+        studentId: allowedStudentId,
+        tripId,
+      }).expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/trips/${tripId}/students`)
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(200);
+
+      const body = response.body as unknown as {
+        data: {
+          students: Array<{ studentId: string; status: string }>;
+          summary: { boarded: number; total: number };
+        };
+      };
+
+      expect(body.data.students[0].status).toBe('CHECKED_IN');
+      expect(body.data.summary).toEqual({ boarded: 1, total: 1 });
     });
   });
 });

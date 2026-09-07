@@ -136,4 +136,39 @@ export class PrismaTripAdapter implements TripRepositoryApi {
       Effect.orDie,
     );
   }
+
+  findActiveReturnByStudent(
+    studentId: string,
+    tenantId: string,
+  ): Effect.Effect<TripData | null, never, never> {
+    const prisma = this.prisma;
+    return pipe(
+      Effect.tryPromise({
+        // Duas queries, sem JOIN cross-schema (trip lê routing.route_students —
+        // mesmo precedente da elegibilidade de check-in na 3.3a).
+        try: async () => {
+          const links = await prisma.routeStudent.findMany({
+            where: { studentId, companyId: tenantId },
+            select: { routeId: true },
+          });
+          if (links.length === 0) return null;
+          return prisma.trip.findFirst({
+            where: {
+              companyId: tenantId,
+              status: 'ACTIVE',
+              type: 'RETURN',
+              routeId: { in: links.map((l) => l.routeId) },
+            },
+            // Duas viagens de retorno ativas (resquício de seed/corrige-dado)
+            // não podem deixar a escolha ao findFirst: a mais recente é a que
+            // o aluno está vivendo.
+            orderBy: { startedAt: 'desc' },
+          });
+        },
+        catch: toInfraError('Erro ao buscar viagem de retorno ativa do aluno'),
+      }),
+      Effect.map((trip) => (trip as TripData) ?? null),
+      Effect.orDie,
+    );
+  }
 }

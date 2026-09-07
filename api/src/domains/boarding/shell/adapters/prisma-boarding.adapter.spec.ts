@@ -153,4 +153,28 @@ describe('PrismaBoardingAdapter (integração — banco real)', () => {
     );
     expect(sameCompanyResult?.id).toBe(created.record.id);
   });
+
+  it('findCheckInByTripAndStudent encontra o check-in do par e respeita o tenant', async () => {
+    const companyId = randomUUID();
+    const tripId = randomUUID();
+    const studentId = randomUUID();
+
+    const created = await insert({ companyId, tripId, studentId });
+    createdIds.push(created.record.id);
+
+    const found = await Effect.runPromise(
+      adapter.findCheckInByTripAndStudent(tripId, studentId, companyId),
+    );
+    expect(found?.id).toBe(created.record.id);
+
+    const otherCompany = await Effect.runPromise(
+      adapter.findCheckInByTripAndStudent(tripId, studentId, randomUUID()),
+    );
+    expect(otherCompany).toBeNull();
+
+    const absentPair = await Effect.runPromise(
+      adapter.findCheckInByTripAndStudent(tripId, randomUUID(), companyId),
+    );
+    expect(absentPair).toBeNull();
+  });
 });

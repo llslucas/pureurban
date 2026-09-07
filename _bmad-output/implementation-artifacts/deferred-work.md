@@ -335,3 +335,22 @@ comparativa em vez de afirmação de viabilidade sem controle.
   evidence: Review (ECH) da 4.0. Preexistente: `get-active-trip` (Story 3.1) já assume uma
     viagem ativa por motorista. Se o produto um dia permitir 2 rotas simultâneas, o fix é no
     domínio trip (não no contrato de boarding); nada a fazer na 4.0.
+
+## Deferred from: review of 4-1-registro-de-ausencia-nao-vou-voltar (2026-09-07)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-registro-de-ausencia-nao-vou-voltar.md`
+  summary: Replay de ausência CANCELADA (após a 4.3) retorna 201 com a linha original — o
+    cliente voltaria a "Ausência registrada" para uma ausência que o aluno desfez; o desfecho
+    de replay de estado cancelado é decisão de contrato da 4.3.
+  evidence: Review (BH) da 4.1. Inalcançável nesta fatia (`cancel-absence` segue stub 501);
+    o design append-only torna o cenário real a partir da 4.3. Decidir lá a semântica (erro
+    vs resposta com cancelamento representado) junto do tema de desfecho da fila offline
+    (`epic-3-retro-item-3`); se nascer campo/código novo, ajustar o contrato no PR da 4.3
+    (drift discipline).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-registro-de-ausencia-nao-vou-voltar.md`
+  summary: Mock MSW do roster (`mobile/src/mocks/handlers/boarding.handlers.ts:311`) calcula
+    `summary.total` incluindo alunos NOT_RETURNING — diverge da API real, que agora os exclui.
+  evidence: Review (VG) da 4.1. O congelado da 4.1 proíbe tocar em `mobile/src/mocks/`
+    (intenção aprovada pelo humano); qualquer consumidor rodando contra mocks vê semântica
+    pré-4.1 do resumo. Alinhar quando a era dos mocks for encerrada de vez (os handlers já
+    não participam do desenvolvimento das fatias).

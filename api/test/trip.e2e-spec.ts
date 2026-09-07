@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { faker } from '@faker-js/faker';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from '../src/domains/shared/shell/infra/prisma.service.js';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 
 interface ApiResponse {
   data: Record<string, unknown>;
@@ -271,6 +271,98 @@ describe('TripController (e2e)', () => {
         .expect(404);
 
       expect((response.body as ApiResponse).error?.code).toBe('TRIP_NOT_FOUND');
+    });
+  });
+
+  // Story 4.1: GET /trips/active passa a aceitar STUDENT (decisão do Lucas) —
+  // para o aluno, a viagem de retorno ativa na rota dele alimenta o botão
+  // "Não vou voltar" da home. Shape da resposta inalterado.
+  describe('GET /api/v1/trips/active — branch STUDENT (Story 4.1)', () => {
+    const seedReturnTrip = async (driverForTrip = driverId) => {
+      const trip = await prisma.trip.create({
+        data: {
+          companyId,
+          routeId,
+          driverId: driverForTrip,
+          type: 'RETURN',
+          status: 'ACTIVE',
+        },
+      });
+      return trip.id;
+    };
+
+    // Testes anteriores deixam viagens ACTIVE penduradas no motorista e na
+    // rota compartilhados (lição do cabeçalho do arquivo). Encerrá-las dá
+    // determinismo ao findFirst daqui — e só na empresa DESTE spec, que é
+    // criada fresca no beforeAll: nunca cruza com os outros arquivos e2e.
+    beforeEach(async () => {
+      await prisma.trip.updateMany({
+        where: { companyId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED' },
+      });
+    });
+
+    it('aluno com retorno ativo na rota dele ⇒ 200 com a viagem (type RETURN)', async () => {
+      const tripId = await seedReturnTrip();
+
+      const response = await get('/api/v1/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      const data = (response.body as ApiResponse).data;
+      expect(data).not.toBeNull();
+      expect(data).toMatchObject({
+        id: tripId,
+        type: 'RETURN',
+        status: 'ACTIVE',
+        routeId,
+      });
+    });
+
+    it('aluno sem retorno ativo (só ida) ⇒ 200 com data null', async () => {
+      // Uma ida ativa NÃO é retorno: o aviso de ausência é da volta.
+      await prisma.trip.create({
+        data: {
+          companyId,
+          routeId,
+          driverId,
+          type: 'OUTBOUND',
+          status: 'ACTIVE',
+        },
+      });
+
+      const response = await get('/api/v1/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toBeNull();
+    });
+
+    it('aluno sem nenhuma viagem ⇒ 200 com data null', async () => {
+      const response = await get('/api/v1/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toBeNull();
+    });
+
+    it('ADMIN ⇒ 403 FORBIDDEN — o handler agora aceita DRIVER e STUDENT, não qualquer papel', async () => {
+      await get('/api/v1/trips/active')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(403);
+    });
+
+    it('motorista continua recebendo a própria viagem ativa ⇒ 200', async () => {
+      const tripId = await seedReturnTrip();
+
+      const response = await get('/api/v1/trips/active')
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toMatchObject({
+        id: tripId,
+        type: 'RETURN',
+      });
     });
   });
 

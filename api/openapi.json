@@ -649,6 +649,7 @@
     },
     "/api/v1/trips/active": {
       "get": {
+        "description": "Para DRIVER: a viagem ativa do motorista autenticado. Para STUDENT: a viagem de retorno ativa na rota do aluno autenticado, para alimentar o aviso \"Não vou voltar\". Ambos retornam { data: null } quando não há viagem.",
         "operationId": "TripController_getActive",
         "parameters": [],
         "responses": {
@@ -666,7 +667,7 @@
             }
           },
           "403": {
-            "description": "FORBIDDEN — somente motoristas",
+            "description": "FORBIDDEN — somente motoristas e alunos (ADMIN não consulta)",
             "content": {
               "application/json": {
                 "schema": {
@@ -681,7 +682,7 @@
             "bearer": []
           }
         ],
-        "summary": "Obter viagem ativa do motorista",
+        "summary": "Obter viagem ativa (motorista) ou retorno ativo do aluno",
         "tags": [
           "trips"
         ]
@@ -1458,17 +1459,7 @@
             }
           },
           "409": {
-            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Contrato declarado na Story 4.0 — implementação na Story 4.1.",
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). ALREADY_CHECKED_IN — aluno já embarcou nesta viagem: o check-in do motorista presente tem autoridade sobre a ausência, e o aluno deve falar com o motorista. IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.",
             "content": {
               "application/json": {
                 "schema": {

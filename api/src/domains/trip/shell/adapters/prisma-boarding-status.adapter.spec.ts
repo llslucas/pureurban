@@ -14,6 +14,7 @@ describe('PrismaBoardingStatusAdapter (integração — banco real)', () => {
   const createdIds: string[] = [];
   const companyIds: string[] = [];
   const userIds: string[] = [];
+  const absenceIds: string[] = [];
 
   const createCompany = async () => {
     const company = await prisma.company.create({
@@ -75,6 +76,12 @@ describe('PrismaBoardingStatusAdapter (integração — banco real)', () => {
         where: { id: { in: createdIds } },
       });
       createdIds.length = 0;
+    }
+    if (absenceIds.length > 0) {
+      await prisma.boardingAbsence.deleteMany({
+        where: { id: { in: absenceIds } },
+      });
+      absenceIds.length = 0;
     }
     if (userIds.length > 0) {
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -160,7 +167,46 @@ describe('PrismaBoardingStatusAdapter (integração — banco real)', () => {
     const result = await Effect.runPromise(
       adapter.findCheckedInByTrip(tripId, otherCompanyId),
     );
-
     expect(result).toEqual([]);
+  });
+
+  it('ausência CANCELADA sai do roster — só cancelledAt IS NULL é ativa', async () => {
+    const companyId = randomUUID();
+    const tripId = randomUUID();
+    // Ausências criadas direto via Prisma (mesmo padrão do insertRecord de
+    // boardingRecord acima): este spec testa a LEITURA do roster, não a
+    // escrita da ausência — essa é do prisma-absence.adapter.spec.ts.
+    const cancellableUntil = new Date(Date.now() + 2 * 60 * 1000);
+
+    const active = await prisma.boardingAbsence.create({
+      data: {
+        companyId,
+        tripId,
+        studentId: randomUUID(),
+        idempotencyKey: randomUUID(),
+        cancellableUntil,
+      },
+    });
+    absenceIds.push(active.id);
+
+    const cancelled = await prisma.boardingAbsence.create({
+      data: {
+        companyId,
+        tripId,
+        studentId: randomUUID(),
+        idempotencyKey: randomUUID(),
+        cancellableUntil,
+        cancelledAt: new Date(),
+      },
+    });
+    absenceIds.push(cancelled.id);
+
+    const result = await Effect.runPromise(
+      adapter.findActiveAbsencesByTrip(tripId, companyId),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].studentId).toBe(active.studentId);
+    expect(result.map((r) => r.studentId)).not.toContain(cancelled.studentId);
   });
 });

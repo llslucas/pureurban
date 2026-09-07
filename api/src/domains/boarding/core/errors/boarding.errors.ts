@@ -92,3 +92,51 @@ export class DuplicateCheckInError extends Data.TaggedError(
       httpStatus: 409,
     });
 }
+
+export class StudentNotOnTripError extends Data.TaggedError(
+  'StudentNotOnTripError',
+)<{
+  readonly code: string;
+  readonly message: string;
+  readonly httpStatus: number;
+}> {
+  static readonly create = () =>
+    new StudentNotOnTripError({
+      code: 'STUDENT_NOT_ON_TRIP',
+      message: 'Aluno não pertence à rota desta viagem',
+      httpStatus: 403,
+    });
+}
+
+export class AbsenceAlreadyRegisteredError extends Data.TaggedError(
+  'AbsenceAlreadyRegisteredError',
+)<{
+  readonly code: string;
+  readonly message: string;
+  readonly httpStatus: number;
+}> {
+  static readonly create = () =>
+    new AbsenceAlreadyRegisteredError({
+      code: 'ALREADY_NOT_RETURNING',
+      message: 'Ausência já registrada nesta viagem',
+      httpStatus: 409,
+    });
+}
+
+// Check-in do motorista presente tem autoridade sobre a ausência do aluno
+// (decisão do Lucas, fecha o defer da 4.0): se ele já embarcou, avisar que não
+// vai voltar é conflito — o aluno precisa resolver com o motorista.
+export class StudentAlreadyCheckedInError extends Data.TaggedError(
+  'StudentAlreadyCheckedInError',
+)<{
+  readonly code: string;
+  readonly message: string;
+  readonly httpStatus: number;
+}> {
+  static readonly create = () =>
+    new StudentAlreadyCheckedInError({
+      code: 'ALREADY_CHECKED_IN',
+      message: 'Aluno já embarcou nesta viagem — falar com o motorista',
+      httpStatus: 409,
+    });
+}
