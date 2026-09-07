@@ -107,6 +107,7 @@ const TRIP_ID = 'f5819ec5-6e0a-4b0a-9c1d-9c96f65a1d99'
 const makeHandlers = (): BoardingEventHandlers => ({
   onNotReturning: jest.fn(),
   onAbsenceCancelled: jest.fn(),
+  onOpen: jest.fn(),
 })
 
 const errorEvent = (xhrStatus: number) => ({
@@ -238,6 +239,22 @@ describe('BoardingEventsClient — reconnect (spec-4-2, "Queda de rede")', () =>
     expect(instances()).toHaveLength(2)
     jest.advanceTimersByTime(1)
     expect(instances()).toHaveLength(3)
+  })
+
+  it("'open' fires onOpen on the first connection and on every reconnection", async () => {
+    refreshAccessToken.mockResolvedValue(true)
+    const handlers = makeHandlers()
+    connectBoardingEvents(TRIP_ID, handlers)
+
+    // Primeira conexão.
+    lastInstance().dispatch('open')
+    expect(handlers.onOpen).toHaveBeenCalledTimes(1)
+
+    // Reabertura pós-queda (401 → refresh → reopen): onOpen dispara de novo.
+    lastInstance().dispatch('error', errorEvent(401))
+    await flush()
+    lastInstance().dispatch('open')
+    expect(handlers.onOpen).toHaveBeenCalledTimes(2)
   })
 
   it('named events forward the parsed payload to the handlers; ping has no listener', () => {

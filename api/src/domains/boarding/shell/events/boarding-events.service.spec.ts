@@ -294,6 +294,26 @@ describe('BoardingEventsService — stream com subscribe refcount', () => {
     ).not.toThrow();
   });
 
+  it('mensagem malformada num canal ATIVO é descartada sem derrubar o stream', () => {
+    const { messages, observer } = collect();
+    service.stream(TRIP_ID).subscribe(observer);
+
+    expect(() =>
+      fake.subscriber.deliver(boardingChannel(TRIP_ID), '{not json'),
+    ).not.toThrow();
+    expect(messages).toEqual([]);
+
+    // O canal segue vivo: a mensagem válida seguinte é entregue normalmente.
+    fake.subscriber.deliver(
+      boardingChannel(TRIP_ID),
+      JSON.stringify({
+        type: 'boarding.not_returning',
+        data: { tripId: TRIP_ID, studentId: 's1', notifiedAt: 'x' },
+      }),
+    );
+    expect(messages).toHaveLength(1);
+  });
+
   it('sinal terminal completa o stream, desinscreve o canal e limpa a entrada', async () => {
     const first = collect();
     const second = collect();

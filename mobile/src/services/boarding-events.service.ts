@@ -19,6 +19,10 @@ export type BoardingCheckinReminderEvent =
 export interface BoardingEventHandlers {
   onNotReturning: (event: BoardingNotReturningEvent) => void
   onAbsenceCancelled: (event: BoardingAbsenceCancelledEvent) => void
+  // (Re)estabelecimento da conexão — inclusive a primeira: o consumidor
+  // reconcilia o estado que pode ter mudado durante a queda de rede
+  // (spec 4.2, linha "Queda de rede": roster reconciliado por refetch).
+  onOpen?: () => void
   // Lembrete do canal (Story 4.4): a story 4.2 só faz forwarding — nenhum
   // consumidor no motorista ainda.
   onCheckinReminder?: (event: BoardingCheckinReminderEvent) => void
@@ -82,15 +86,14 @@ class BoardingEventsClient {
     if (this.closed) return
 
     const token = tokenStorage.getAccessToken()
-    const source = new EventSource<
-      'boarding.not_returning' | 'boarding.absence_cancelled' | 'boarding.checkin_reminder'
-    >(`${API_BASE_URL}${EVENTS_PATH}`, {
+    const source: TypedEventSource = new EventSource(`${API_BASE_URL}${EVENTS_PATH}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     this.source = source
 
     source.addEventListener('open', () => {
       this.attempts = 0
+      this.handlers.onOpen?.()
     })
 
     source.addEventListener('error', (event) => {

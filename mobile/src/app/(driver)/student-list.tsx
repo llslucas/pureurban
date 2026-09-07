@@ -25,7 +25,16 @@ function applyNotReturningToRoster(
   const student = roster.students.find((s) => s.studentId === event.studentId)
   // Aluno já ausente: evento duplicado (replay pós-reconexão) — idempotente,
   // sem decrementar o total de novo.
-  if (!student || student.status === 'NOT_RETURNING') return roster
+  // Aluno já embarcado: o check-in prevalece (last-write-wins do épico) —
+  // aplicar viraria badge e toast errados até o refetch; a invalidação feita
+  // pelo handler reconcilia com o servidor.
+  if (
+    !student ||
+    student.status === 'NOT_RETURNING' ||
+    student.status === 'CHECKED_IN'
+  ) {
+    return roster
+  }
 
   return {
     students: roster.students.map((s) =>
@@ -176,14 +185,17 @@ export default function StudentListScreen() {
 
   // Um cliente SSE por viagem ativa: trocou a viagem, fecha e reabre no canal
   // novo. close() no unmount e no 409 pós-fim de viagem (dentro do serviço).
+  // onOpen reconcile por refetch: ausências acontecidas durante a queda de
+  // rede chegam só no (re)estabelecimento da conexão.
   useEffect(() => {
     if (!tripId) return
     const connection = connectBoardingEvents(tripId, {
       onNotReturning: handleNotReturning,
       onAbsenceCancelled: handleAbsenceCancelled,
+      onOpen: reconcileRoster,
     })
     return () => connection.close()
-  }, [tripId, handleNotReturning, handleAbsenceCancelled])
+  }, [tripId, handleNotReturning, handleAbsenceCancelled, reconcileRoster])
 
   // ---- Guardas na ordem da Tabela de Verdade ----
 

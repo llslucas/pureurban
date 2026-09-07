@@ -165,7 +165,16 @@ export class BoardingEventsService implements OnModuleDestroy {
     const entry = this.channels.get(channel);
     if (!entry) return;
 
-    const parsed = JSON.parse(message) as { type: string; data?: unknown };
+    let parsed: { type: string; data?: unknown };
+    try {
+      parsed = JSON.parse(message) as { type: string; data?: unknown };
+    } catch {
+      // Mensagem malformada num canal ativo não pode derrubar o processo
+      // (uncaught exception no listener 'message' do ioredis): descarta.
+      this.logger.warn(`Malformed message on ${channel} — dropped`);
+      return;
+    }
+
     if (parsed.type === TRIP_ENDED_SIGNAL) {
       // Fora do mapa ANTES do complete: nenhuma mensagem nova entra num
       // subject em processo de encerramento.

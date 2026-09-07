@@ -205,6 +205,31 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
     expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
   })
 
+  it('not_returning para aluno CHECKED_IN no cache: sem badge, sem toast, só refetch', async () => {
+    const anaEmbarcada = {
+      ...STUDENT_A,
+      status: 'CHECKED_IN' as const,
+      checkedInAt: '2026-09-07T18:09:00.000Z',
+    }
+    const ambosEmbarcados = rosterWith(anaEmbarcada, STUDENT_B)
+    mockTrip.getTripStudents
+      .mockResolvedValueOnce(ambosEmbarcados)
+      .mockResolvedValue(ambosEmbarcados)
+
+    renderScreen()
+    expect(await screen.findByText('2/2 embarcados')).toBeTruthy()
+    expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(1)
+
+    act(() => registeredHandlers().onNotReturning(NOT_RETURNING_EVENT))
+
+    // Check-in prevalece (last-write-wins do épico): badge e contagem intactos,
+    // sem toast — o refetch de reconciliação corrige o resto.
+    expect(screen.getAllByText('✓ Embarcou')).toHaveLength(2)
+    expect(screen.getByText('2/2 embarcados')).toBeTruthy()
+    expect(screen.queryByText(/não vai voltar no ônibus/)).toBeNull()
+    await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
+  })
+
   it('absence_cancelled com aluno CHECKED_IN no cache: check-in prevalece e o refetch reconcilia', async () => {
     const anaEmbarcada = {
       ...STUDENT_A,
@@ -289,5 +314,20 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
 
     const connection = mockConnect.mock.results[0]?.value as { close: () => void }
     expect(connection.close).toHaveBeenCalled()
+  })
+
+  it('onOpen: (re)estabelecimento da conexão reconcilia o roster por refetch', async () => {
+    // Ausências acontecidas durante a queda de rede só são percebidas na
+    // reconexão — o evento 'open' deve disparar o refetch de reconciliação.
+    const antes = rosterWith(STUDENT_A, STUDENT_B)
+    mockTrip.getTripStudents.mockResolvedValue(antes)
+
+    renderScreen()
+    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(1)
+
+    act(() => registeredHandlers().onOpen?.())
+
+    await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
   })
 })
