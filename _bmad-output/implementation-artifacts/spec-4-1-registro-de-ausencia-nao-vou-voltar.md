@@ -2,7 +2,7 @@
 title: 'Story 4.1: Registro de Ausência "Não Vou Voltar" (Fatia Vertical)'
 type: 'feature'
 created: '2026-09-07'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 8e1ce51a17519bde0e02ac6a70b190713934475b
@@ -148,36 +148,36 @@ confirmação, estado "Ausência registrada" e countdown alimentado por `cancell
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `api/prisma/schema.prisma` + migração -- NEW `BoardingAbsence`; `npx prisma migrate dev`
+- [x] `api/prisma/schema.prisma` + migração -- NEW `BoardingAbsence`; `npx prisma migrate dev`
   + `npx prisma generate`.
-- [ ] `api/src/domains/boarding/core/errors/boarding.errors.ts` -- tagged errors novos.
-- [ ] `api/src/domains/boarding/core/ports/absence-repository.port.ts` -- NEW port.
-- [ ] `api/src/domains/boarding/core/schemas/not-returning.schema.ts` -- NEW `Schema.Struct`
+- [x] `api/src/domains/boarding/core/errors/boarding.errors.ts` -- tagged errors novos.
+- [x] `api/src/domains/boarding/core/ports/absence-repository.port.ts` -- NEW port.
+- [x] `api/src/domains/boarding/core/schemas/not-returning.schema.ts` -- NEW `Schema.Struct`
   `{ tripId: Schema.UUID }` (código de pipe: `VALIDATION_ERROR`).
-- [ ] `api/src/domains/boarding/core/use-cases/register-not-returning.use-case.ts` -- NEW
+- [x] `api/src/domains/boarding/core/use-cases/register-not-returning.use-case.ts` -- NEW
   (replay-first → trip ativa → aluno na rota → já CHECKED_IN → ausência ativa →
   create; `CANCELLABLE_WINDOW_MS`; evento `boarding.not_returning`).
-- [ ] `api/src/domains/boarding/shell/adapters/prisma-absence.adapter.ts` -- NEW adapter.
-- [ ] `api/src/domains/boarding/shell/boarding.module.ts` + `boarding.service.ts` +
+- [x] `api/src/domains/boarding/shell/adapters/prisma-absence.adapter.ts` -- NEW adapter.
+- [x] `api/src/domains/boarding/shell/boarding.module.ts` + `boarding.service.ts` +
   `boarding.controller.ts` -- wiring do endpoint real no stub da 4.0.
-- [ ] `api/src/domains/trip/core/ports/boarding-status.port.ts` +
+- [x] `api/src/domains/trip/core/ports/boarding-status.port.ts` +
   `shell/adapters/prisma-boarding-status.adapter.ts` +
   `core/use-cases/get-trip-students.use-case.ts` -- `NOT_RETURNING` no roster + `total`.
-- [ ] `api/src/domains/trip/` (port `trip-repository.port.ts`, use case, `trip.controller.ts`,
+- [x] `api/src/domains/trip/` (port `trip-repository.port.ts`, use case, `trip.controller.ts`,
   `trip.service.ts`) -- `GET /trips/active` para STUDENT (viagem RETURN ativa na rota).
-- [ ] `api/openapi.json` + `mobile/src/types/api.d.ts` -- `npm run openapi:export` (api/) e
+- [x] `api/openapi.json` + `mobile/src/types/api.d.ts` -- `npm run openapi:export` (api/) e
   `npm run openapi:types` (mobile/) após os ajustes de contrato; commit dos dois.
-- [ ] Testes unitários core: `register-not-returning.use-case.spec.ts` (NEW, matriz I/O),
+- [x] Testes unitários core: `register-not-returning.use-case.spec.ts` (NEW, matriz I/O),
   `get-trip-students.use-case.spec.ts` (UPDATE), spec do use case do active-trip do aluno
   (NEW), adapter spec (NEW, modelo `prisma-boarding.adapter.spec.ts`).
-- [ ] `api/test/boarding.e2e-spec.ts` -- UPDATE bloco 4.0 (501→201) + cenários da matriz
+- [x] `api/test/boarding.e2e-spec.ts` -- UPDATE bloco 4.0 (501→201) + cenários da matriz
   (happy, replay, duplicada, já CHECKED_IN, fora da rota, viagem inativa, roster
   `NOT_RETURNING`).
-- [ ] `mobile/src/services/boarding.service.ts` + `mobile/src/app/(student)/home.tsx` --
+- [x] `mobile/src/services/boarding.service.ts` + `mobile/src/app/(student)/home.tsx` --
   serviço + botão proeminente → dialog de confirmação (≤2 toques) → "Ausência registrada" +
   countdown por `cancellableUntil`; expirada, apresentada como consolidada; mensagens
   claras por código de erro; sem viagem de retorno ativa, botão desabilitado com dica.
-- [ ] `mobile/src/student-home.test.tsx` -- NEW (happy path, 2 toques, `ALREADY_NOT_RETURNING`
+- [x] `mobile/src/student-home.test.tsx` -- NEW (happy path, 2 toques, `ALREADY_NOT_RETURNING`
   → estado registrado, erros tipados, sem viagem → desabilitado).
 
 **Acceptance Criteria:**
@@ -197,9 +197,58 @@ confirmação, estado "Ausência registrada" e countdown alimentado por `cancell
 
 ## Implementation Notes
 
+- **Branch `feat/4-1-registro-de-ausencia-nao-vou-voltar`** (a partir de `main` @ 8e1ce51),
+  6 commits atômicos (modelo+migração; trip/roster/active; boarding core+shell; contrato;
+  mobile; docs). Sem PR aberto — aguardando revisão/aprovação.
+- **`cancellableUntil` também é coluna** (`boarding_absences.cancellableUntil`): o core
+  calcula no create (mesma leitura de relógio do `notifiedAt`) e persiste — a 4.3 consulta
+  o valor sem recalcular, e a resposta da API sai direto da linha.
+- **Ordem real das regras no use case:** replay → trip ativa → aluno na rota → já
+  CHECKED_IN → ausência ativa → create. O conflito com check-in vence a checagem de
+  ausência ativa (testes fixam a ordem nos dois níveis).
+- **Corrida de replay no adapter:** P2002 em `[companyId, idempotencyKey]` → re-leitura pela
+  key com discriminador `{ created, record }` (mesmo padrão do check-in). `created: false`
+  com payload divergente vira `IDEMPOTENCY_KEY_CONFLICT` no use case, sem evento duplicado.
+- **Roster:** `findActiveAbsencesByTrip` entra no `Effect.all` (concurrency 3);
+  `TripBoardingStatus` ganha `NOT_RETURNING`; invariante `boarded <= total` preservada
+  (CHECKED_IN vence ausência e o aluno volta a contar).
+- **Verificação executada (2026-09-07):** `npm run build` 0 erros; `npm test` 234/234 (suíte
+  do core: 63ms); e2e boarding 40/40 + trip 32/32 (inclui branch STUDENT do `/trips/active`
+  e 403 para ADMIN); `openapi:export` 2x com sha256 idêntico; `openapi:types` + `tsc
+  --noEmit` mobile limpos; mobile `npm test` 124/124; lint sem arquivo da story na saída
+  (baseline ~148 erros preexistentes); `git status --porcelain mobile/src/mocks/` vazio.
+- **Falha e2e pré-existente (fora do escopo):** `route-assignment.e2e-spec.ts` espera login
+  200 e a API responde 201 — provada presente no baseline 8e1ce51 via worktree. É a mesma
+  suíte vermelha da baseline já registrada no action item `epic-3-retro-item-2`.
+- `AbsenceRepository.findActiveByTrip` fica sem consumidor nesta story (superfície do port
+  para 4.2/4.3). Smoke manual web (botão + roster refetch) não executado — coberto por e2e.
+
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Achado (camada) | Veredito | Evidência |
+|---|-----------------|----------|-----------|
+| 1 | BH: copy do app promete cancelamento ("Dá para cancelar…", "Cancelar disponível por m:ss") sem o botão, que só nasce na 4.3 | low | Real: `home.tsx` mostra countdown anunciando ação inexistente nesta fatia. Copy-only: dialog sem a frase de cancelamento + rótulo factual "Janela de cancelamento" (fica correto quando a 4.3 trouxer o botão). → patch |
+| 2 | BH: botão "Meu QR Code" some quando a ausência está registrada — aluno que errou o toque fica sem QR para embarcar | medium | Real: o card de ausência substitui o bloco inteiro do QR em `home.tsx`. Aluno com registro indevido perde o artefato de embarque até o cache expirar (24h) — caminho de produto quebrado no cenário de erro do próprio fluxo. → patch (QR visível nos dois estados) |
+| 3 | BH: replay de ausência CANCELADA (após 4.3) retorna 201 com a linha original → cliente mostra "Ausência registrada" para ausência desfeita | low | Inalcançável nesta fatia (`cancel-absence` é 501); o desfecho do replay de erro/cancelamento é decisão de contrato da 4.3 — mesmo tema de `epic-3-retro-item-3` e dos defers de ciclo de vida da 4.0. → defer |
+| 4 | BH: POST com `tripId` OUTBOUND é aceito (roster da ida exclui o aluno do total) | false | Comportamento decidido na spec aprovada (Never: "sem validação de tipo de viagem — o contrato da 4.0 não declara esse erro; a tela só oferece a viagem de retorno ativa"). Cliente entregue nunca envia ida. Corrigir exigiria editar spec → rejeitado. |
+| 5 | BH: contradição "Smoke manual web não executado" (Notes) vs Verification que lista o smoke | false | Verification é o plano pré-implementação; Implementation Notes é o registro de execução — mesmo padrão da triage #11 da 4.0. Sem contradição de fato. |
+| 6 | BH: números divergentes (234/234 vs ~206+; ~148 vs ~147 lint) | false | Plano (estimativas) vs registro (execução real): `npm test` terminou em 234 testes e a baseline de lint medida foi 148. Mesmo padrão da 5. |
+| 7 | BH: estado "Ausência registrada" some quando a viagem termina (query desabilitada sem tripId) | low | Comportamento real, mas consequência nula: viagem encerrada torna o card moot e o próximo retorno nasce limpo. Fix exige novo ramo de UI persistente pós-fim de viagem — complexidade sem benefício demonstrado. → rejeitado |
+| 8 | BH: copy de `TRIP_NOT_ACTIVE` manda "Atualize e tente de novo" sem haver refresh na tela; código sem teste mobile | low | Real: mensagem promete ação indisponível e o mapeamento não tem caso de teste. Fix direto: ajustar a string + adicionar o caso no `student-home.test.tsx`. → patch |
+| 9 | BH: `findActiveReturnByStudent` usa `findFirst` sem `orderBy` — viagem escolhida não-determinística com 2 retornos ativos | low | Alcançável só com anomalia operacional (2 motoristas com retorno ativo na mesma rota), mas o fix é 1 linha e o próprio e2e de trip precisa encerrar viagens pendentes para ser determinístico. → patch |
+| 10 | BH: título de teste e2e obsoleto ("lógica na 4.1" num teste que É a lógica da 4.1) | low | Real e cosmético; correção direta. → patch |
+| 11 | BH: comentário do fixture mobile diz "2 minutos à frente de notifiedAt" mas o valor é `now + 90s` | low | Real e cosmético; correção direta do comentário/fixture. → patch |
+| 12 | BH: `AbsenceRepository.findActiveByTrip` sem consumidor (código especulativo) | false | Superfície do port explicitamente mandada pela Code Map da spec aprovada (para 4.2/4.3), com testes que provam o contrato do adapter. Nenhum defeito. |
+| 13 | BH: drift de rastreabilidade — `ALREADY_CHECKED_IN` documentado no `@ApiResponse` do controller, não no DTO citado pela Code Map | false | O contrato entregue é o `openapi.json` regenerado e commitado (drift check verde); onde mora a anotação é detalhe de implementação. A correção pedida é editar a spec → rejeitado. |
+| 14 | BH: sem e2e de conflito de idempotência entre alunos distintos e de isolamento de tenant no branch STUDENT do `/trips/active` | low | Cobertura existente prova os comportamentos (core unit para `studentId` divergente; filtro `companyId` uniforme e provado no adapter de ausências do mesmo PR). Os e2es extras são defesa-em-profundidade que adicionam superfície. → rejeitado |
+| 15 | ECH: corrida endTrip × create — ausência persistida contra viagem recém-encerrada | low | Janela de milissegundos; consequência inerte (roster de viagem encerrada não é alcançado pela UI — sem viagem ativa a tela do motorista nem lista). Fix exigiria transação com re-check — complexidade sem dano demonstrado. → rejeitado |
+| 16 | ECH: dialog dispensado com mutation em voo + reconfirmação ⇒ 2º POST com key nova (ausência dupla + evento duplo) | low | Real e alcançável em rede lenta (o fix é trava de UI: não resetar a key com mutation pendente e desabilitar o botão). → patch |
+| 17 | ECH: cache escrito sob key possivelmente obsoleta (tripId do render vs variável da mutation) | low | Real: `onSuccess` usa `tripId` do closure; se a viagem mudar em voo, o estado se perde. Fix direto: escrever sob a variável recebida pela mutation. → patch |
+| 18 | VG (gap pré-verificado): filtro `cancelledAt: null` do roster (`prisma-boarding-status.adapter.ts:65`) sem teste que observe linha cancelada — deletar o filtro mantém todas as suítes verdes | medium | Demonstrado pelo reviewer: nenhuma suíte produz ausência cancelada no caminho do roster; quando a 4.3 entregar cancelamento, aluno cancelado continuaria "NÃO VAI VOLTAR" com suíte verde. Disposição filed: patch (caso de linha cancelada no spec do adapter). → patch |
+| 19 | VG (outro): MSW `boarding.handlers.ts:311` calcula `total` incluindo NOT_RETURNING — diverge da API real | low | Divergência real, mas o congelado proíbe tocar em `mobile/src/mocks/` nesta fatia (intenção aprovada pelo humano). → defer |
+| 20 | VG (outro): mesmo `findFirst` sem `orderBy` do #9 (precedente `findActiveByDriver`) | low | Mesma causa raiz do #9 → agrupado no patch. |
 
 ## Design Notes
 

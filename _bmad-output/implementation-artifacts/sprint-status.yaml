@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-07-2026 15:02"
+last_updated: "09-07-2026 16:20"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -190,7 +190,7 @@ development_status:
   # que decide "quem deve ser lembrado" são preservados integralmente.
   epic-4: in-progress
   4-0-contrato-de-api-ausencia: done
-  4-1-registro-de-ausencia-nao-vou-voltar: in-progress
+  4-1-registro-de-ausencia-nao-vou-voltar: review
   4-2-canal-sse-e-recebimento-em-tempo-real: backlog
   4-3-cancelamento-de-ausencia: backlog
   4-4-lembrete-automatico-de-check-in-pendente: backlog
