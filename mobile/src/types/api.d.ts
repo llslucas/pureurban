@@ -202,7 +202,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Obter viagem ativa do motorista */
+        /**
+         * Obter viagem ativa (motorista) ou retorno ativo do aluno
+         * @description Para DRIVER: a viagem ativa do motorista autenticado. Para STUDENT: a viagem de retorno ativa na rota do aluno autenticado, para alimentar o aviso "Não vou voltar". Ambos retornam { data: null } quando não há viagem.
+         */
         get: operations["TripController_getActive"];
         put?: never;
         post?: never;
@@ -1459,7 +1462,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description FORBIDDEN — somente motoristas */
+            /** @description FORBIDDEN — somente motoristas e alunos (ADMIN não consulta) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2206,17 +2209,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado. */
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). ALREADY_CHECKED_IN — aluno já embarcou nesta viagem: o check-in do motorista presente tem autoridade sobre a ausência, e o aluno deve falar com o motorista. IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado. */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description Contrato declarado na Story 4.0 — implementação na Story 4.1. */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
