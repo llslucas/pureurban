@@ -45,6 +45,7 @@ import {
   BoardingCheckinReminderEventDto,
 } from './dtos/boarding-events.dto.js';
 import { CheckInInput } from '../../core/schemas/check-in.schema.js';
+import { NotReturningInput } from '../../core/schemas/not-returning.schema.js';
 import { BoardingService } from '../boarding.service.js';
 
 @ApiTags('boarding')
@@ -164,22 +165,24 @@ export class BoardingController {
     description:
       'TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ' +
       'ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). ' +
+      'ALREADY_CHECKED_IN — aluno já embarcou nesta viagem: o check-in do motorista presente tem autoridade sobre a ausência, e o aluno deve falar com o motorista. ' +
       'IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.',
     type: ErrorResponseDto,
   })
-  @ApiResponse({
-    status: 501,
-    description:
-      'Contrato declarado na Story 4.0 — implementação na Story 4.1.',
-    type: ErrorResponseDto,
-  })
-  // Sem @Body() no stub: o ESLint do repo (no-unused-vars sem argsIgnorePattern)
-  // rejeitaria o parâmetro parado, e o body já é documentado pelo @ApiBody — o
-  // @Body(new EffectSchemaPipe(...)) é amarrado na fatia (4.1).
-  notReturning(): never {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.1',
+  notReturning(
+    @TenantId() companyId: string,
+    @IdempotencyKey() idempotencyKey: string,
+    @Req() req: Request & { user: { userId: string } },
+    @Body(new EffectSchemaPipe(NotReturningInput, 'VALIDATION_ERROR'))
+    body: NotReturningInput,
+  ) {
+    // O aluno vem do token, nunca do body: é a identidade autenticada que
+    // avisa a própria ausência (mesmo padrão do driverId no check-in).
+    return this.boardingService.registerNotReturning({
+      ...body,
+      companyId,
+      studentId: req.user.userId,
+      idempotencyKey,
     });
   }
 
