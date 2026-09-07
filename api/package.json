@@ -24,7 +24,8 @@
     "test:pw:headed": "npx playwright test --headed --workers=1",
     "test:pw:debug": "npx playwright test --debug",
     "openapi:export": "nest build && node dist/scripts/export-openapi.js",
-    "openapi:check": "npm run openapi:export && git diff --exit-code HEAD -- openapi.json"
+    "openapi:check": "npm run openapi:export && git diff --exit-code HEAD -- openapi.json",
+    "seed": "prisma db seed"
   },
   "dependencies": {
     "@effect/schema": "^0.75.5",
@@ -48,9 +49,6 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1"
-  },
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -78,8 +76,7 @@
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-loader": "^9.5.2",
-    "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
     "unplugin-swc": "^1.5.9",
