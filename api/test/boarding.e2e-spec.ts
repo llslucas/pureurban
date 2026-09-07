@@ -525,4 +525,68 @@ describe('BoardingController (e2e)', () => {
       );
     });
   });
+
+  // Story 4.0: contrato declarado, lógica ainda não (stubs 501). A matriz de
+  // roles fica travada aqui porque o override por handler (@Roles STUDENT nos
+  // POSTs, DRIVER no stream) vence o ['DRIVER'] da classe — perdê-lo é falha
+  // silenciosa de autorização.
+  describe('Story 4.0 — stubs 501 (not-returning, cancel-absence, events)', () => {
+    const notReturning = (token: string | null) => {
+      const req = post('/api/v1/boarding/not-returning').send({
+        tripId: randomUUID(),
+      });
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req.set('X-Idempotency-Key', randomUUID());
+    };
+
+    const cancelAbsence = (token: string | null) => {
+      const req = post('/api/v1/boarding/cancel-absence').send({
+        tripId: randomUUID(),
+      });
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req.set('X-Idempotency-Key', randomUUID());
+    };
+
+    const events = (token: string | null) => {
+      const req = request(app.getHttpServer()).get('/api/v1/boarding/events');
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req;
+    };
+
+    it('STUDENT: POST /not-returning retorna 501 NOT_IMPLEMENTED (lógica na 4.1)', async () => {
+      const response = await notReturning(studentToken).expect(501);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'NOT_IMPLEMENTED',
+      );
+    });
+
+    it('STUDENT: POST /cancel-absence retorna 501 NOT_IMPLEMENTED (lógica na 4.3)', async () => {
+      const response = await cancelAbsence(studentToken).expect(501);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'NOT_IMPLEMENTED',
+      );
+    });
+
+    it('DRIVER: GET /events retorna 501 NOT_IMPLEMENTED (stream na 4.2)', async () => {
+      const response = await events(driverToken).expect(501);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'NOT_IMPLEMENTED',
+      );
+    });
+
+    it('DRIVER nos POSTs deve dar 403 — o override STUDENT por handler vence o DRIVER da classe', async () => {
+      await notReturning(driverToken).expect(403);
+      await cancelAbsence(driverToken).expect(403);
+    });
+
+    it('STUDENT em /events deve dar 403 — o stream é do motorista', async () => {
+      await events(studentToken).expect(403);
+    });
+
+    it('sem token, as 3 rotas novas devem dar 401', async () => {
+      await notReturning(null).expect(401);
+      await cancelAbsence(null).expect(401);
+      await events(null).expect(401);
+    });
+  });
 });

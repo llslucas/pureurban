@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-07-2026 12:11"
+last_updated: "09-07-2026 14:14"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -188,8 +188,8 @@ development_status:
   # CORTADAS -> Fase 2: 4-5a e 4-5b (broadcast do motorista, FR36/FR37).
   # 4.4 troca push notification por lembrete in-app; o scheduler e o use case do core
   # que decide "quem deve ser lembrado" são preservados integralmente.
-  epic-4: backlog
-  4-0-contrato-de-api-ausencia: backlog
+  epic-4: in-progress
+  4-0-contrato-de-api-ausencia: done
   4-1-registro-de-ausencia-nao-vou-voltar: backlog
   4-2-canal-sse-e-recebimento-em-tempo-real: backlog
   4-3-cancelamento-de-ausencia: backlog
