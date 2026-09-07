@@ -1,16 +1,65 @@
 import { router } from 'expo-router'
-import React from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Banner, Button, Text } from 'react-native-paper'
-import { useQuery } from '@tanstack/react-query'
+import { ActivityIndicator, Banner, Button, Snackbar, Text } from 'react-native-paper'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { StudentCard } from '@/components/student-card'
 import { ApiClientError } from '@/services/api-client'
-import { tripService, type Trip } from '@/services/trip.service'
+import {
+  connectBoardingEvents,
+  type BoardingAbsenceCancelledEvent,
+  type BoardingNotReturningEvent,
+} from '@/services/boarding-events.service'
+import { tripService, type Trip, type TripStudents } from '@/services/trip.service'
 import { useAuthStore } from '@/stores/auth.store'
+
+// Eventos aplicados ao cache como NOVO array + novos objetos (StudentCard é
+// React.memo: mutação in-place não re-renderizaria o card). O summary é
+// ajustado no próprio cache e a query é sempre invalidada em seguida — o
+// servidor é a verdade (o total que exclui ausentes é regra dele).
+function applyNotReturningToRoster(
+  roster: TripStudents,
+  event: BoardingNotReturningEvent,
+): TripStudents {
+  const student = roster.students.find((s) => s.studentId === event.studentId)
+  // Aluno já ausente: evento duplicado (replay pós-reconexão) — idempotente,
+  // sem decrementar o total de novo.
+  if (!student || student.status === 'NOT_RETURNING') return roster
+
+  return {
+    students: roster.students.map((s) =>
+      s.studentId === event.studentId ? { ...s, status: 'NOT_RETURNING' } : s,
+    ),
+    // O total do servidor exclui o ausente (28/32 → 28/31); o boarded não muda
+    // — quem avisou ausência não embarcou.
+    summary: { ...roster.summary, total: Math.max(0, roster.summary.total - 1) },
+  }
+}
+
+function applyAbsenceCancelledToRoster(
+  roster: TripStudents,
+  event: BoardingAbsenceCancelledEvent,
+): TripStudents {
+  const student = roster.students.find((s) => s.studentId === event.studentId)
+  // Check-in prevalece sobre a ausência (last-write-wins do épico): se o
+  // motorista já embarcou o aluno, o cache CHECKED_IN fica como está e a
+  // invalidação abaixo reconcilia com o servidor.
+  if (!student || student.status !== 'NOT_RETURNING') return roster
+
+  return {
+    students: roster.students.map((s) =>
+      s.studentId === event.studentId ? { ...s, status: 'NOT_CHECKED_IN' } : s,
+    ),
+    // O aluno volta a contar no total ao reverter a ausência.
+    summary: { ...roster.summary, total: roster.summary.total + 1 },
+  }
+}
 
 export default function StudentListScreen() {
   const { user, logout } = useAuthStore()
+  const queryClient = useQueryClient()
+  const [snackbar, setSnackbar] = useState({ visible: false, message: '' })
 
   // MESMA query key de trip.tsx e scan.tsx — reusar, não criar outra (finding de
   // review na 3.2b: key duplicada faz as telas divergirem). Mesmos parâmetros —
@@ -58,6 +107,83 @@ export default function StudentListScreen() {
     retry: (count, error) =>
       count < 2 && !(error instanceof ApiClientError && error.status >= 400 && error.status < 500),
   })
+
+  // ---- Canal SSE (Story 4.2) ----
+
+  // Evento com studentId fora do cache (roster velho, aluno novo na rota):
+  // nada a aplicar localmente — só o refetch reconcilia com o servidor.
+  const reconcileRoster = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['trip', tripId, 'students'] })
+  }, [queryClient, tripId])
+
+  const handleNotReturning = useCallback(
+    (event: BoardingNotReturningEvent) => {
+      const rosterCache = queryClient.getQueryData<TripStudents>([
+        'trip',
+        tripId,
+        'students',
+      ])
+      if (!rosterCache) {
+        reconcileRoster()
+        return
+      }
+
+      const student = rosterCache.students.find(
+        (s) => s.studentId === event.studentId,
+      )
+      if (!student) {
+        // Sem nome no cache não há toast — o nome nunca vem no evento (só IDs).
+        reconcileRoster()
+        return
+      }
+
+      const applied = applyNotReturningToRoster(rosterCache, event)
+      if (applied !== rosterCache) {
+        queryClient.setQueryData<TripStudents>(
+          ['trip', tripId, 'students'],
+          applied,
+        )
+        // Toast não bloqueante: o badge na lista é o sinal principal.
+        setSnackbar({ visible: true, message: `${student.name} não vai voltar no ônibus` })
+      }
+      reconcileRoster()
+    },
+    [queryClient, tripId, reconcileRoster],
+  )
+
+  const handleAbsenceCancelled = useCallback(
+    (event: BoardingAbsenceCancelledEvent) => {
+      const rosterCache = queryClient.getQueryData<TripStudents>([
+        'trip',
+        tripId,
+        'students',
+      ])
+      if (rosterCache) {
+        const applied = applyAbsenceCancelledToRoster(rosterCache, event)
+        if (applied !== rosterCache) {
+          queryClient.setQueryData<TripStudents>(
+            ['trip', tripId, 'students'],
+            applied,
+          )
+        }
+      }
+      // Invalida mesmo sem mudança local: a verdade do servidor reconcilia
+      // (inclusive o caso CHECKED_IN, onde o check-in prevalece).
+      reconcileRoster()
+    },
+    [queryClient, tripId, reconcileRoster],
+  )
+
+  // Um cliente SSE por viagem ativa: trocou a viagem, fecha e reabre no canal
+  // novo. close() no unmount e no 409 pós-fim de viagem (dentro do serviço).
+  useEffect(() => {
+    if (!tripId) return
+    const connection = connectBoardingEvents(tripId, {
+      onNotReturning: handleNotReturning,
+      onAbsenceCancelled: handleAbsenceCancelled,
+    })
+    return () => connection.close()
+  }, [tripId, handleNotReturning, handleAbsenceCancelled])
 
   // ---- Guardas na ordem da Tabela de Verdade ----
 
@@ -215,6 +341,15 @@ export default function StudentListScreen() {
         }
         contentContainerStyle={students.length === 0 ? styles.emptyContent : undefined}
       />
+
+      {/* Toast de ausência em tempo real — precedente: (student)/home.tsx. */}
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar((s) => ({ ...s, visible: false }))}
+        duration={4000}
+      >
+        {snackbar.message}
+      </Snackbar>
     </View>
   )
 }
