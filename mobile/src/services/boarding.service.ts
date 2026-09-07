@@ -7,6 +7,8 @@ import { apiClient } from './api-client'
 // em `Record<string, never>` — ver deferred-work.md, defer da 3.0).
 export type CheckInRequest = components['schemas']['CheckInRequestDto']
 export type CheckInResponse = components['schemas']['CheckInResponseDto']
+export type NotReturningRequest = components['schemas']['NotReturningRequestDto']
+export type NotReturningResponse = components['schemas']['NotReturningResponseDto']
 
 export const boardingService = {
   // A chave de idempotência é RECEBIDA, não gerada aqui. Ela pertence à
@@ -19,4 +21,14 @@ export const boardingService = {
     apiClient.post<CheckInResponse>('/api/v1/boarding/check-in', input, {
       'X-Idempotency-Key': idempotencyKey,
     }),
+
+  // Mesma regra da key: recebida do chamador (a tela gera uma por tentativa,
+  // com expo-crypto). O studentId quem monta é a API, a partir do JWT — o body
+  // só precisa do tripId da viagem de retorno ativa.
+  notifyNotReturning: (tripId: string, idempotencyKey: string) =>
+    apiClient.post<NotReturningResponse>(
+      '/api/v1/boarding/not-returning',
+      { tripId } satisfies NotReturningRequest,
+      { 'X-Idempotency-Key': idempotencyKey },
+    ),
 }
