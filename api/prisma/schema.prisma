@@ -173,3 +173,28 @@ model BoardingRecord {
   @@map("boarding_records")
   @@schema("boarding")
 }
+
+// Ausência "não vou voltar" registrada pelo aluno (Story 4.1). Append-only:
+// re-registro pós-cancelamento (4.3) cria NOVA linha e cancelledAt marca a
+// antiga — "ausência ativa" é cancelledAt IS NULL, checado aplicacionalmente
+// (unique composto com coluna anulada NÃO impede duas linhas ativas: o Postgres
+// trata NULLs como distintos e o Prisma não expõe NULLS NOT DISTINCT).
+model BoardingAbsence {
+  id               String    @id @default(uuid())
+  companyId        String
+  tripId           String
+  studentId        String
+  idempotencyKey   String
+  notifiedAt       DateTime  @default(now())
+  // Fim da janela de cancelamento (notifiedAt + 2 min), calculado no core no
+  // create — o cliente nunca calcula a janela, só exibe o countdown.
+  cancellableUntil DateTime
+  cancelledAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([companyId, idempotencyKey], name: "absence_idempotency")
+  @@index([tripId, studentId])
+  @@map("boarding_absences")
+  @@schema("boarding")
+}
