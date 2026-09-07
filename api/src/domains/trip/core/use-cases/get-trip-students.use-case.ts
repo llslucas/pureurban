@@ -6,7 +6,10 @@ import { BoardingStatus } from '../ports/boarding-status.port.js';
 import { TripNotFound, DriverNotAssigned } from '../errors/trip.errors.js';
 import type { WithEvents } from '../../../shared/core/events/index.js';
 
-export type TripBoardingStatus = 'CHECKED_IN' | 'NOT_CHECKED_IN';
+export type TripBoardingStatus =
+  | 'CHECKED_IN'
+  | 'NOT_CHECKED_IN'
+  | 'NOT_RETURNING';
 
 export interface TripStudentView {
   studentId: string;
@@ -45,24 +48,31 @@ export const getTripStudents = (input: {
       );
     }
 
-    const [roster, checkedIn] = yield* Effect.all(
+    const [roster, checkedIn, absences] = yield* Effect.all(
       [
         tripRoster.findRouteStudents(trip.routeId, input.tenantId),
         boardingStatus.findCheckedInByTrip(trip.id, input.tenantId),
+        boardingStatus.findActiveAbsencesByTrip(trip.id, input.tenantId),
       ],
-      { concurrency: 2 },
+      { concurrency: 3 },
     );
 
     const checkedInBy = new Map(checkedIn.map((c) => [c.studentId, c]));
+    const absentIds = new Set(absences.map((a) => a.studentId));
 
     const fromRoster: TripStudentView[] = roster.map((student) => {
       const record = checkedInBy.get(student.studentId);
+      // Check-in vence ausência: o motorista que embarcou o aluno tem
+      // autoridade sobre o "não vou voltar" (last-write-wins do Épico 4).
+      const status: TripBoardingStatus = record
+        ? 'CHECKED_IN'
+        : absentIds.has(student.studentId)
+          ? 'NOT_RETURNING'
+          : 'NOT_CHECKED_IN';
       return {
         studentId: student.studentId,
         name: student.name,
-        status: (record
-          ? 'CHECKED_IN'
-          : 'NOT_CHECKED_IN') as TripBoardingStatus,
+        status,
         checkedInAt: record?.checkedInAt ?? null,
       };
     });
@@ -90,7 +100,11 @@ export const getTripStudents = (input: {
 
     const summary = {
       boarded: students.filter((s) => s.status === 'CHECKED_IN').length,
-      total: students.length,
+      // Ausência ativa tira o aluno do total ("28/32" → "28/31"): ninguém
+      // espera por quem avisou que não volta. Como CHECKED_IN vence a ausência,
+      // aluno com ambos segue contando nos dois lados e `boarded <= total`
+      // continua válido.
+      total: students.filter((s) => s.status !== 'NOT_RETURNING').length,
     };
 
     return noEvents({ students, summary });

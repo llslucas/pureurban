@@ -4,6 +4,7 @@ import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
 import type {
   BoardingStatusApi,
   CheckedInStudent,
+  AbsentStudent,
 } from '../../core/ports/boarding-status.port.js';
 
 const toInfraError = (msg: string) => (e: unknown) =>
@@ -45,6 +46,26 @@ export class PrismaBoardingStatusAdapter implements BoardingStatusApi {
           }));
         },
         catch: toInfraError('Falha ao buscar check-ins da viagem'),
+      }),
+      Effect.orDie,
+    );
+  }
+
+  // Mesma leitura cross-schema do check-in, agora sobre boarding_absences.
+  // cancelledAt: null = ausência ATIVA — linhas canceladas ficam na tabela
+  // (append-only) mas não contam para o roster.
+  findActiveAbsencesByTrip(
+    tripId: string,
+    companyId: string,
+  ): Effect.Effect<AbsentStudent[]> {
+    return pipe(
+      Effect.tryPromise({
+        try: () =>
+          this.prisma.boardingAbsence.findMany({
+            where: { tripId, companyId, cancelledAt: null },
+            select: { studentId: true },
+          }),
+        catch: toInfraError('Falha ao buscar ausências ativas da viagem'),
       }),
       Effect.orDie,
     );

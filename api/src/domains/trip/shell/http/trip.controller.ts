@@ -94,7 +94,17 @@ export class TripController {
   }
 
   @Get('active')
-  @ApiOperation({ summary: 'Obter viagem ativa do motorista' })
+  // Override do ['DRIVER'] da classe: o aluno também consulta a própria
+  // viagem — retorno ativo na rota dele (decisão do Lucas, Story 4.1).
+  // RolesGuard usa getAllAndOverride — metadata do handler vence a da classe.
+  @Roles(['DRIVER', 'STUDENT'])
+  @ApiOperation({
+    summary: 'Obter viagem ativa (motorista) ou retorno ativo do aluno',
+    description:
+      'Para DRIVER: a viagem ativa do motorista autenticado. Para STUDENT: a viagem de ' +
+      'retorno ativa na rota do aluno autenticado, para alimentar o aviso "Não vou voltar". ' +
+      'Ambos retornam { data: null } quando não há viagem.',
+  })
   @ApiResponse({ status: 200, description: 'Viagem ativa ou null' })
   @ApiResponse({
     status: 401,
@@ -103,13 +113,16 @@ export class TripController {
   })
   @ApiResponse({
     status: 403,
-    description: 'FORBIDDEN — somente motoristas',
+    description: 'FORBIDDEN — somente motoristas e alunos (ADMIN não consulta)',
     type: ErrorResponseDto,
   })
   async getActive(
     @TenantId() tenantId: string,
-    @Req() req: Request & { user: { userId: string } },
+    @Req() req: Request & { user: { userId: string; role: string } },
   ) {
+    if (req.user.role === 'STUDENT') {
+      return this.tripService.getActiveStudentTrip(req.user.userId, tenantId);
+    }
     const driverId = req.user.userId;
     return this.tripService.getActiveTrip(driverId, tenantId);
   }

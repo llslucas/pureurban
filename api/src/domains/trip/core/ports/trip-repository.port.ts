@@ -42,6 +42,12 @@ export interface TripRepositoryApi {
     driverId: string,
     tenantId: string,
   ): Effect.Effect<TripData | null, never, never>;
+  // Viagem de RETORNO ativa na rota do aluno (4.1): trip ACTIVE + type RETURN
+  // + rota em que o aluno está vinculado (RouteStudent). null quando nenhuma.
+  findActiveReturnByStudent(
+    studentId: string,
+    tenantId: string,
+  ): Effect.Effect<TripData | null, never, never>;
 }
 
 // Context Tag para injeção no Effect runtime

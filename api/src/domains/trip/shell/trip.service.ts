@@ -4,6 +4,7 @@ import { EffectEventDispatcher } from '../../shared/shell/effect-runtime/event-d
 import { startTrip } from '../core/use-cases/start-trip.use-case.js';
 import { endTrip } from '../core/use-cases/end-trip.use-case.js';
 import { getActiveTrip } from '../core/use-cases/get-active-trip.use-case.js';
+import { getActiveStudentTrip } from '../core/use-cases/get-active-student-trip.use-case.js';
 import { getTripStudents } from '../core/use-cases/get-trip-students.use-case.js';
 import { TripRepository } from '../core/ports/trip-repository.port.js';
 import { TripRoster } from '../core/ports/trip-roster.port.js';
@@ -53,6 +54,13 @@ export class TripService {
     return this.eventDispatcher.runAndDispatch(
       this.runtime,
       getActiveTrip({ driverId, tenantId }),
+    );
+  }
+
+  async getActiveStudentTrip(studentId: string, tenantId: string) {
+    return this.eventDispatcher.runAndDispatch(
+      this.runtime,
+      getActiveStudentTrip({ studentId, tenantId }),
     );
   }
 

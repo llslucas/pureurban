@@ -6,6 +6,10 @@ export interface CheckedInStudent {
   checkedInAt: Date;
 }
 
+export interface AbsentStudent {
+  studentId: string;
+}
+
 export interface BoardingStatusApi {
   // Check-ins registrados nesta viagem. A EXISTÊNCIA do registro é o
   // CHECKED_IN — não há coluna status em boarding_records (3.3a, Task 1.4).
@@ -17,6 +21,14 @@ export interface BoardingStatusApi {
     tripId: string,
     companyId: string,
   ): Effect.Effect<CheckedInStudent[]>;
+
+  // Ausências "não vou voltar" ATIVAS (cancelledAt IS NULL) desta viagem (4.1).
+  // Só o studentId: quem está ausente sai do total do summary, e o nome do
+  // aluno de roster vem do próprio roster.
+  findActiveAbsencesByTrip(
+    tripId: string,
+    companyId: string,
+  ): Effect.Effect<AbsentStudent[]>;
 }
 
 export class BoardingStatus extends Context.Tag('BoardingStatus')<
