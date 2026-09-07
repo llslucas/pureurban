@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { Layer, ManagedRuntime } from 'effect';
 import { BoardingController } from './http/boarding.controller.js';
 import { BoardingService, BOARDING_RUNTIME } from './boarding.service.js';
+import { BoardingEventsService } from './events/boarding-events.service.js';
+import { BoardingEventsGuard } from './http/boarding-events.guard.js';
 import { PrismaBoardingAdapter } from './adapters/prisma-boarding.adapter.js';
 import { PrismaAbsenceAdapter } from './adapters/prisma-absence.adapter.js';
 import { PrismaTripAccessAdapter } from './adapters/prisma-trip-access.adapter.js';
@@ -12,9 +14,12 @@ import { TripAccess } from '../core/ports/trip-access.port.js';
 import { StudentEligibility } from '../core/ports/student-eligibility.port.js';
 import { SharedKernelModule } from '../../shared/shell/shared-kernel.module.js';
 import { EffectEventDispatcher } from '../../shared/shell/effect-runtime/event-dispatcher.service.js';
+import { TripModule } from '../../trip/shell/trip.module.js';
 
 @Module({
-  imports: [SharedKernelModule],
+  // TripModule: o guard do stream resolve a viagem ativa via TripService
+  // (composição shell-to-shell). RedisService vem do SharedKernelModule.
+  imports: [SharedKernelModule, TripModule],
   controllers: [BoardingController],
   providers: [
     PrismaBoardingAdapter,
@@ -22,6 +27,8 @@ import { EffectEventDispatcher } from '../../shared/shell/effect-runtime/event-d
     PrismaTripAccessAdapter,
     PrismaStudentEligibilityAdapter,
     BoardingService,
+    BoardingEventsService,
+    BoardingEventsGuard,
     EffectEventDispatcher,
     {
       provide: BOARDING_RUNTIME,
