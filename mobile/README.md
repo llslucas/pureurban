@@ -27,15 +27,12 @@ atual — nunca tela em branco.
 2. Banco e Redis no ar, a partir da raiz do repositório: `docker compose up -d`
 3. Migrações aplicadas: `cd ../api && npx prisma migrate deploy && npx prisma generate`
 4. API no ar: `cd ../api && npm run start:dev`
-5. Um usuário para logar. **O seed não funciona** — `npm run seed` não existe,
-   `npx prisma db seed` responde `No seed command configured` (o Prisma 7 moveu essa
-   chave para `prisma.config.ts` e ela não foi migrada) e `prisma/seed.ts` falha em
-   `new PrismaClient()` sem `adapter`. Crie o admin pela própria API:
+5. Um usuário para logar. Rode o seed na API — cria a empresa `PureUrban Dev` e o
+   admin `admin@pureurban.dev` / `admin123456` (troque a senha após o primeiro login).
+   Idempotente: se os dados já existem, imprime `Skipping.` e não altera nada:
 
    ```bash
-   curl -X POST http://localhost:3000/api/v1/auth/register \
-     -H 'Content-Type: application/json' \
-     -d '{"name":"PureUrban Dev","email":"admin@pureurban.dev","password":"admin123456"}'
+   cd ../api && npm run seed
    ```
 
 6. `mobile/.env` criado a partir de `.env.example`:

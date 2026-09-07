@@ -1,6 +1,7 @@
 /**
  * Seed helpers — setup de dados do Épico 3 via API (nunca via UI, nunca via
- * seed do banco: a Story 1.9 está quebrada e nenhum spec pode depender dela).
+ * seed do banco: cada spec precisa de um tenant isolado com e-mail único, e o
+ * seed é global e idempotente por nome de empresa).
  *
  * Cada chamada cria um tenant isolado a partir de `POST /auth/register` com
  * e-mail faker único. Não há cleanup: lixo no Postgres de teste local é aceito,

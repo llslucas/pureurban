@@ -1,25 +1,31 @@
 /**
- * Prisma Seed — PureUrban
+ * Prisma Seed — PureUrban (dev-only)
  *
  * Populates the database with an initial Company and Admin user for development.
  *
- * Usage (requires DB running):
- *   npx prisma db seed
- *
- * Or manually:
- *   npx ts-node prisma/seed.ts
- *
- * NOTE: Requires Docker:
+ * Usage (requires Docker DB running and api/.env — copy .env.example if missing):
  *   docker compose up -d
  *   npx prisma migrate dev
  *   npx prisma generate
+ *   npm run seed
+ *
+ * Idempotent: skips when the seed data already exists.
  */
 
+import 'dotenv/config'
 import { PrismaClient } from '../src/generated/prisma/client.js'
+import { PrismaPg } from '@prisma/adapter-pg'
 import * as bcrypt from 'bcrypt'
 
-// @ts-ignore — seed usa conexão direta via DATABASE_URL; tipos gerados exigem `adapter` (usado em PrismaService)
-const prisma = new PrismaClient()
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl) {
+  console.error('❌ DATABASE_URL is not set — copy api/.env.example to api/.env')
+  process.exit(1)
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: databaseUrl }),
+})
 
 const SALT_ROUNDS = 12
 
