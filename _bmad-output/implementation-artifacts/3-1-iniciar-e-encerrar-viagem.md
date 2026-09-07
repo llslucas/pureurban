@@ -654,7 +654,85 @@ Gemini 2.5 Pro (Antigravity)
 
 **Novos (Mobile):**
 - `mobile/src/services/trip.service.ts`
-- `mobile/src/stores/trip.store.ts`
+- ~~`mobile/src/stores/trip.store.ts`~~ (removido no code review — dead code, ver abaixo)
 
 **Modificados (Mobile):**
 - `mobile/src/app/(driver)/trip.tsx`
+
+## Code Review (2026-09-06)
+
+Revisão feita meses depois da implementação (a story foi entregue em abril/2026, antes do
+Épico 2, com Gemini). Alvo: o estado atual do código da 3.1 na `main`, descontando a parte
+da Story 3.5a (lista de alunos) que já teve review próprio. 3 camadas de review em paralelo
+(blind-hunter, edge-case-hunter, verification-gap). Branch: `fix/3-1-review`.
+
+Baseline verde antes das mudanças: 32 testes de unidade do domínio trip + 24 e2e.
+Depois: **37 unidade + 27 e2e**, `tsc` limpo (api e mobile), lint da api de 148 → **147 erros**
+(baseline pré-existente; a story reduziu 1), mobile lint/jest verdes (106 testes).
+
+### Corrigido nesta branch (patches)
+
+| # | Achado | Correção |
+|---|--------|----------|
+| 1 | AC #3: uma RETURN podia ser criada sem `relatedTripId` — vira uma OUTBOUND disfarçada. | `startTrip` recusa RETURN sem `relatedTripId` (`InvalidTripTransition` / `RETURN_REQUIRES_RELATED_TRIP`) e descarta `relatedTripId` num OUTBOUND. `CreateTripDto` ganha `@ValidateIf` espelhando a regra. +3 testes de unidade, +1 e2e (400). |
+| 2 | `prisma-trip.adapter.update()` fazia `update({ where: { id } })` sem `companyId` — viola "toda query filtra por companyId", com janela TOCTOU. | Envolvido em `$transaction` (findFirst tenant-scoped + update), mesmo padrão do `prisma-route.adapter`. |
+| 3 | `endTrip` respondia 400 `InvalidTripTransition`/`TRIP_NOT_OWNED` para viagem de outro motorista — status errado + revela que a viagem existe. | Passa a responder `TripNotFound` (404, não-disclosure). Teste de unidade ajustado. |
+| 4 | AC #2/#6: nenhum teste verificava que `endedAt` é gravado (só `status`). | Teste de unidade afirma o patch mandado ao repo; e2e afirma `endedAt` ≈ agora na resposta. |
+| 5 | AC #3: criação de RETURN + persistência de `relatedTripId` nunca exercitada pelo caminho real. | e2e novo: encerra ida → POST RETURN com `relatedTripId` → afirma `type`/`status`/`relatedTripId`. |
+| 6 | `get-active-trip.use-case.ts` sem arquivo de spec. | `get-active-trip.use-case.spec.ts` novo (3 testes). |
+| 7 | Dead code: `useTripStore` (Zustand) nunca importado — 2ª fonte de verdade divergente; `EndTripDto` nunca usado. | `mobile/src/stores/trip.store.ts` removido; `EndTripDto` removido. |
+| 8 | Card de viagem concluída mostrava `Alunos: 0/0 (em breve)` hardcoded. | Usa a contagem real (`studentsSummary`), com fallback `—`, igual ao card ativo. |
+
+### Adiado (ver `deferred-work.md`, seção 2026-09-06)
+
+- `relatedTripId` não é validado contra uma ida real (mesma empresa/motorista/rota, COMPLETED) — precisa de método novo no port.
+- "Uma viagem ativa por motorista" é check-then-create sem transação nem índice único parcial (migração SQL cru).
+- **Fluxo "Iniciar Retorno" some no reload** — `/trips/active` só devolve `ACTIVE`; a ida encerrada não é recuperável. AC #2/#3 pela ponta do cliente. Amarrado à decisão do `PLACEHOLDER_ROUTE_ID`.
+- Sem `TripResponseDto` — `openapi.json` sem corpo de resposta para POST/PATCH; `Trip` do mobile é manual (regra 11 da architecture.md).
+- `trip.tsx` sem teste de render (máquina de 4 estados, `isError` não distinguido de "sem viagem").
+- `test/route-assignment.e2e-spec.ts` vermelho na baseline (login `.expect(200)` vs 201) — incidental, fora do escopo.
+
+### ⚠️ Decisão de produto pendente — bloqueia o fechamento da story
+
+`PLACEHOLDER_ROUTE_ID = 'route-placeholder-id'` em `trip.tsx` é passado em toda chamada de
+`startTrip`. Não é UUID (o DTO rejeita com 400) e, mesmo sendo, cairia no `RouteAccess`
+(403 `DRIVER_NOT_ASSIGNED`). **O fluxo de iniciar viagem pela UI não funciona.** Precisa de
+decisão: de onde vem o `routeId` do motorista? (rota vinculada única auto-selecionada / seletor
+de rota / `GET /drivers/me/routes` novo). O fluxo "iniciar retorno" (defer acima) depende da
+mesma decisão. Até lá a story fica em `review`, não `done` — a viagem só entra por API (como
+no smoke da 3.6).
+
+## Suggested Review Order
+
+**AC #3 — viagem de retorno exige vínculo com a ida**
+
+- Regra no core: recusa RETURN sem `relatedTripId`, ignora num OUTBOUND
+  [`start-trip.use-case.ts:54`](../../api/src/domains/trip/core/use-cases/start-trip.use-case.ts#L54)
+- Mesma regra no shell, para 400 antes do use case + Swagger correto
+  [`create-trip.dto.ts:30`](../../api/src/domains/trip/shell/http/dtos/create-trip.dto.ts#L30)
+
+**Multi-tenancy na escrita**
+
+- `update()` envolto em `$transaction` (findFirst tenant-scoped + update), padrão do routing
+  [`prisma-trip.adapter.ts:82`](../../api/src/domains/trip/shell/adapters/prisma-trip.adapter.ts#L82)
+
+**Semântica de erro do encerramento**
+
+- Viagem de outro motorista → `TripNotFound` (404, não-disclosure), era 400
+  [`end-trip.use-case.ts:27`](../../api/src/domains/trip/core/use-cases/end-trip.use-case.ts#L27)
+
+**UI**
+
+- Card de viagem concluída usa a contagem real de embarque
+  [`trip.tsx:121`](../../mobile/src/app/(driver)/trip.tsx#L121)
+
+**Testes**
+
+- Unidade: RETURN repassa args ao repo, recusa sem `relatedTripId`, descarta em OUTBOUND
+  [`start-trip.use-case.spec.ts:158`](../../api/src/domains/trip/core/use-cases/start-trip.use-case.spec.ts#L158)
+- Unidade: `endTrip` grava `endedAt`; viagem alheia → `TripNotFound`
+  [`end-trip.use-case.spec.ts:45`](../../api/src/domains/trip/core/use-cases/end-trip.use-case.spec.ts#L45)
+- Unidade: `getActiveTrip` (arquivo novo)
+  [`get-active-trip.use-case.spec.ts:1`](../../api/src/domains/trip/core/use-cases/get-active-trip.use-case.spec.ts#L1)
+- e2e: ciclo encerrar (`endedAt` ≈ agora) + iniciar retorno atrelado; RETURN sem `relatedTripId` → 400
+  [`trip.e2e-spec.ts:317`](../../api/test/trip.e2e-spec.ts#L317)
