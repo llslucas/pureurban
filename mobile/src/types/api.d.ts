@@ -373,6 +373,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boarding/not-returning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Registrar ausência "não vou voltar"
+         * @description O aluno autenticado (studentId do JWT) avisa que não vai voltar na viagem ativa. Idempotência: mesma X-Idempotency-Key retorna o mesmo resultado com 201, sem duplicar. cancellableUntil (janela de cancelamento) é calculado pelo servidor — o cliente nunca calcula, só exibe o countdown.
+         */
+        post: operations["BoardingController_notReturning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boarding/cancel-absence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancelar ausência dentro da janela de segurança
+         * @description O aluno autenticado (studentId do JWT) desfaz a ausência registrada. Só é aceito dentro da janela cancellableUntil (notifiedAt + 2 minutos, calculada pelo servidor). Idempotência: mesma X-Idempotency-Key retorna o mesmo resultado com 200.
+         */
+        post: operations["BoardingController_cancelAbsence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boarding/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream SSE de eventos de embarque da viagem do motorista
+         * @description Canal em tempo real do motorista para a viagem ativa. Cada mensagem do stream traz a linha `event:` com o tipo (boarding.not_returning | boarding.absence_cancelled | boarding.checkin_reminder) e a linha `data:` com o payload JSON. A conexão é encerrada elegantemente quando a viagem termina; a reconexão após queda de rede é responsabilidade do cliente (EventSource), sem duplicar entradas na lista.
+         */
+        get: operations["BoardingController_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -518,6 +578,143 @@ export interface components {
              * @example 2026-08-14T07:05:00.000Z
              */
             occurredAt?: string;
+        };
+        NotReturningResponseDto: {
+            /**
+             * Format: uuid
+             * @description ID do registro de ausência
+             * @example 550e8400-e29b-41d4-a716-446655440004
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description ID do aluno que registrou a ausência (vem do JWT, nunca do body)
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            studentId: string;
+            /**
+             * Format: uuid
+             * @description ID da viagem em que a ausência foi registrada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Status do aluno após o registro da ausência
+             * @example NOT_RETURNING
+             * @enum {string}
+             */
+            status: "NOT_RETURNING";
+            /**
+             * @description Momento do registro da ausência (ISO 8601 UTC). Base do cálculo de cancellableUntil.
+             * @example 2026-09-07T21:10:00.000Z
+             */
+            notifiedAt: string;
+            /**
+             * @description Fim da janela de cancelamento (ISO 8601 UTC), calculado pelo servidor como notifiedAt + 2 minutos. O cliente nunca calcula a janela — só exibe o countdown e esconde o cancelamento quando expira.
+             * @example 2026-09-07T21:12:00.000Z
+             */
+            cancellableUntil: string;
+        };
+        NotReturningRequestDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem ativa em que o aluno registra a ausência
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+        };
+        CancelAbsenceResponseDto: {
+            /**
+             * Format: uuid
+             * @description ID do aluno que cancelou a ausência (vem do JWT, nunca do body)
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            studentId: string;
+            /**
+             * Format: uuid
+             * @description ID da viagem em que a ausência foi cancelada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Status do aluno após o cancelamento — volta a aguardar check-in
+             * @example NOT_CHECKED_IN
+             * @enum {string}
+             */
+            status: "NOT_CHECKED_IN";
+            /**
+             * @description Momento do cancelamento (ISO 8601 UTC)
+             * @example 2026-09-07T21:11:00.000Z
+             */
+            cancelledAt: string;
+        };
+        CancelAbsenceRequestDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem em que a ausência será cancelada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+        };
+        /** @description Evento SSE `boarding.not_returning`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido ao motorista da viagem quando um aluno registra ausência (POST /not-returning, Story 4.1) — o status na lista muda para "NÃO VAI VOLTAR" e a contagem resumida se ajusta. O nome do aluno é resolvido pelo cliente a partir do roster. */
+        BoardingNotReturningEventDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem em que a ausência foi registrada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * Format: uuid
+             * @description ID do aluno que registrou a ausência
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            studentId: string;
+            /**
+             * @description Momento do registro da ausência (ISO 8601 UTC) — eco do notifiedAt da ausência
+             * @example 2026-09-07T21:10:00.000Z
+             */
+            notifiedAt: string;
+        };
+        /** @description Evento SSE `boarding.absence_cancelled`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido ao motorista da viagem quando o aluno cancela a ausência dentro da janela (POST /cancel-absence, Story 4.3) — status e contagem resumida voltam ao estado anterior. O nome do aluno é resolvido pelo cliente a partir do roster. */
+        BoardingAbsenceCancelledEventDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem em que a ausência foi cancelada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * Format: uuid
+             * @description ID do aluno que cancelou a ausência
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            studentId: string;
+            /**
+             * @description Momento do cancelamento (ISO 8601 UTC) — eco do cancelledAt do cancelamento
+             * @example 2026-09-07T21:11:00.000Z
+             */
+            cancelledAt: string;
+        };
+        /** @description Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster. */
+        BoardingCheckinReminderEventDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem de retorno em curso
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * Format: uuid
+             * @description ID do aluno que deve ser lembrado do check-in
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            studentId: string;
+            /**
+             * @description Momento do disparo do lembrete (ISO 8601 UTC)
+             * @example 2026-09-07T22:15:00.000Z
+             */
+            remindedAt: string;
         };
     };
     responses: never;
@@ -1942,6 +2139,227 @@ export interface operations {
             };
             /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. DUPLICATE_CHECK_IN — aluno já embarcou nesta viagem (key diferente). IDEMPOTENCY_KEY_CONFLICT — key já usada para um aluno ou viagem diferente do enviado. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    BoardingController_notReturning: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação notify_not_returning). Mesma key reenviada retorna o mesmo resultado sem duplicar a ausência. */
+                "X-Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotReturningRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Ausência registrada com sucesso */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["NotReturningResponseDto"];
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description STUDENT_NOT_ON_TRIP — aluno não pertence à rota da viagem. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Contrato declarado na Story 4.0 — implementação na Story 4.1. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    BoardingController_cancelAbsence: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação cancel_absence). Mesma key reenviada retorna o mesmo resultado. */
+                "X-Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelAbsenceRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Ausência cancelada com sucesso */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CancelAbsenceResponseDto"];
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description STUDENT_NOT_ON_TRIP — aluno não pertence à rota da viagem. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description ABSENCE_NOT_FOUND — ausência inexistente ou já cancelada, enviada com X-Idempotency-Key diferente. Reenvio da MESMA key da chamada original retorna o resultado original com 200. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Contrato declarado na Story 4.0 — implementação na Story 4.3. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    BoardingController_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stream `text/event-stream` — uma mensagem por evento, com `event:` carregando o tipo e `data:` o payload JSON (oneOf dos três schemas). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["BoardingNotReturningEventDto"] | components["schemas"]["BoardingAbsenceCancelledEventDto"] | components["schemas"]["BoardingCheckinReminderEventDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN — role DRIVER exigida; somente o motorista atribuído à rota abre o stream daquela viagem. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description TRIP_NOT_ACTIVE — motorista autenticado sem viagem ativa (inexistente, encerrada ou de outra empresa). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Contrato declarado na Story 4.0 — implementação na Story 4.2. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
