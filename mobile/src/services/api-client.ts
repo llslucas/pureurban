@@ -26,7 +26,6 @@ async function attemptTokenRefresh(): Promise<boolean> {
   if (refreshPromise) {
     return refreshPromise
   }
-
   refreshPromise = (async () => {
     // Timeout de 15s para o fetch de refresh — evita deadlock se o servidor travar
     const refreshController = new AbortController()
@@ -60,6 +59,15 @@ async function attemptTokenRefresh(): Promise<boolean> {
   })()
 
   return refreshPromise
+}
+
+// Wrapper do refresh single-flight para consumidores fora do pipeline de
+// request — hoje, o cliente SSE (Story 4.2): em 401 no stream, o token é
+// renovado pela MESMA promessa dos requests. Dois consumidores disparando
+// refresh em paralelo criarariam corrida (um invalidaria o refresh token do
+// outro) — daí reusar o mutex em vez de chamar /auth/refresh direto.
+export function refreshAccessToken(): Promise<boolean> {
+  return attemptTokenRefresh()
 }
 
 async function parseResponseJson(response: Response): Promise<Record<string, unknown>> {

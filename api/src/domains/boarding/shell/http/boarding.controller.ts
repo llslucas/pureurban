@@ -1,15 +1,17 @@
 import {
   Controller,
   Post,
-  Get,
   Body,
   Req,
   HttpCode,
   HttpStatus,
   UseGuards,
   NotImplementedException,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { Observable } from 'rxjs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -47,6 +49,8 @@ import {
 import { CheckInInput } from '../../core/schemas/check-in.schema.js';
 import { NotReturningInput } from '../../core/schemas/not-returning.schema.js';
 import { BoardingService } from '../boarding.service.js';
+import { BoardingEventsService } from '../events/boarding-events.service.js';
+import { BoardingEventsGuard } from './boarding-events.guard.js';
 
 @ApiTags('boarding')
 @ApiBearerAuth()
@@ -55,7 +59,10 @@ import { BoardingService } from '../boarding.service.js';
 @Roles(['DRIVER'])
 @ApiExtraModels(QrCodePayloadDto)
 export class BoardingController {
-  constructor(private readonly boardingService: BoardingService) {}
+  constructor(
+    private readonly boardingService: BoardingService,
+    private readonly boardingEventsService: BoardingEventsService,
+  ) {}
 
   @Post('check-in')
   @HttpCode(HttpStatus.CREATED)
@@ -256,12 +263,12 @@ export class BoardingController {
     });
   }
 
-  // GET, não @Sse: com interceptors globais, o Nest embrulha o handler num
-  // Observable lazy (defer) — num handler @Sse o throw é engolido pelo stream
-  // e vira mensagem `event: error` com HTTP 200, nunca o 501 que a matriz I/O
-  // desta story exige. 4.2 troca por @Sse junto com a implementação do stream.
-  @Get('events')
+  // O 409 de viagem inativa sai do BoardingEventsGuard, ANTES do stream: erro
+  // de guard alcança o exception filter; erro dentro de handler @Sse viria
+  // HTTP 200 `event: error` (a exceção é engolida pelo stream).
+  @Sse('events')
   @Roles(['DRIVER'])
+  @UseGuards(BoardingEventsGuard)
   @ApiOperation({
     summary: 'Stream SSE de eventos de embarque da viagem do motorista',
     description:
@@ -308,16 +315,9 @@ export class BoardingController {
       'TRIP_NOT_ACTIVE — motorista autenticado sem viagem ativa (inexistente, encerrada ou de outra empresa).',
     type: ErrorResponseDto,
   })
-  @ApiResponse({
-    status: 501,
-    description:
-      'Contrato declarado na Story 4.0 — implementação na Story 4.2.',
-    type: ErrorResponseDto,
-  })
-  events(): never {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.2',
-    });
+  events(
+    @Req() req: Request & { user: { userId: string }; boardingTripId: string },
+  ): Observable<MessageEvent> {
+    return this.boardingEventsService.stream(req.boardingTripId);
   }
 }

@@ -3,9 +3,10 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'node:crypto';
+import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from '../src/domains/shared/shell/infra/prisma.service.js';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 
 interface ApiResponse {
   data: Record<string, unknown>;
@@ -533,11 +534,11 @@ describe('BoardingController (e2e)', () => {
     });
   });
 
-  // Story 4.0 declarou o contrato; a 4.1 implementa o POST /not-returning — os
-  // stubs 501 de cancel-absence (4.3) e events (4.2) permanecem. A matriz de
-  // roles fica travada aqui porque o override por handler (@Roles STUDENT nos
-  // POSTs, DRIVER no stream) vence o ['DRIVER'] da classe — perdê-lo é falha
-  // silenciosa de autorização.
+  // Story 4.0 declarou o contrato; a 4.1 implementou o POST /not-returning e a
+  // 4.2 o stream de /events (testado no describe abaixo). cancel-absence segue
+  // stub até a 4.3. A matriz de roles fica travada aqui porque o override por
+  // handler (@Roles STUDENT nos POSTs, DRIVER no stream) vence o ['DRIVER'] da
+  // classe — perdê-lo é falha silenciosa de autorização.
   describe('Story 4.0/4.1 — matriz de roles (not-returning, cancel-absence, events)', () => {
     const notReturning = (
       token: string | null,
@@ -586,13 +587,6 @@ describe('BoardingController (e2e)', () => {
       );
     });
 
-    it('DRIVER: GET /events retorna 501 NOT_IMPLEMENTED (stream na 4.2)', async () => {
-      const response = await events(driverToken).expect(501);
-      expect((response.body as ApiResponse).error?.code).toBe(
-        'NOT_IMPLEMENTED',
-      );
-    });
-
     it('DRIVER nos POSTs deve dar 403 — o override STUDENT por handler vence o DRIVER da classe', async () => {
       await notReturning(driverToken).expect(403);
       await cancelAbsence(driverToken).expect(403);
@@ -606,6 +600,217 @@ describe('BoardingController (e2e)', () => {
       await notReturning(null).expect(401);
       await cancelAbsence(null).expect(401);
       await events(null).expect(401);
+    });
+  });
+
+  describe('GET /api/v1/boarding/events — stream SSE (Story 4.2)', () => {
+    // O guard resolve a viagem ativa do driver: encerrar todas antes de cada
+    // teste garante que o canal do stream é exatamente a viagem semeada aqui
+    // (testes anteriores do arquivo deixam viagens ACTIVE para trás).
+    const endAllActiveTrips = () =>
+      prisma.trip.updateMany({
+        where: { driverId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED' },
+      });
+
+    interface StreamMessage {
+      event: string;
+      data: Record<string, unknown>;
+    }
+
+    interface StreamHandle {
+      ready: Promise<void>;
+      status: () => number | undefined;
+      headers: () => Record<string, unknown>;
+      messages: StreamMessage[];
+      firstMessage: Promise<StreamMessage>;
+      closed: Promise<void>;
+      abort: () => void;
+    }
+
+    // O Response do superagent não resolve tipos sob o eslint-type-checked —
+    // o shape mínimo que o teste usa vem daqui.
+    const responseOf = (
+      r: unknown,
+    ): {
+      statusCode?: number;
+      headers?: Record<string, unknown>;
+      on: (event: string, listener: () => void) => unknown;
+    } =>
+      (
+        r as {
+          response: {
+            statusCode?: number;
+            headers?: Record<string, unknown>;
+            on: (event: string, listener: () => void) => unknown;
+          };
+        }
+      ).response;
+
+    const openStream = (token: string): StreamHandle => {
+      const messages: StreamMessage[] = [];
+      let resolveReady!: () => void;
+      let resolveFirst: (message: StreamMessage) => void = () => {};
+      let resolveClosed: () => void = () => {};
+      const ready = new Promise<void>((resolve) => {
+        resolveReady = resolve;
+      });
+      const firstMessage = new Promise<StreamMessage>((resolve) => {
+        resolveFirst = resolve;
+      });
+      const closed = new Promise<void>((resolve) => {
+        resolveClosed = resolve;
+      });
+
+      const req = request(app.getHttpServer())
+        .get('/api/v1/boarding/events')
+        .set('Authorization', `Bearer ${token}`)
+        // Streaming sem buffer: o superagent não resolve a promessa do request
+        // em respostas não terminadas — `ready`, `firstMessage` e `closed`
+        // são resolvidos pelos eventos do parser.
+        .buffer(false)
+        .parse((res: IncomingMessage) => {
+          resolveReady();
+          res.on('error', () => resolveClosed());
+          res.on('end', () => resolveClosed());
+          res.on('close', () => resolveClosed());
+          let raw = '';
+          res.on('data', (chunk: Buffer) => {
+            raw += chunk.toString();
+            let boundary = raw.indexOf('\n\n');
+            while (boundary >= 0) {
+              const block = raw.slice(0, boundary);
+              raw = raw.slice(boundary + 2);
+              boundary = raw.indexOf('\n\n');
+              const lines = block.split('\n');
+              const eventLine = lines.find((line) => line.startsWith('event:'));
+              const dataLine = lines.find((line) => line.startsWith('data:'));
+              if (!eventLine) continue;
+              const message: StreamMessage = {
+                event: eventLine.slice('event:'.length).trim(),
+                data: dataLine
+                  ? (JSON.parse(
+                      dataLine.slice('data:'.length).trim(),
+                    ) as Record<string, unknown>)
+                  : {},
+              };
+              messages.push(message);
+              resolveFirst(message);
+            }
+          });
+        });
+
+      // O request fica pendente até o abort; sem isso o worker quebra com
+      // unhandled rejection ('Aborted') quando o teste encerra a conexão.
+      void Promise.resolve(req).catch(() => undefined);
+
+      return {
+        // Parser anexado ⇒ headers do stream chegaram ⇒ guard passou e o Nest
+        // já subscreveu o canal Redis (subscrição síncrona, mesmo tick do pipe).
+        ready: ready.then(() => {
+          // O Response do superagent reemite o ECONNRESET do socket no abort —
+          // sem listener vira uncaught exception e derruba o worker do vitest.
+          responseOf(req).on('error', () => resolveClosed());
+        }),
+        headers: () => responseOf(req).headers ?? {},
+        status: () => responseOf(req).statusCode,
+        messages,
+        firstMessage,
+        closed,
+        abort: () => {
+          try {
+            req.abort();
+          } catch {
+            // Stream já fechado — nada a abortar.
+          }
+        },
+      };
+    };
+
+    // O supertest fecha o server após o end() de cada request que ele próprio
+    // bindou (serverAddress → app.listen(0) quando não há porta; end() →
+    // server.close()). Com um stream SSE aberto, o close() pendura esperando a
+    // conexão e requests seguintes não conectam. Bind explícito uma vez: os
+    // Test passam a reusar a porta e nunca anexam o _server que fecha o app.
+    beforeAll(async () => {
+      const server = app.getHttpServer() as HttpServer;
+      if (!server.listening) {
+        await new Promise<void>((resolve, reject) => {
+          server.once('listening', () => resolve());
+          server.once('error', reject);
+          server.listen(0);
+        });
+      }
+    });
+
+    beforeEach(endAllActiveTrips);
+
+    const events = (token: string | null) => {
+      const req = request(app.getHttpServer()).get('/api/v1/boarding/events');
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req;
+    };
+
+    it('driver sem viagem ativa: 409 TRIP_NOT_ACTIVE no envelope, nunca stream', async () => {
+      const response = await events(driverToken).expect(409);
+
+      const body = response.body as ApiResponse;
+      expect(body.error?.code).toBe('TRIP_NOT_ACTIVE');
+      expect(body.error?.message).toBeDefined();
+      expect(body).not.toHaveProperty('data');
+      expect(body).not.toHaveProperty('meta');
+    });
+
+    it('stream entrega boarding.not_returning com o schema do contrato em < 3s (NFR3)', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const stream = openStream(driverToken);
+      await stream.ready;
+
+      expect(stream.status()).toBe(200);
+      expect(String(stream.headers()['content-type'])).toMatch(
+        /^text\/event-stream/,
+      );
+
+      const start = Date.now();
+      const response = await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId })
+        .expect(201);
+      const first = await stream.firstMessage;
+      const elapsed = Date.now() - start;
+
+      expect(elapsed).toBeLessThan(3000);
+      expect(first.event).toBe('boarding.not_returning');
+      expect(first.data).toEqual({
+        tripId,
+        studentId: allowedStudentId,
+        notifiedAt: (response.body as ApiResponse).data.notifiedAt as string,
+      });
+
+      stream.abort();
+    });
+
+    it('end-trip com stream aberto: o stream completa e a reconexão recebe 409 (sem loop)', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const stream = openStream(driverToken);
+      await stream.ready;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/trips/${tripId}/end`)
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(200);
+
+      // Sinal terminal do trip.ended completa o stream (response.end()) —
+      // sem abort(): a resposta já terminou e abortar aqui destruiria o
+      // socket keep-alive com um ECONNRESET órfão.
+      await stream.closed;
+
+      // Reconexão pós-fim: guard responde 409 — o cliente para de reconectar.
+      const response = await events(driverToken).expect(409);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
     });
   });
 

@@ -16,6 +16,9 @@ import { EffectEventDispatcher } from '../../shared/shell/effect-runtime/event-d
 @Module({
   imports: [SharedKernelModule],
   controllers: [TripController],
+  // TripService exportado para composição shell-to-shell (BoardingEventsGuard
+  // resolve a viagem ativa por ele, em vez de duplicar o port do core).
+  exports: [TripService],
   providers: [
     PrismaTripAdapter,
     PrismaTripRosterAdapter,

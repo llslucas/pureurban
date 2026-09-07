@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RolesGuard } from './guards/roles.guard.js';
 import { TenantGuard } from './guards/tenant.guard.js';
+import { RedisService } from './infra/redis.service.js';
 
 /**
  * SharedKernelModule — centraliza as exportações de guards, decorators e
@@ -13,7 +14,7 @@ import { TenantGuard } from './guards/tenant.guard.js';
  * globalmente via APP_FILTER/APP_INTERCEPTOR no AppModule.
  */
 @Module({
-  providers: [RolesGuard, TenantGuard],
-  exports: [RolesGuard, TenantGuard],
+  providers: [RolesGuard, TenantGuard, RedisService],
+  exports: [RolesGuard, TenantGuard, RedisService],
 })
 export class SharedKernelModule {}
