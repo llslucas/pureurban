@@ -64,7 +64,7 @@ export class BoardingAbsenceCancelledEventDto {
 
 @ApiSchema({
   description:
-    'Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster.',
+    'Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster. A entrega ao aluno é derivada do estado na abertura do app (Story 4.4) — este stream é o canal do motorista.',
 })
 export class BoardingCheckinReminderEventDto {
   @ApiProperty({

@@ -696,7 +696,7 @@ export interface components {
              */
             cancelledAt: string;
         };
-        /** @description Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster. */
+        /** @description Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster. A entrega ao aluno é derivada do estado na abertura do app (Story 4.4) — este stream é o canal do motorista. */
         BoardingCheckinReminderEventDto: {
             /**
              * Format: uuid
@@ -2179,7 +2179,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). */
+            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). INVALID_IDEMPOTENCY_KEY — header presente mas acima de 200 caracteres. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2206,7 +2206,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). */
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2257,7 +2257,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). */
+            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). INVALID_IDEMPOTENCY_KEY — header presente mas acima de 200 caracteres. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2293,7 +2293,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos). */
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado. */
             409: {
                 headers: {
                     [name: string]: unknown;

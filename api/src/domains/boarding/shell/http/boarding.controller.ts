@@ -133,6 +133,7 @@ export class BoardingController {
     required: true,
     description:
       'UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação notify_not_returning). Mesma key reenviada retorna o mesmo resultado sem duplicar a ausência.',
+    schema: { type: 'string', maxLength: 200 },
   })
   @ApiBody({ type: NotReturningRequestDto })
   @ApiDataResponse(
@@ -143,7 +144,9 @@ export class BoardingController {
   @ApiResponse({
     status: 400,
     description:
-      'VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID).',
+      'VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). ' +
+      'MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). ' +
+      'INVALID_IDEMPOTENCY_KEY — header presente mas acima de 200 caracteres.',
     type: ErrorResponseDto,
   })
   @ApiResponse({
@@ -160,7 +163,8 @@ export class BoardingController {
     status: 409,
     description:
       'TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ' +
-      'ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente).',
+      'ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). ' +
+      'IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.',
     type: ErrorResponseDto,
   })
   @ApiResponse({
@@ -175,7 +179,7 @@ export class BoardingController {
   notReturning(): never {
     throw new NotImplementedException({
       code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.x',
+      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.1',
     });
   }
 
@@ -194,6 +198,7 @@ export class BoardingController {
     required: true,
     description:
       'UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação cancel_absence). Mesma key reenviada retorna o mesmo resultado.',
+    schema: { type: 'string', maxLength: 200 },
   })
   @ApiBody({ type: CancelAbsenceRequestDto })
   @ApiDataResponse(
@@ -204,7 +209,9 @@ export class BoardingController {
   @ApiResponse({
     status: 400,
     description:
-      'VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID).',
+      'VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). ' +
+      'MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). ' +
+      'INVALID_IDEMPOTENCY_KEY — header presente mas acima de 200 caracteres.',
     type: ErrorResponseDto,
   })
   @ApiResponse({
@@ -228,7 +235,8 @@ export class BoardingController {
     status: 409,
     description:
       'TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ' +
-      'CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos).',
+      'CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos). ' +
+      'IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.',
     type: ErrorResponseDto,
   })
   @ApiResponse({
@@ -241,7 +249,7 @@ export class BoardingController {
   cancelAbsence(): never {
     throw new NotImplementedException({
       code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.x',
+      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.3',
     });
   }
 
@@ -306,7 +314,7 @@ export class BoardingController {
   events(): never {
     throw new NotImplementedException({
       code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.x',
+      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.2',
     });
   }
 }

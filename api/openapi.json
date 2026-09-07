@@ -1384,7 +1384,8 @@
             "description": "UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação notify_not_returning). Mesma key reenviada retorna o mesmo resultado sem duplicar a ausência.",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
           }
         ],
@@ -1427,7 +1428,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID).",
+            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). INVALID_IDEMPOTENCY_KEY — header presente mas acima de 200 caracteres.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1457,7 +1458,7 @@
             }
           },
           "409": {
-            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente).",
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. ALREADY_NOT_RETURNING — ausência já registrada nesta viagem (key diferente). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1499,7 +1500,8 @@
             "description": "UUID v4 gerado no cliente — chave da fila offline (Architecture §5, Tier 2, operação cancel_absence). Mesma key reenviada retorna o mesmo resultado.",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
           }
         ],
@@ -1542,7 +1544,7 @@
             }
           },
           "400": {
-            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID).",
+            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID). MISSING_IDEMPOTENCY_KEY — header X-Idempotency-Key ausente ou vazio (é required). INVALID_IDEMPOTENCY_KEY — header presente mas acima de 200 caracteres.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1582,7 +1584,7 @@
             }
           },
           "409": {
-            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos).",
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2139,7 +2141,7 @@
             "example": "2026-09-07T22:15:00.000Z"
           }
         },
-        "description": "Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster.",
+        "description": "Evento SSE `boarding.checkin_reminder`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Lembrete in-app ao aluno que embarcou na ida e, após 15 minutos do início da viagem de retorno, não fez check-in nem registrou ausência (Story 4.4) — emitido no máximo uma vez por aluno por viagem. O nome do aluno é resolvido pelo cliente a partir do roster. A entrega ao aluno é derivada do estado na abertura do app (Story 4.4) — este stream é o canal do motorista.",
         "required": [
           "tripId",
           "studentId",
