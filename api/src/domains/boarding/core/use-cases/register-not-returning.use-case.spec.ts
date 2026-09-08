@@ -36,6 +36,7 @@ const mockAbsence: BoardingAbsenceData = {
   notifiedAt: new Date('2026-01-01T10:00:00.000Z'),
   cancellableUntil: new Date('2026-01-01T10:02:00.000Z'),
   cancelledAt: null,
+  cancelIdempotencyKey: null,
   createdAt: new Date('2026-01-01T10:00:00.000Z'),
   updatedAt: new Date('2026-01-01T10:00:00.000Z'),
 };

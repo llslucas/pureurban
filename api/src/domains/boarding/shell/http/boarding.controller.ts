@@ -6,7 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  NotImplementedException,
   Sse,
   MessageEvent,
 } from '@nestjs/common';
@@ -48,6 +47,7 @@ import {
 } from './dtos/boarding-events.dto.js';
 import { CheckInInput } from '../../core/schemas/check-in.schema.js';
 import { NotReturningInput } from '../../core/schemas/not-returning.schema.js';
+import { CancelAbsenceInput } from '../../core/schemas/cancel-absence.schema.js';
 import { BoardingService } from '../boarding.service.js';
 import { BoardingEventsService } from '../events/boarding-events.service.js';
 import { BoardingEventsGuard } from './boarding-events.guard.js';
@@ -249,17 +249,19 @@ export class BoardingController {
       'IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado.',
     type: ErrorResponseDto,
   })
-  @ApiResponse({
-    status: 501,
-    description:
-      'Contrato declarado na Story 4.0 — implementação na Story 4.3.',
-    type: ErrorResponseDto,
-  })
-  // Sem @Body() no stub: ver notReturning() — o pipe é amarrado na fatia (4.3).
-  cancelAbsence(): never {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 4.0 — implementação na Story 4.3',
+  cancelAbsence(
+    @TenantId() companyId: string,
+    @IdempotencyKey() idempotencyKey: string,
+    @Req() req: Request & { user: { userId: string } },
+    @Body(new EffectSchemaPipe(CancelAbsenceInput, 'VALIDATION_ERROR'))
+    body: CancelAbsenceInput,
+  ) {
+    // O aluno vem do token, nunca do body — mesmo padrão do notReturning.
+    return this.boardingService.cancelAbsence({
+      ...body,
+      companyId,
+      studentId: req.user.userId,
+      idempotencyKey,
     });
   }
 

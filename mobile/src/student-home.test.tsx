@@ -7,6 +7,7 @@ import StudentHomeScreen from '@/app/(student)/home'
 import { ApiClientError } from '@/services/api-error'
 import {
   boardingService,
+  type CancelAbsenceResponse,
   type NotReturningResponse,
 } from '@/services/boarding.service'
 import { tripService, type Trip } from '@/services/trip.service'
@@ -33,7 +34,10 @@ jest.mock('@/services/trip.service', () => ({
 }))
 
 jest.mock('@/services/boarding.service', () => ({
-  boardingService: { notifyNotReturning: jest.fn() },
+  boardingService: {
+    notifyNotReturning: jest.fn(),
+    cancelAbsence: jest.fn(),
+  },
 }))
 
 jest.mock('@/stores/auth.store', () => ({
@@ -66,6 +70,13 @@ const ABSENCE: NotReturningResponse = {
   // janela aberta o bastante para o countdown de 1:xx aparecer e não zerar
   // durante o teste. É o valor do servidor — a tela nunca recalcula.
   cancellableUntil: new Date(Date.now() + 90 * 1000).toISOString(),
+}
+
+const CANCELLATION: CancelAbsenceResponse = {
+  studentId: 'student-1',
+  tripId: RETURN_TRIP.id,
+  status: 'NOT_CHECKED_IN',
+  cancelledAt: new Date().toISOString(),
 }
 
 function mockUser() {
@@ -181,8 +192,9 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
       screen.getByText('O motorista já foi avisado de que você não vai voltar.'),
     ).toBeTruthy()
     // Janela factual no formato m:ss alimentada pelo cancellableUntil do
-    // servidor — o botão de cancelar em si é da 4.3.
+    // servidor, com o "Cancelar" da 4.3 dentro dela.
     expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
+    expect(screen.getByText('Cancelar')).toBeTruthy()
     // Registro da ausência não esconde o embarque: o QR continua na tela.
     expect(screen.getByText('Meu QR Code')).toBeTruthy()
     expect(screen.queryByText('Não vou voltar')).toBeNull()
@@ -194,7 +206,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     )
   })
 
-  it('janela expirada: ausência apresentada como consolidada, sem countdown', async () => {
+  it('janela expirada: ausência apresentada como consolidada, sem countdown e sem botão Cancelar', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
     mockBoarding.notifyNotReturning.mockResolvedValue({
       ...ABSENCE,
@@ -207,6 +219,9 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     expect(await screen.findByText('Ausência registrada')).toBeTruthy()
     expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
+    // Consolidada = o card fica, mas o caminho de volta (Cancelar) some com a janela.
+    expect(screen.queryByText('Cancelar')).toBeNull()
+    expect(mockBoarding.cancelAbsence).not.toHaveBeenCalled()
   })
 
   it('ALREADY_NOT_RETURNING: vira estado registrado, não erro', async () => {
@@ -300,6 +315,103 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     expect(await screen.findByText('Ausência registrada')).toBeTruthy()
     expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
+    // O cancelamento volta a ficar disponível também na reidratação.
+    expect(screen.getByText('Cancelar')).toBeTruthy()
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
+  })
+})
+
+describe('StudentHomeScreen — cancelamento de ausência (spec-4-3)', () => {
+  it('cancelar em 1 toque: card some, "Não vou voltar" volta e o cache sob a key da viagem é limpo', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+    mockBoarding.cancelAbsence.mockResolvedValue(CANCELLATION)
+
+    renderScreen()
+
+    // Fluxo completo da AC: registrar → cancelar, ≤ 2 toques por operação.
+    fireEvent.press(await openDialog())
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+
+    fireEvent.press(screen.getByText('Cancelar'))
+
+    // O ramo normal É o estado confirmado: o aviso volta a ficar disponível.
+    expect(await screen.findByText('Não vou voltar')).toBeTruthy()
+    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    expect(mockBoarding.cancelAbsence).toHaveBeenCalledWith(
+      RETURN_TRIP.id,
+      'generated-key-1',
+    )
+    // Cache limpo: após removeQueries a query remontada refaz o fetch e
+    // consolida em null — o valor "sem ausência" desta key (v5 não grava
+    // undefined via setQueryData; ver onSuccess no home.tsx).
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(['studentAbsence', RETURN_TRIP.id]),
+      ).toBeNull(),
+    )
+  })
+
+  it('corrida com a expiração (409 CANCELLATION_PERIOD_EXPIRED): card consolida, mensagem orienta avisar o motorista, tela não trava', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+    mockBoarding.cancelAbsence.mockRejectedValue(
+      new ApiClientError(
+        'CANCELLATION_PERIOD_EXPIRED',
+        'Janela de cancelamento já expirou',
+        409,
+      ),
+    )
+
+    renderScreen()
+
+    fireEvent.press(await openDialog())
+    await screen.findByText('Ausência registrada')
+
+    fireEvent.press(screen.getByText('Cancelar'))
+
+    expect(
+      await screen.findByText(
+        'O tempo para cancelar pelo app passou. Avise o motorista pessoalmente.',
+      ),
+    ).toBeTruthy()
+    // Consolidado: o card permanece, mas sem countdown e sem novo Cancelar.
+    expect(screen.getByText('Ausência registrada')).toBeTruthy()
+    expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
+    expect(screen.queryByText('Cancelar')).toBeNull()
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(['studentAbsence', RETURN_TRIP.id]),
+      ).toEqual({ registered: true, absence: null }),
+    )
+  })
+
+  it('404 ABSENCE_NOT_FOUND (estado local velho): mensagem clara e volta ao ramo normal', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+    mockBoarding.cancelAbsence.mockRejectedValue(
+      new ApiClientError(
+        'ABSENCE_NOT_FOUND',
+        'Nenhuma ausência ativa para cancelar',
+        404,
+      ),
+    )
+
+    renderScreen()
+
+    fireEvent.press(await openDialog())
+    await screen.findByText('Ausência registrada')
+
+    fireEvent.press(screen.getByText('Cancelar'))
+
+    expect(
+      await screen.findByText('Não há registro de ausência para cancelar.'),
+    ).toBeTruthy()
+    expect(await screen.findByText('Não vou voltar')).toBeTruthy()
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(['studentAbsence', RETURN_TRIP.id]),
+      ).toBeNull(),
+    )
   })
 })

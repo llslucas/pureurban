@@ -9,6 +9,7 @@ export interface BoardingAbsenceData {
   notifiedAt: Date;
   cancellableUntil: Date;
   cancelledAt: Date | null;
+  cancelIdempotencyKey: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,9 +22,23 @@ export interface CreateAbsenceResult {
   record: BoardingAbsenceData;
 }
 
+// Mesmo discriminador do create: cancelled distingue "anulei agora" de "a key
+// já estava gravada" (corrida da unique nova). Sem ele o use case emite
+// boarding.absence_cancelled duas vezes para o mesmo cancelamento.
+export interface CancelAbsenceResult {
+  cancelled: boolean;
+  record: BoardingAbsenceData;
+}
+
 export interface AbsenceRepositoryApi {
   findByIdempotencyKey(
     idempotencyKey: string,
+    companyId: string,
+  ): Effect.Effect<BoardingAbsenceData | null>;
+
+  // Lookup do replay do cancelamento: a key vive na própria linha anulada.
+  findByCancelIdempotencyKey(
+    cancelIdempotencyKey: string,
     companyId: string,
   ): Effect.Effect<BoardingAbsenceData | null>;
 
@@ -49,6 +64,17 @@ export interface AbsenceRepositoryApi {
     notifiedAt: Date;
     cancellableUntil: Date;
   }): Effect.Effect<CreateAbsenceResult>;
+
+  // Grava cancelledAt + cancelIdempotencyKey na linha ativa (append-only:
+  // nunca delete). cancelled === false sinaliza corrida da unique
+  // [companyId, cancelIdempotencyKey] — o record é a re-leitura pela key e
+  // julgar o payload é papel do use case.
+  cancel(data: {
+    absenceId: string;
+    companyId: string;
+    cancelledAt: Date;
+    cancelIdempotencyKey: string;
+  }): Effect.Effect<CancelAbsenceResult>;
 }
 
 export class AbsenceRepository extends Context.Tag('AbsenceRepository')<

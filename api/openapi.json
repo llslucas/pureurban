@@ -1583,16 +1583,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "Contrato declarado na Story 4.0 — implementação na Story 4.3.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            }
           }
         },
         "security": [

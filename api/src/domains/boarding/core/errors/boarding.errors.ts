@@ -140,3 +140,36 @@ export class StudentAlreadyCheckedInError extends Data.TaggedError(
       httpStatus: 409,
     });
 }
+
+// Nenhuma ausência ativa para (tripId, studentId): inexistente ou já cancelada
+// com key diferente. Replay do CANCELAMENTO não cai aqui — a cancel key fica
+// gravada na linha anulada e o replay devolve o resultado original.
+export class AbsenceNotFoundError extends Data.TaggedError(
+  'AbsenceNotFoundError',
+)<{
+  readonly code: string;
+  readonly message: string;
+  readonly httpStatus: number;
+}> {
+  static readonly create = () =>
+    new AbsenceNotFoundError({
+      code: 'ABSENCE_NOT_FOUND',
+      message: 'Nenhuma ausência ativa nesta viagem para cancelar',
+      httpStatus: 404,
+    });
+}
+
+export class CancellationPeriodExpiredError extends Data.TaggedError(
+  'CancellationPeriodExpiredError',
+)<{
+  readonly code: string;
+  readonly message: string;
+  readonly httpStatus: number;
+}> {
+  static readonly create = () =>
+    new CancellationPeriodExpiredError({
+      code: 'CANCELLATION_PERIOD_EXPIRED',
+      message: 'Janela de cancelamento (cancellableUntil) já expirou',
+      httpStatus: 409,
+    });
+}
