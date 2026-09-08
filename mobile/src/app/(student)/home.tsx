@@ -27,6 +27,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   STUDENT_NOT_ON_TRIP: 'Você não pertence à rota desta viagem.',
   TRIP_NOT_ACTIVE: 'A viagem não está mais ativa.',
   ALREADY_CHECKED_IN: 'Você já embarcou nesta viagem. Fale com o motorista.',
+  CANCELLATION_PERIOD_EXPIRED:
+    'O tempo para cancelar pelo app passou. Avise o motorista pessoalmente.',
+  ABSENCE_NOT_FOUND: 'Não há registro de ausência para cancelar.',
 }
 
 const formatCountdown = (ms: number) => {
@@ -115,6 +118,61 @@ export default function StudentHomeScreen() {
     },
   })
 
+  // Key por tentativa do CANCELAMENTO, separada da do registro: cada operação
+  // tem replay próprio no servidor (a cancel key persiste na linha anulada).
+  const cancelAttemptKeyRef = React.useRef<string | null>(null)
+
+  const cancelMutation = useMutation({
+    mutationFn: (currentTripId: string) => {
+      if (!cancelAttemptKeyRef.current) {
+        cancelAttemptKeyRef.current = Crypto.randomUUID()
+      }
+      return boardingService.cancelAbsence(
+        currentTripId,
+        cancelAttemptKeyRef.current,
+      )
+    },
+    onSuccess: (_cancellation, currentTripId) => {
+      // Sucesso = voltar ao ramo normal: "Não vou voltar" volta a ficar
+      // disponível e não existe estado "retorno confirmado" — o próprio ramo
+      // normal é o estado confirmado do cancelamento.
+      // removeQueries e não setQueryData(key, undefined): no TanStack v5 um
+      // resultado undefined é NO-OP — o cache só sai da key com remoção.
+      queryClient.removeQueries({ queryKey: ['studentAbsence', currentTripId] })
+      cancelAttemptKeyRef.current = null
+    },
+    onError: (error, currentTripId) => {
+      cancelAttemptKeyRef.current = null
+
+      // As duas corridas conhecidas reescrevem o cache antes da mensagem —
+      // a tela nunca trava num estado que o servidor já não confirma.
+      if (error instanceof ApiClientError) {
+        if (error.code === 'CANCELLATION_PERIOD_EXPIRED') {
+          // A janela fechou no meio do envio: o servidor MANTÉM a ausência —
+          // cache consolidado (sem countdown), como se tivesse expirado em paz.
+          queryClient.setQueryData<StudentAbsenceCache>(
+            ['studentAbsence', currentTripId],
+            { registered: true, absence: null },
+          )
+        } else if (error.code === 'ABSENCE_NOT_FOUND') {
+          // Estado local velho (cache mais novo que o servidor): nada a
+          // cancelar — limpa e volta ao ramo normal (removeQueries: v5 trata
+          // setQueryData(key, undefined) como no-op, ver onSuccess).
+          queryClient.removeQueries({
+            queryKey: ['studentAbsence', currentTripId],
+          })
+        }
+      }
+
+      setSnackbarMessage(
+        error instanceof ApiClientError
+          ? (ERROR_MESSAGES[error.code] ?? error.message)
+          : 'Não foi possível cancelar a ausência. Tente novamente.',
+      )
+      setSnackbarVisible(true)
+    },
+  })
+
   // Ticking local de 1s derivado de cancellableUntil — o cliente NUNCA
   // recalcula a janela, só exibe o countdown com o valor do servidor.
   const [nowMs, setNowMs] = React.useState(() => Date.now())
@@ -136,6 +194,13 @@ export default function StudentHomeScreen() {
   const handleConfirm = () => {
     if (!tripId) return
     notifyMutation.mutate(tripId)
+  }
+
+  // O tripId é capturado no toque (argumento da mutation), não no render: o
+  // escopo pode mudar enquanto o cancelamento voa (padrão do notifyMutation).
+  const handleCancel = () => {
+    if (!tripId) return
+    cancelMutation.mutate(tripId)
   }
 
   const handleDismissDialog = () => {
@@ -181,12 +246,22 @@ export default function StudentHomeScreen() {
                 O motorista já foi avisado de que você não vai voltar.
               </Text>
               {windowExpired ? null : (
-                // Rótulo factual: o cancelamento em si chega na 4.3 — aqui a
-                // janela só informa até quando ele será possível.
-                <Text variant="titleMedium" style={styles.countdown}>
-                  Janela de cancelamento{' '}
-                  {formatCountdown((expiryMs ?? 0) - nowMs)}
-                </Text>
+                <>
+                  <Text variant="titleMedium" style={styles.countdown}>
+                    Janela de cancelamento{' '}
+                    {formatCountdown((expiryMs ?? 0) - nowMs)}
+                  </Text>
+                  <Button
+                    mode="outlined"
+                    contentStyle={styles.buttonContent}
+                    icon="undo-variant"
+                    disabled={!tripId || cancelMutation.isPending}
+                    loading={cancelMutation.isPending}
+                    onPress={handleCancel}
+                  >
+                    Cancelar
+                  </Button>
+                </>
               )}
             </Card.Content>
           </Card>

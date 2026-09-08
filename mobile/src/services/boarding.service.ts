@@ -9,6 +9,8 @@ export type CheckInRequest = components['schemas']['CheckInRequestDto']
 export type CheckInResponse = components['schemas']['CheckInResponseDto']
 export type NotReturningRequest = components['schemas']['NotReturningRequestDto']
 export type NotReturningResponse = components['schemas']['NotReturningResponseDto']
+export type CancelAbsenceRequest = components['schemas']['CancelAbsenceRequestDto']
+export type CancelAbsenceResponse = components['schemas']['CancelAbsenceResponseDto']
 
 export const boardingService = {
   // A chave de idempotência é RECEBIDA, não gerada aqui. Ela pertence à
@@ -29,6 +31,17 @@ export const boardingService = {
     apiClient.post<NotReturningResponse>(
       '/api/v1/boarding/not-returning',
       { tripId } satisfies NotReturningRequest,
+      { 'X-Idempotency-Key': idempotencyKey },
+    ),
+
+  // Mesmo padrão do notifyNotReturning: key por tentativa gerada na tela,
+  // studentId quem monta é a API. Diferencial do cancelamento: o próprio
+  // endpoint É o replay — a mesma key reenviada devolve o cancelamento
+  // original (200) em vez de 404, então a key viva durante o envio importa.
+  cancelAbsence: (tripId: string, idempotencyKey: string) =>
+    apiClient.post<CancelAbsenceResponse>(
+      '/api/v1/boarding/cancel-absence',
+      { tripId } satisfies CancelAbsenceRequest,
       { 'X-Idempotency-Key': idempotencyKey },
     ),
 }
