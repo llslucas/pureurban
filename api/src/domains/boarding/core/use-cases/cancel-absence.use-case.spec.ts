@@ -485,9 +485,11 @@ describe('cancelAbsence', () => {
     );
   });
 
-  it('aluno já CHECKED_IN não é regra do cancelamento: o contrato não declara esse erro aqui', async () => {
-    // O cancelamento nem consulta BoardingRepository — a autoridade do
-    // check-in vive na derivação do roster (CHECKED_IN vence).
+  it('sucesso não depende de estado de check-in: o use case não requer port de check-in', async () => {
+    // O layer abaixo NÃO fornece BoardingRepository — se o R do cancelamento
+    // o exigisse, o Effect morreria com serviço faltante e este teste falharia.
+    // A autoridade do CHECKED_IN vive na derivação do roster; o contrato do
+    // cancelamento não declara erro de check-in.
     const absenceRepo = happyAbsenceRepo();
 
     const [result, events] = await run(

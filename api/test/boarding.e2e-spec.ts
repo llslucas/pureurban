@@ -1178,6 +1178,40 @@ describe('BoardingController (e2e)', () => {
       expect(body.data.summary).toEqual({ boarded: 0, total: 1 });
     });
 
+    it('aluno já CHECKED_IN: o cancelamento não rejeita (o contrato não declara erro de check-in aqui) e o roster mantém CHECKED_IN', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      await registerAbsence(tripId);
+
+      // O motorista presente embarcou o aluno DEPOIS do aviso de ausência.
+      await checkIn(driverToken, randomUUID(), {
+        studentId: allowedStudentId,
+        tripId,
+      }).expect(201);
+
+      // A autoridade do check-in vive no roster (last-write-wins), não no
+      // cancelamento — este endpoint não tem ALREADY_CHECKED_IN no contrato.
+      const response = await cancelAbsence(studentToken, { tripId }).expect(
+        200,
+      );
+      expect(
+        ((response.body as ApiResponse).data as Record<string, string>).status,
+      ).toBe('NOT_CHECKED_IN');
+
+      const body = (
+        (await rosterOf(tripId)).body as unknown as {
+          data: {
+            students: Array<{ studentId: string; status: string }>;
+            summary: { boarded: number; total: number };
+          };
+        }
+      ).data;
+      expect(body.students[0]).toMatchObject({
+        studentId: allowedStudentId,
+        status: 'CHECKED_IN',
+      });
+      expect(body.summary).toEqual({ boarded: 1, total: 1 });
+    });
+
     it('viagem encerrada ou de outra empresa ⇒ 409 TRIP_NOT_ACTIVE', async () => {
       const completed = await cancelAbsence(studentToken, {
         tripId: completedTripId,
@@ -1308,6 +1342,27 @@ describe('BoardingController (e2e)', () => {
       expect((second.body as ApiResponse).data).toEqual(
         (first.body as ApiResponse).data,
       );
+    });
+
+    it('replay do REGISTRO (key K) após o cancelamento devolve 201 com a linha ORIGINAL, sem segunda linha (fecha o defer #3 da 4.1)', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+      const registerKey = randomUUID();
+      const first = await registerAbsence(tripId, registerKey);
+
+      await cancelAbsence(studentToken, { tripId }).expect(200);
+
+      // O reenvio do registro com a MESMA key NÃO vira 404 pós-cancelamento:
+      // a key do registro segue na linha anulada e o replay devolve o payload
+      // original (id, notifiedAt, cancellableUntil), sem criar nova linha.
+      const replay = await registerAbsence(tripId, registerKey);
+      expect((replay.body as ApiResponse).data).toEqual(
+        (first.body as ApiResponse).data,
+      );
+
+      const rows = await prisma.boardingAbsence.findMany({
+        where: { tripId },
+      });
+      expect(rows).toHaveLength(1);
     });
 
     it('mesma cancel key para outra viagem ⇒ 409 IDEMPOTENCY_KEY_CONFLICT', async () => {
