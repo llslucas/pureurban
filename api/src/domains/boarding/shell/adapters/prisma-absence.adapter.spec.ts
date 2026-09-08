@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { Effect } from 'effect';
+import { Effect, Exit } from 'effect';
 import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
 import { PrismaAbsenceAdapter } from './prisma-absence.adapter.js';
 
@@ -81,6 +81,106 @@ describe('PrismaAbsenceAdapter (integração — banco real)', () => {
     expect(second.record.studentId).toBe(first.record.studentId);
   });
 
+  it('cancel anula a linha ativa persistindo cancelledAt e cancelIdempotencyKey (append-only, sem delete)', async () => {
+    const created = await insert();
+    createdIds.push(created.record.id);
+    const cancelledAt = new Date('2026-01-01T10:05:00.000Z');
+    const cancelKey = randomUUID();
+
+    const { cancelled, record } = await Effect.runPromise(
+      adapter.cancel({
+        absenceId: created.record.id,
+        companyId: created.record.companyId,
+        cancelledAt,
+        cancelIdempotencyKey: cancelKey,
+      }),
+    );
+
+    expect(cancelled).toBe(true);
+    expect(record.cancelledAt).toEqual(cancelledAt);
+    expect(record.cancelIdempotencyKey).toBe(cancelKey);
+    expect(record.id).toBe(created.record.id);
+  });
+
+  it('findByCancelIdempotencyKey devolve a linha anulada pela cancel key — o lookup do replay do cancelamento', async () => {
+    const companyId = randomUUID();
+    const created = await insert({ companyId });
+    createdIds.push(created.record.id);
+    const cancelKey = randomUUID();
+    await Effect.runPromise(
+      adapter.cancel({
+        absenceId: created.record.id,
+        companyId,
+        cancelledAt: new Date(),
+        cancelIdempotencyKey: cancelKey,
+      }),
+    );
+
+    const found = await Effect.runPromise(
+      adapter.findByCancelIdempotencyKey(cancelKey, companyId),
+    );
+
+    expect(found?.id).toBe(created.record.id);
+    expect(found?.cancelIdempotencyKey).toBe(cancelKey);
+    expect(found?.cancelledAt).not.toBeNull();
+  });
+
+  it('corrida da unique [companyId, cancelIdempotencyKey]: cancelar OUTRA linha com key já usada devolve cancelled: false e a linha original (re-leitura pela key)', async () => {
+    const companyId = randomUUID();
+    const cancelKey = randomUUID();
+
+    const first = await insert({ companyId });
+    createdIds.push(first.record.id);
+    await Effect.runPromise(
+      adapter.cancel({
+        absenceId: first.record.id,
+        companyId,
+        cancelledAt: new Date(),
+        cancelIdempotencyKey: cancelKey,
+      }),
+    );
+
+    // Ausência ativa diferente, mesma empresa: o update com a MESMA cancel key
+    // estoura P2002 — o adapter relê pela key em vez de quebrar.
+    const second = await insert({ companyId });
+    createdIds.push(second.record.id);
+
+    const outcome = await Effect.runPromise(
+      adapter.cancel({
+        absenceId: second.record.id,
+        companyId,
+        cancelledAt: new Date(),
+        cancelIdempotencyKey: cancelKey,
+      }),
+    );
+
+    expect(outcome.cancelled).toBe(false);
+    expect(outcome.record.id).toBe(first.record.id);
+    expect(outcome.record.cancelIdempotencyKey).toBe(cancelKey);
+  });
+
+  it('cancel com companyId de outra empresa nem toca a linha — o isolamento vive no where da escrita', async () => {
+    const created = await insert();
+    createdIds.push(created.record.id);
+
+    const exit = await Effect.runPromiseExit(
+      adapter.cancel({
+        absenceId: created.record.id,
+        companyId: randomUUID(),
+        cancelledAt: new Date(),
+        cancelIdempotencyKey: randomUUID(),
+      }),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+
+    const after = await prisma.boardingAbsence.findUnique({
+      where: { id: created.record.id },
+    });
+    expect(after?.cancelledAt).toBeNull();
+    expect(after?.cancelIdempotencyKey).toBeNull();
+  });
+
   it('findActiveByTripAndStudent ignora ausência cancelada e devolve só a ativa', async () => {
     const companyId = randomUUID();
     const tripId = randomUUID();
@@ -140,11 +240,25 @@ describe('PrismaAbsenceAdapter (integração — banco real)', () => {
       idempotencyKey,
     });
     createdIds.push(created.record.id);
+    const cancelKey = randomUUID();
+    await Effect.runPromise(
+      adapter.cancel({
+        absenceId: created.record.id,
+        companyId,
+        cancelledAt: new Date(),
+        cancelIdempotencyKey: cancelKey,
+      }),
+    );
 
     const byKey = await Effect.runPromise(
       adapter.findByIdempotencyKey(idempotencyKey, otherCompanyId),
     );
     expect(byKey).toBeNull();
+
+    const byCancelKey = await Effect.runPromise(
+      adapter.findByCancelIdempotencyKey(cancelKey, otherCompanyId),
+    );
+    expect(byCancelKey).toBeNull();
 
     const active = await Effect.runPromise(
       adapter.findActiveByTripAndStudent(tripId, studentId, otherCompanyId),
