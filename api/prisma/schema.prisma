@@ -46,14 +46,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Vínculos de rota (cross-schema: auth → routing)
+  routeStudents RouteStudent[] @relation("StudentRoutes")
+  routeDrivers  RouteDriver[]  @relation("DriverRoutes")
+
   @@unique([email])
   @@index([companyId, role, isActive])
   @@map("users")
   @@schema("auth")
-
-  // Vínculos de rota (cross-schema: auth → routing)
-  routeStudents RouteStudent[] @relation("StudentRoutes")
-  routeDrivers  RouteDriver[]  @relation("DriverRoutes")
 }
 
 // ─── TRIP (Viagens) ─────────────────────────────────────────
@@ -85,8 +85,8 @@ model Trip {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  relatedTrip Trip?  @relation("TripReturn", fields: [relatedTripId], references: [id])
-  returnTrip  Trip?  @relation("TripReturn")
+  relatedTrip Trip? @relation("TripReturn", fields: [relatedTripId], references: [id])
+  returnTrip  Trip? @relation("TripReturn")
 
   @@index([driverId, status])
   @@index([routeId, status])
@@ -108,13 +108,13 @@ model Route {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@index([companyId])
-  @@map("routes")
-  @@schema("routing")
-
   // Relações reversas para vínculos de alunos e motoristas
   routeStudents RouteStudent[]
   routeDrivers  RouteDriver[]
+
+  @@index([companyId])
+  @@map("routes")
+  @@schema("routing")
 }
 
 // Join table: aluno ↔ rota (routing schema, FK cross-schema para auth.users)
@@ -180,22 +180,22 @@ model BoardingRecord {
 // (unique composto com coluna anulada NÃO impede duas linhas ativas: o Postgres
 // trata NULLs como distintos e o Prisma não expõe NULLS NOT DISTINCT).
 model BoardingAbsence {
-  id                  String    @id @default(uuid())
-  companyId           String
-  tripId              String
-  studentId           String
-  idempotencyKey      String
-  notifiedAt          DateTime  @default(now())
+  id                   String    @id @default(uuid())
+  companyId            String
+  tripId               String
+  studentId            String
+  idempotencyKey       String
+  notifiedAt           DateTime  @default(now())
   // Fim da janela de cancelamento (notifiedAt + 2 min), calculado no core no
   // create — o cliente nunca calcula a janela, só exibe o countdown.
-  cancellableUntil    DateTime
-  cancelledAt         DateTime?
+  cancellableUntil     DateTime
+  cancelledAt          DateTime?
   // Key de idempotência do PRÓPRIO cancelamento (4.3), persistida na linha que
   // ele anulou — sem tabela genérica. Nullable: NULLs são distintos no Postgres
   // e cada linha só pode ser anulada uma vez.
   cancelIdempotencyKey String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@unique([companyId, idempotencyKey], name: "absence_idempotency")
   @@unique([companyId, cancelIdempotencyKey], name: "absence_cancel_idempotency")
