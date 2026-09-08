@@ -2,7 +2,7 @@
 title: 'Story 4.3: Cancelamento de Ausência (Fatia Vertical)'
 type: 'feature'
 created: '2026-09-08'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: fb6d7511eb56bbfde9577bdb30b1c21c3180d5d3
@@ -212,6 +212,16 @@ countdown no card de ausência em `(student)/home.tsx`.
   quando a key já vive em OUTRA linha (o update da própria linha não a dispara); re-leitura
   pela key devolve `cancelled: false` + a linha original, e o julgamento de payload é do use
   case (mesmo padrão do create da 4.1). Isolamento tenant reforçado no `where` da escrita.
+- **Review (2026-09-08, 3 camadas — 17 achados, 3 patches):** (1) teste unit que se dizia
+  de check-in era clone do happy path → retitulado para o que prova (o use case não requer
+  port de check-in); (2) novo e2e "check-in → cancelamento → roster mantém CHECKED_IN"
+  pinando a autoridade do check-in ponta-a-ponta; (3) novo e2e "replay do REGISTRO pós-
+  cancelamento devolve 201 com a linha original" pinando o defer #3 da 4.1; (4) `npx
+  prisma format` no schema (cosmético, inclui drift pré-existente de alinhamento em
+  User/Trip/Route). Rejeitados com precedente: corrida de duplo cancelamento em ms
+  (aceita em Design Notes, consequências benignas), persister MMKV na janela de throttle
+  (~1s, autocorreção em 24h), extras de cobertura defesa-em-profundidade, textos de
+  contrato pré-existentes.
 - **Verificação executada (2026-09-08, re-executada pelo orquestrador):** `npm run build`
   0 erros; `npm test` 267/267 (suíte do core: 66–74ms); e2e 128 verdes (boarding 54/54 —
   inclui stream `absence_cancelled` < 3s com payload exato, roster reverte, replay pós-fim
@@ -224,6 +234,26 @@ countdown no card de ausência em `(student)/home.tsx`.
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Achado (camada) | Veredito | Evidência |
+|---|-----------------|----------|-----------|
+| 1 | BH: congelado diz `setQueryData → undefined` mas a implementação usa `removeQueries`; Spec Change Log vazio | low | O desvio está registrado no lugar próprio (Implementation Notes + comentários no código); o bloco congelado é propriedade do humano e o Change Log é para emendas de loopback (nenhuma ocorreu). A correção apontada é editar esta spec → rejeitado por regra |
+| 2 | BH: Design Notes ("cancelamento OK → undefined") contradiz Implementation Notes (removeQueries/null) | false | Mesmo padrão da triage #9 da 4.0: Implementation Notes narra explicitamente a supersessão (no-op do v5, removeQueries, assentamento em null) — o documento não é ambíguo ao leitor; corrigir seria editar a spec → rejeitado |
+| 3 | BH: sprint-status `in-progress` vs spec `in-review` vs tasks [x] | false | Transição de processo: o sync do sprint-status para review acontece no fechamento da story (precedente triage #10 da 4.0). Estado transitório do fluxo |
+| 4 | BH: Verification "~246+"/"~148" vs Notes "267/147" | false | Verification é o plano pré-implementação (estimativas); Implementation Notes é o registro de execução — mesmo padrão das triages #11 da 4.0 e #5/#6 da 4.1 |
+| 5 | BH: teste unit "aluno já CHECKED_IN" é clone do happy path; nenhum teste faz check-in → cancelamento | low | Real: o teste não simula check-in (o use case nem tem port dele) e o nome promove comportamento não exercitado; a autoridade do check-in no roster É provada (4.1), mas o invariante ponta-a-ponta "check-in presente + cancelamento 200" ficou sem pino → patch |
+| 6 | BH: `INVALID_IDEMPOTENCY_KEY` (>200 chars) sem teste no cancel | low | O decorator é compartilhado, provado no próprio nível (`idempotency-key.decorator.spec`) e no e2e do not-returning — mesma pipeline; teste extra é defesa-em-profundidade (precedente triage #14 da 4.1) → rejeitado |
+| 7 | BH/ECH: 2 cancelamentos simultâneos (keys diferentes) → 2º escreve por cima e emite 2º evento | low | Alcançável só em duplo toque simultâneo na janela de ms entre leitura e escrita; o cliente mantém a key durante o pending e o 2º toque pós-erro cai no 404; 2º evento é no-op no roster do motorista (handler recusa status não-NOT_RETURNING); corrida residual aceita e documentada nas Design Notes → rejeitado (improvável + fix além de correção direta) |
+| 8 | BH: mesma corrida quebra "replay devolve o resultado ORIGINAL" da 1ª key (404) | low | Mesma causa raiz do #7: cenário de ms cujo desfecho ("replay do primeiro pode 404") está explicitamente aceito nas Design Notes aprovadas → rejeitado |
+| 9 | BH: `cancelledAt!` no service — invariante só em comentário; se quebrar, TypeError → 500 | false | Invariante por construção: só `cancel()` grava `cancelIdempotencyKey` (sempre junto de `cancelledAt`, no mesmo update) e `findByCancelIdempotencyKey` só casa linhas por essa key — ambos os ramos do service recebem `cancelledAt` não-nulo; estado inalcançável não é defeito |
+| 10 | BH: alinhamento do bloco `BoardingAbsence` quebrado; `prisma format` não rodado | low | Real: `npx prisma format --check` reporta o schema sem formatação após a coluna nova → patch (rodar `prisma format`) |
+| 11 | BH: `CancelOutcome` duplica `CreateOutcome` no adapter | false | As uniões modelam desfechos de operações distintas (create vs cancel); a coincidência estrutural não cria fonte de verdade com risco nomeável de divergência — nenhum chamador pode divergir; "mais limpo" sem dano concreto não é severidade |
+| 12 | BH: matriz congelada não tem linha para divergência de `studentId` no replay | false | O "Always" congelado já fixa "Match compara `tripId` + `studentId`" — a linha da matriz é ilustrativa; exceder a matriz não produz desfecho ruim |
+| 13 | BH: branch de erro genérico (não-ApiClientError) e duplo toque pendente sem teste mobile | low | Branches-irmãos cobertos (3 caminhos tipados testados); guarda de 2 linhas (key por tentativa + disabled/loading); precedente triage #16 da 4.2 → rejeitado |
+| 14 | BH: descrição 403 do Swagger confunde negação de papel com `STUDENT_NOT_ON_TRIP` | low | Texto pré-existente da 4.0, intocado neste diff (só handler e remoção da 501 mudaram); fix exige regenerar contrato, além de correção direta → rejeitado |
+| 15 | ECH: kill do app na janela de throttle do persister pós-cancel restaura card de ausência | low | Real em princípio (throttle ~1s do query-sync-storage-persister), mas exige cancelar e matar o app em <1s; desfecho é card consolidado falso que se autocorrige no gc (24h), sem bloqueio nem dano de dados; fix (flush de persister pós-mutation) é mecanismo novo → rejeitado |
+| 16 | VG: invariante "replay do registro pós-cancelamento devolve a linha original" (defer #3 da 4.1) sem pino de teste | low | Pré-verificado: `findByIdempotencyKey` não filtra `cancelledAt`, mas nada falharia se alguém o "alinhasse" ao filtro do `findActiveByTripAndStudent`; o Code Map desta spec fixa o comportamento → patch (1 e2e: register → cancel → replay do registro com a key original → 201 com payload original) |
+| 17 | VG screening: sem gaps de verificação | — | Todas as Demonstrações de regressão/adoção/quebra refutadas pelo reviewer; o achado "Other" virou a linha 16 |
 
 ## Design Notes
 
