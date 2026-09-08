@@ -3,6 +3,7 @@ import type { ManagedRuntime } from 'effect';
 import { EffectEventDispatcher } from '../../shared/shell/effect-runtime/event-dispatcher.service.js';
 import { checkIn } from '../core/use-cases/check-in.use-case.js';
 import { registerNotReturning } from '../core/use-cases/register-not-returning.use-case.js';
+import { cancelAbsence } from '../core/use-cases/cancel-absence.use-case.js';
 import { BoardingRepository } from '../core/ports/boarding-repository.port.js';
 import { AbsenceRepository } from '../core/ports/absence-repository.port.js';
 import { TripAccess } from '../core/ports/trip-access.port.js';
@@ -67,6 +68,27 @@ export class BoardingService {
       status: 'NOT_RETURNING' as const,
       notifiedAt: absence.notifiedAt.toISOString(),
       cancellableUntil: absence.cancellableUntil.toISOString(),
+    };
+  }
+
+  async cancelAbsence(input: {
+    studentId: string;
+    tripId: string;
+    companyId: string;
+    idempotencyKey: string;
+  }) {
+    const absence = await this.eventDispatcher.runAndDispatch(
+      this.runtime,
+      cancelAbsence(input),
+    );
+
+    return {
+      studentId: absence.studentId,
+      tripId: absence.tripId,
+      status: 'NOT_CHECKED_IN' as const,
+      // Invariante do use case: cancelamento e replay só devolvem linha
+      // anulada — cancelledAt nunca é null aqui.
+      cancelledAt: absence.cancelledAt!.toISOString(),
     };
   }
 }
