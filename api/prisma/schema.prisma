@@ -203,3 +203,25 @@ model BoardingAbsence {
   @@map("boarding_absences")
   @@schema("boarding")
 }
+
+// Pending check-in reminder (Story 4.4). Append-only and created solely by
+// the scan: the unique guarantees at most one reminder per student per trip —
+// the next scan tick re-reads and creates nothing (P2002 ⇒ created: false).
+// No "cancellation": answering the reminder (check-in or absence) clears the
+// pending state at READ time, not here — driver (stream) and student (GET)
+// see the same outcome with no extra write.
+model BoardingReminder {
+  id         String   @id @default(uuid())
+  companyId  String
+  tripId     String
+  studentId  String
+  remindedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Left-prefix sufficient for the queries by tripId (scan and GET).
+  @@unique([tripId, studentId], name: "reminder_one_per_student_per_trip")
+  @@index([companyId])
+  @@map("boarding_reminders")
+  @@schema("boarding")
+}
