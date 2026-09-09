@@ -161,9 +161,7 @@ describe('getPendingReminder', () => {
       'company-1',
     );
     expect(result).toBeNull();
-    expect(
-      ports.reminderRepo.findByTripAndStudent,
-    ).not.toHaveBeenCalled();
+    expect(ports.reminderRepo.findByTripAndStudent).not.toHaveBeenCalled();
     expect(events).toEqual([]);
   });
 
