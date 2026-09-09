@@ -37,6 +37,7 @@ jest.mock('@/services/boarding.service', () => ({
   boardingService: {
     notifyNotReturning: jest.fn(),
     cancelAbsence: jest.fn(),
+    getPendingReminder: jest.fn(),
   },
 }))
 
@@ -77,6 +78,12 @@ const CANCELLATION: CancelAbsenceResponse = {
   tripId: RETURN_TRIP.id,
   status: 'NOT_CHECKED_IN',
   cancelledAt: new Date().toISOString(),
+}
+
+// Shape of GET /api/v1/boarding/reminder (spec 4.4): null = no reminder.
+const REMINDER = {
+  tripId: RETURN_TRIP.id,
+  remindedAt: '2026-09-07T18:15:00.000Z',
 }
 
 function mockUser() {
@@ -123,6 +130,9 @@ function renderScreen() {
 beforeEach(() => {
   jest.clearAllMocks()
   mockUser()
+  // Same default as the 4.1/4.3 tests: no pending reminder — the banner stays
+  // out of their path. The 4.4 tests override it when needed.
+  mockBoarding.getPendingReminder.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -413,5 +423,137 @@ describe('StudentHomeScreen — cancelamento de ausência (spec-4-3)', () => {
         queryClient.getQueryData(['studentAbsence', RETURN_TRIP.id]),
       ).toBeNull(),
     )
+  })
+})
+
+describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () => {
+  it('banner appears when the GET returns a pending reminder — those not on the stream see it when opening the app', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getPendingReminder.mockResolvedValue(REMINDER)
+
+    renderScreen()
+
+    expect(
+      await screen.findByText(/ainda não confirmou o retorno/),
+    ).toBeTruthy()
+    // O fluxo normal da 4.1 continua disponível ao lado do banner.
+    expect(screen.getByText('Meu QR Code')).toBeTruthy()
+  })
+
+  it('GET null (sem lembrete): nenhum banner', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+
+    renderScreen()
+
+    expect(await screen.findByText('Não vou voltar')).toBeTruthy()
+    expect(screen.queryByText(/ainda não confirmou o retorno/)).toBeNull()
+  })
+
+  it('GET fails: banner absent and the screen keeps working — the reminder is an accessory', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getPendingReminder.mockRejectedValue(new Error('Network down'))
+
+    renderScreen()
+
+    expect(await screen.findByText('Não vou voltar')).toBeTruthy()
+    expect(screen.queryByText(/ainda não confirmou o retorno/)).toBeNull()
+  })
+
+  it('without an active trip the GET is not even called (enabled: Boolean(tripId))', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    expect(await screen.findByText('Não vou voltar')).toBeTruthy()
+    expect(mockBoarding.getPendingReminder).not.toHaveBeenCalled()
+  })
+
+  it('answering from the banner: same 4.1 dialog/mutation with the same per-attempt key, in 2 taps', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getPendingReminder.mockResolvedValue(REMINDER)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+
+    renderScreen()
+
+    // The banner must be mounted before the tap: while the GET has not
+    // resolved, the only "Não vou voltar" in the tree is the normal-branch
+    // button.
+    expect(await screen.findByText(/ainda não confirmou o retorno/)).toBeTruthy()
+
+    // Tap 1 — banner action (first "Não vou voltar" in the tree: the banner
+    // renders before the normal branch).
+    const bannerButton = (await screen.findAllByText('Não vou voltar'))[0]
+    await waitFor(() => expect(bannerButton).not.toBeDisabled())
+    fireEvent.press(bannerButton)
+    expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
+
+    // Tap 2 — the SAME 4.1 dialog confirms.
+    fireEvent.press(await screen.findByText('Confirmar'))
+
+    await waitFor(() =>
+      expect(mockBoarding.notifyNotReturning).toHaveBeenCalledWith(
+        RETURN_TRIP.id,
+        'generated-key-1',
+      ),
+    )
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+  })
+
+  it('after success the banner disappears: query cache removed and the GET refetch already returns null', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getPendingReminder
+      .mockResolvedValueOnce(REMINDER)
+      .mockResolvedValue(null)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+
+    renderScreen()
+
+    // Same precondition as the previous test: banner mounted before the tap.
+    expect(await screen.findByText(/ainda não confirmou o retorno/)).toBeTruthy()
+
+    fireEvent.press((await screen.findAllByText('Não vou voltar'))[0])
+    fireEvent.press(await screen.findByText('Confirmar'))
+
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    await waitFor(() =>
+      expect(screen.queryByText(/ainda não confirmou o retorno/)).toBeNull(),
+    )
+    // The reminder cache was removed (removeQueries) — no stale value left.
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(['studentReminder', RETURN_TRIP.id]),
+      ).toBeNull(),
+    )
+  })
+
+  it('cancelling the absence also removes the reminder cache: the pending banner comes back without a remount', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    // Server-side sequence: reminder answered (GET null while the absence is
+    // active), then the cancellation reopens the pending state — the next GET
+    // answers the reminder again.
+    mockBoarding.getPendingReminder
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(REMINDER)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+    mockBoarding.cancelAbsence.mockResolvedValue(CANCELLATION)
+
+    renderScreen()
+
+    // Register (2 taps) — the absence card replaces the normal branch.
+    fireEvent.press(await openDialog())
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+
+    // Cancel (1 tap) — the reminder pending state is restored server-side.
+    fireEvent.press(screen.getByText('Cancelar'))
+
+    // Without the cache removal in cancelMutation the stale null (or the
+    // pre-cancel cache) would answer first and the banner would wait for a
+    // remount; with it the evicted query refetches and the banner returns.
+    expect(
+      await screen.findByText(/ainda não confirmou o retorno/),
+    ).toBeTruthy()
+    expect(
+      queryClient.getQueryData(['studentReminder', RETURN_TRIP.id]),
+    ).toMatchObject({ tripId: RETURN_TRIP.id })
   })
 })

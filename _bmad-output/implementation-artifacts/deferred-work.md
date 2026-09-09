@@ -354,3 +354,11 @@ comparativa em vez de afirmação de viabilidade sem controle.
     (intenção aprovada pelo humano); qualquer consumidor rodando contra mocks vê semântica
     pré-4.1 do resumo. Alinhar quando a era dos mocks for encerrada de vez (os handlers já
     não participam do desenvolvimento das fatias).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-4-lembrete-automatico-de-check-in-pendente.md`
+  summary: Ligar o focusManager do TanStack Query ao AppState no RN para que refetch-on-focus
+    funcione de verdade (hoje o banner do lembrete só refresca em mount/remount pós-staleTime).
+  evidence: Review da 4.4 (achados BH5/ECH8, verificados por grep) — nenhum wiring de
+    focusManager/AppState existe em mobile/src e o comentário da home foi corrigido para
+    refletir isso. Limitação app-wide (atinge activeTrip, roster etc.), vizinha do defer
+    onlineManager→NetInfo já documentado em student-list.tsx:109 e do action item
+    epic-3-retro-item-5. Comportamento da 4.4 conforme a intenção congelada (sem polling).

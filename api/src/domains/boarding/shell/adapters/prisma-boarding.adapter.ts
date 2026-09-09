@@ -5,6 +5,7 @@ import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
 import type {
   BoardingRepositoryApi,
   BoardingRecordData,
+  CheckInSummary,
   RecordCheckInResult,
 } from '../../core/ports/boarding-repository.port.js';
 import { DuplicateCheckInError } from '../../core/errors/boarding.errors.js';
@@ -110,5 +111,22 @@ export class PrismaBoardingAdapter implements BoardingRepositoryApi {
       }
       return yield* Effect.fail(DuplicateCheckInError.create());
     });
+  }
+
+  findCheckInsByTrip(
+    tripId: string,
+    companyId: string,
+  ): Effect.Effect<CheckInSummary[]> {
+    return pipe(
+      Effect.tryPromise({
+        try: () =>
+          this.prisma.boardingRecord.findMany({
+            where: { tripId, companyId },
+            select: { studentId: true, checkedInAt: true },
+          }),
+        catch: toInfraError('Falha ao buscar check-ins da viagem'),
+      }),
+      Effect.orDie,
+    );
   }
 }

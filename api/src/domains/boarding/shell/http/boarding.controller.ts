@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Req,
   HttpCode,
@@ -40,6 +41,7 @@ import {
   CancelAbsenceRequestDto,
   CancelAbsenceResponseDto,
 } from './dtos/cancel-absence.dto.js';
+import { PendingReminderResponseDto } from './dtos/pending-reminder.dto.js';
 import {
   BoardingNotReturningEventDto,
   BoardingAbsenceCancelledEventDto,
@@ -51,6 +53,7 @@ import { CancelAbsenceInput } from '../../core/schemas/cancel-absence.schema.js'
 import { BoardingService } from '../boarding.service.js';
 import { BoardingEventsService } from '../events/boarding-events.service.js';
 import { BoardingEventsGuard } from './boarding-events.guard.js';
+import { TripService } from '../../../trip/shell/trip.service.js';
 
 @ApiTags('boarding')
 @ApiBearerAuth()
@@ -62,6 +65,9 @@ export class BoardingController {
   constructor(
     private readonly boardingService: BoardingService,
     private readonly boardingEventsService: BoardingEventsService,
+    // Shell-to-shell composition (BoardingEventsGuard pattern): the student's
+    // active trip is resolved by the trip domain, not duplicated in boarding.
+    private readonly tripService: TripService,
   ) {}
 
   @Post('check-in')
@@ -262,6 +268,74 @@ export class BoardingController {
       companyId,
       studentId: req.user.userId,
       idempotencyKey,
+    });
+  }
+
+  @Get('reminder')
+  // Override of the class-level ['DRIVER']: the reminder is consumed by the
+  // student (same override as the absence POSTs — handler metadata beats class
+  // metadata in the RolesGuard's getAllAndOverride).
+  @Roles(['STUDENT'])
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Lembrete pendente de check-in na volta',
+    description:
+      'Deriva na leitura o lembrete disparado pelo scan automático (Story 4.4) para o aluno ' +
+      'autenticado (studentId do JWT): pendente somente se a linha BoardingReminder existe E o aluno ' +
+      'ainda não fez check-in na viagem E não tem ausência ativa. 200 sempre — data null significa ' +
+      '"sem lembrete" (sem viagem de retorno ativa, sem linha, ou pendência já resolvida). ' +
+      'Permite quem não estava conectado ao stream ver o lembrete ao abrir o app.',
+  })
+  @ApiExtraModels(PendingReminderResponseDto)
+  @ApiResponse({
+    status: 200,
+    description:
+      'Envelope { data, meta } com data null ou { tripId, remindedAt }. A viagem ativa é resolvida ' +
+      'pelo domínio trip ANTES do boarding — aluno sem viagem de retorno ativa já recebe data null.',
+    schema: {
+      properties: {
+        data: {
+          allOf: [{ $ref: getSchemaPath(PendingReminderResponseDto) }],
+          nullable: true,
+        },
+        meta: {
+          type: 'object',
+          properties: { timestamp: { type: 'string', format: 'date-time' } },
+        },
+      },
+      required: ['data', 'meta'],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN — role STUDENT exigida (o lembrete é do aluno).',
+    type: ErrorResponseDto,
+  })
+  async reminder(
+    @TenantId() companyId: string,
+    @Req() req: Request & { user: { userId: string } },
+  ) {
+    // No active return trip on the student's route ⇒ { data: null } resolved
+    // BEFORE touching boarding (same semantics as GET /trips/active).
+    const trip = await this.tripService.getActiveStudentTrip(
+      req.user.userId,
+      companyId,
+    );
+    if (!trip) {
+      return null;
+    }
+
+    // The student comes from the token, never from the query — same pattern
+    // as the absence POSTs.
+    return this.boardingService.getPendingReminder({
+      studentId: req.user.userId,
+      tripId: trip.id,
+      companyId,
     });
   }
 

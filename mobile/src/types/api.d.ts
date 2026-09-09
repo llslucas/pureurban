@@ -416,6 +416,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boarding/reminder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lembrete pendente de check-in na volta
+         * @description Deriva na leitura o lembrete disparado pelo scan automático (Story 4.4) para o aluno autenticado (studentId do JWT): pendente somente se a linha BoardingReminder existe E o aluno ainda não fez check-in na viagem E não tem ausência ativa. 200 sempre — data null significa "sem lembrete" (sem viagem de retorno ativa, sem linha, ou pendência já resolvida). Permite quem não estava conectado ao stream ver o lembrete ao abrir o app.
+         */
+        get: operations["BoardingController_reminder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boarding/events": {
         parameters: {
             query?: never;
@@ -658,6 +678,19 @@ export interface components {
              * @example 550e8400-e29b-41d4-a716-446655440001
              */
             tripId: string;
+        };
+        PendingReminderResponseDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem de retorno com lembrete pendente
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Momento do disparo do lembrete (ISO 8601 UTC) — o mesmo remindedAt do evento boarding.checkin_reminder
+             * @example 2026-09-07T22:15:00.000Z
+             */
+            remindedAt: string;
         };
         /** @description Evento SSE `boarding.not_returning`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido ao motorista da viagem quando um aluno registra ausência (POST /not-returning, Story 4.1) — o status na lista muda para "NÃO VAI VOLTAR" e a contagem resumida se ajusta. O nome do aluno é resolvido pelo cliente a partir do roster. */
         BoardingNotReturningEventDto: {
@@ -2289,6 +2322,50 @@ export interface operations {
             };
             /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. CANCELLATION_PERIOD_EXPIRED — fora da janela cancellableUntil (notifiedAt + 2 minutos). IDEMPOTENCY_KEY_CONFLICT — key já usada para uma viagem diferente do enviado. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    BoardingController_reminder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Envelope { data, meta } com data null ou { tripId, remindedAt }. A viagem ativa é resolvida pelo domínio trip ANTES do boarding — aluno sem viagem de retorno ativa já recebe data null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PendingReminderResponseDto"] | null;
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN — role STUDENT exigida (o lembrete é do aluno). */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

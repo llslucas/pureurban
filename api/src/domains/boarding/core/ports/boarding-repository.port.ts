@@ -44,6 +44,19 @@ export interface BoardingRepositoryApi {
     idempotencyKey: string;
     checkedInAt: Date;
   }): Effect.Effect<RecordCheckInResult, DuplicateCheckInError>;
+
+  // Check-ins of a whole trip (4.4): the scan crosses who boarded the
+  // OUTBOUND (via relatedTripId) with who already boarded the RETURN — the
+  // latter are not reminder candidates. Minimal view: id and instant suffice.
+  findCheckInsByTrip(
+    tripId: string,
+    companyId: string,
+  ): Effect.Effect<CheckInSummary[]>;
+}
+
+export interface CheckInSummary {
+  studentId: string;
+  checkedInAt: Date;
 }
 
 export class BoardingRepository extends Context.Tag('BoardingRepository')<

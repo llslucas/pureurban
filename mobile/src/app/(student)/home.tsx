@@ -66,6 +66,19 @@ export default function StudentHomeScreen() {
     gcTime: 24 * 60 * 60 * 1000,
   })
 
+  // Pending check-in reminder (Story 4.4): the server derives it at read
+  // time — the same outcome the driver sees on the stream. No polling: the
+  // banner is read on mount/remount (after staleTime) and refreshed by the
+  // explicit cache removals after each action — React Native has no window
+  // focus, so while the screen sits open it does not live-refresh (push is
+  // Fase 2). A GET failure only hides the banner — the screen never depends
+  // on it.
+  const { data: pendingReminder } = useQuery({
+    queryKey: ['studentReminder', tripId ?? 'none'],
+    queryFn: () => boardingService.getPendingReminder(),
+    enabled: Boolean(tripId),
+  })
+
   const [dialogVisible, setDialogVisible] = React.useState(false)
   const [snackbarVisible, setSnackbarVisible] = React.useState(false)
   const [snackbarMessage, setSnackbarMessage] = React.useState('')
@@ -91,6 +104,10 @@ export default function StudentHomeScreen() {
         ['studentAbsence', currentTripId],
         { registered: true, absence },
       )
+      // The reminder (4.4) converges to the same outcome as the absence:
+      // without the removal the banner would survive the success — the GET
+      // refetch brings null, but the stale cache would answer first.
+      queryClient.removeQueries({ queryKey: ['studentReminder', currentTripId] })
       attemptKeyRef.current = null
       setDialogVisible(false)
     },
@@ -139,6 +156,10 @@ export default function StudentHomeScreen() {
       // removeQueries e não setQueryData(key, undefined): no TanStack v5 um
       // resultado undefined é NO-OP — o cache só sai da key com remoção.
       queryClient.removeQueries({ queryKey: ['studentAbsence', currentTripId] })
+      // Cancelar reabre a pendência no servidor (ausência anulada, linha do
+      // lembrete intacta): sem a remoção o cache null responderia primeiro e
+      // o banner só voltaria no próximo remount.
+      queryClient.removeQueries({ queryKey: ['studentReminder', currentTripId] })
       cancelAttemptKeyRef.current = null
     },
     onError: (error, currentTripId) => {
@@ -237,6 +258,30 @@ export default function StudentHomeScreen() {
         >
           Meu QR Code
         </Button>
+
+        {/* Reminder (4.4) between the QR and the absence branch: it answers
+            with the EXACT 4.1 mutation — the banner only opens the existing
+            dialog. It disappears when the absence is registered or the GET
+            returns null (pending state resolved). */}
+        {pendingReminder && !registered ? (
+          <Card mode="outlined" style={styles.reminderBanner}>
+            <Card.Content style={styles.reminderContent}>
+              <Text variant="titleSmall">E a volta?</Text>
+              <Text variant="bodyMedium" style={styles.reminderHint}>
+                Você ainda não confirmou o retorno. Se não vai voltar, avise o
+                motorista.
+              </Text>
+              <Button
+                mode="contained"
+                contentStyle={styles.buttonContent}
+                icon="bus-alert"
+                onPress={() => setDialogVisible(true)}
+              >
+                Não vou voltar
+              </Button>
+            </Card.Content>
+          </Card>
+        ) : null}
 
         {registered ? (
           <Card mode="elevated" style={styles.absenceCard}>
@@ -342,6 +387,17 @@ const styles = StyleSheet.create({
   },
   absenceCard: {
     borderRadius: 16,
+  },
+  reminderBanner: {
+    borderRadius: 16,
+  },
+  reminderContent: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  reminderHint: {
+    textAlign: 'center',
+    opacity: 0.7,
   },
   absenceContent: {
     alignItems: 'center',
