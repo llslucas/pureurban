@@ -11,6 +11,8 @@ export type NotReturningRequest = components['schemas']['NotReturningRequestDto'
 export type NotReturningResponse = components['schemas']['NotReturningResponseDto']
 export type CancelAbsenceRequest = components['schemas']['CancelAbsenceRequestDto']
 export type CancelAbsenceResponse = components['schemas']['CancelAbsenceResponseDto']
+export type PendingReminderResponse =
+  components['schemas']['PendingReminderResponseDto']
 
 export const boardingService = {
   // A chave de idempotência é RECEBIDA, não gerada aqui. Ela pertence à
@@ -44,4 +46,11 @@ export const boardingService = {
       { tripId } satisfies CancelAbsenceRequest,
       { 'X-Idempotency-Key': idempotencyKey },
     ),
+
+  // Pending reminder (Story 4.4): the server DERIVES it at read time —
+  // pending only if the scan row exists and the student has not resolved it
+  // yet (check-in on the return / active absence). null = no reminder; the
+  // { data } envelope is handled by the apiClient.
+  getPendingReminder: () =>
+    apiClient.get<PendingReminderResponse | null>('/api/v1/boarding/reminder'),
 }
