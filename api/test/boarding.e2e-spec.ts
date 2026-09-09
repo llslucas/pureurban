@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from '../src/domains/shared/shell/infra/prisma.service.js';
+import { ReminderSchedulerService } from '../src/domains/boarding/shell/reminder-scheduler.service.js';
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 
 interface ApiResponse {
@@ -566,6 +567,12 @@ describe('BoardingController (e2e)', () => {
       return req;
     };
 
+    const reminder = (token: string | null) => {
+      const req = request(app.getHttpServer()).get('/api/v1/boarding/reminder');
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req;
+    };
+
     it('STUDENT: POST /not-returning registra a ausência com 201', async () => {
       const tripId = await seedActiveTrip('RETURN');
       const response = await notReturning(studentToken, tripId).expect(201);
@@ -601,15 +608,153 @@ describe('BoardingController (e2e)', () => {
       await cancelAbsence(driverToken).expect(403);
     });
 
+    it('DRIVER no GET /reminder deve dar 403 — o lembrete é consultado pelo aluno (mesmo override)', async () => {
+      await reminder(driverToken).expect(403);
+    });
+
     it('STUDENT em /events deve dar 403 — o stream é do motorista', async () => {
       await events(studentToken).expect(403);
     });
 
-    it('sem token, as 3 rotas novas devem dar 401', async () => {
+    it('sem token, as rotas novas devem dar 401', async () => {
       await notReturning(null).expect(401);
       await cancelAbsence(null).expect(401);
       await events(null).expect(401);
+      await reminder(null).expect(401);
     });
+  });
+
+  // Stream helpers at file scope (hoisted from the 4.2 block): the 4.4
+  // reminder block opens the same stream to prove the event's delivery.
+  interface StreamMessage {
+    event: string;
+    data: Record<string, unknown>;
+  }
+
+  interface StreamHandle {
+    ready: Promise<void>;
+    status: () => number | undefined;
+    headers: () => Record<string, unknown>;
+    messages: StreamMessage[];
+    firstMessage: Promise<StreamMessage>;
+    closed: Promise<void>;
+    abort: () => void;
+  }
+
+  // O Response do superagent não resolve tipos sob o eslint-type-checked —
+  // o shape mínimo que o teste usa vem daqui.
+  const responseOf = (
+    r: unknown,
+  ): {
+    statusCode?: number;
+    headers?: Record<string, unknown>;
+    on: (event: string, listener: () => void) => unknown;
+  } =>
+    (
+      r as {
+        response: {
+          statusCode?: number;
+          headers?: Record<string, unknown>;
+          on: (event: string, listener: () => void) => unknown;
+        };
+      }
+    ).response;
+
+  const openStream = (token: string): StreamHandle => {
+    const messages: StreamMessage[] = [];
+    let resolveReady!: () => void;
+    let resolveFirst: (message: StreamMessage) => void = () => {};
+    let resolveClosed: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      resolveReady = resolve;
+    });
+    const firstMessage = new Promise<StreamMessage>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const closed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
+    });
+
+    const req = request(app.getHttpServer())
+      .get('/api/v1/boarding/events')
+      .set('Authorization', `Bearer ${token}`)
+      // Streaming sem buffer: o superagent não resolve a promessa do request
+      // em respostas não terminadas — `ready`, `firstMessage` e `closed`
+      // são resolvidos pelos eventos do parser.
+      .buffer(false)
+      .parse((res: IncomingMessage) => {
+        resolveReady();
+        res.on('error', () => resolveClosed());
+        res.on('end', () => resolveClosed());
+        res.on('close', () => resolveClosed());
+        let raw = '';
+        res.on('data', (chunk: Buffer) => {
+          raw += chunk.toString();
+          let boundary = raw.indexOf('\n\n');
+          while (boundary >= 0) {
+            const block = raw.slice(0, boundary);
+            raw = raw.slice(boundary + 2);
+            boundary = raw.indexOf('\n\n');
+            const lines = block.split('\n');
+            const eventLine = lines.find((line) => line.startsWith('event:'));
+            const dataLine = lines.find((line) => line.startsWith('data:'));
+            if (!eventLine) continue;
+            const message: StreamMessage = {
+              event: eventLine.slice('event:'.length).trim(),
+              data: dataLine
+                ? (JSON.parse(dataLine.slice('data:'.length).trim()) as Record<
+                    string,
+                    unknown
+                  >)
+                : {},
+            };
+            messages.push(message);
+            resolveFirst(message);
+          }
+        });
+      });
+
+    // O request fica pendente até o abort; sem isso o worker quebra com
+    // unhandled rejection ('Aborted') quando o teste encerra a conexão.
+    void Promise.resolve(req).catch(() => undefined);
+
+    return {
+      // Parser anexado ⇒ headers do stream chegaram ⇒ guard passou e o Nest
+      // já subscreveu o canal Redis (subscrição síncrona, mesmo tick do pipe).
+      ready: ready.then(() => {
+        // O Response do superagent reemite o ECONNRESET do socket no abort —
+        // sem listener vira uncaught exception e derruba o worker do vitest.
+        responseOf(req).on('error', () => resolveClosed());
+      }),
+      headers: () => responseOf(req).headers ?? {},
+      status: () => responseOf(req).statusCode,
+      messages,
+      firstMessage,
+      closed,
+      abort: () => {
+        try {
+          req.abort();
+        } catch {
+          // Stream já fechado — nada a abortar.
+        }
+      },
+    };
+  };
+
+  // O supertest fecha o server após o end() de cada request que ele próprio
+  // bindou (serverAddress → app.listen(0) quando não há porta; end() →
+  // server.close()). Com um stream SSE aberto, o close() pendura esperando a
+  // conexão e requests seguintes não conectam. Bind explícito uma vez: os
+  // Test passam a reusar a porta e nunca anexam o _server que fecha o app.
+  beforeAll(async () => {
+    const server = app.getHttpServer() as HttpServer;
+    if (!server.listening) {
+      await new Promise<void>((resolve, reject) => {
+        server.once('listening', () => resolve());
+        server.once('error', reject);
+        server.listen(0);
+      });
+    }
   });
 
   describe('GET /api/v1/boarding/events — stream SSE (Story 4.2)', () => {
@@ -621,136 +766,6 @@ describe('BoardingController (e2e)', () => {
         where: { driverId, status: 'ACTIVE' },
         data: { status: 'COMPLETED' },
       });
-
-    interface StreamMessage {
-      event: string;
-      data: Record<string, unknown>;
-    }
-
-    interface StreamHandle {
-      ready: Promise<void>;
-      status: () => number | undefined;
-      headers: () => Record<string, unknown>;
-      messages: StreamMessage[];
-      firstMessage: Promise<StreamMessage>;
-      closed: Promise<void>;
-      abort: () => void;
-    }
-
-    // O Response do superagent não resolve tipos sob o eslint-type-checked —
-    // o shape mínimo que o teste usa vem daqui.
-    const responseOf = (
-      r: unknown,
-    ): {
-      statusCode?: number;
-      headers?: Record<string, unknown>;
-      on: (event: string, listener: () => void) => unknown;
-    } =>
-      (
-        r as {
-          response: {
-            statusCode?: number;
-            headers?: Record<string, unknown>;
-            on: (event: string, listener: () => void) => unknown;
-          };
-        }
-      ).response;
-
-    const openStream = (token: string): StreamHandle => {
-      const messages: StreamMessage[] = [];
-      let resolveReady!: () => void;
-      let resolveFirst: (message: StreamMessage) => void = () => {};
-      let resolveClosed: () => void = () => {};
-      const ready = new Promise<void>((resolve) => {
-        resolveReady = resolve;
-      });
-      const firstMessage = new Promise<StreamMessage>((resolve) => {
-        resolveFirst = resolve;
-      });
-      const closed = new Promise<void>((resolve) => {
-        resolveClosed = resolve;
-      });
-
-      const req = request(app.getHttpServer())
-        .get('/api/v1/boarding/events')
-        .set('Authorization', `Bearer ${token}`)
-        // Streaming sem buffer: o superagent não resolve a promessa do request
-        // em respostas não terminadas — `ready`, `firstMessage` e `closed`
-        // são resolvidos pelos eventos do parser.
-        .buffer(false)
-        .parse((res: IncomingMessage) => {
-          resolveReady();
-          res.on('error', () => resolveClosed());
-          res.on('end', () => resolveClosed());
-          res.on('close', () => resolveClosed());
-          let raw = '';
-          res.on('data', (chunk: Buffer) => {
-            raw += chunk.toString();
-            let boundary = raw.indexOf('\n\n');
-            while (boundary >= 0) {
-              const block = raw.slice(0, boundary);
-              raw = raw.slice(boundary + 2);
-              boundary = raw.indexOf('\n\n');
-              const lines = block.split('\n');
-              const eventLine = lines.find((line) => line.startsWith('event:'));
-              const dataLine = lines.find((line) => line.startsWith('data:'));
-              if (!eventLine) continue;
-              const message: StreamMessage = {
-                event: eventLine.slice('event:'.length).trim(),
-                data: dataLine
-                  ? (JSON.parse(
-                      dataLine.slice('data:'.length).trim(),
-                    ) as Record<string, unknown>)
-                  : {},
-              };
-              messages.push(message);
-              resolveFirst(message);
-            }
-          });
-        });
-
-      // O request fica pendente até o abort; sem isso o worker quebra com
-      // unhandled rejection ('Aborted') quando o teste encerra a conexão.
-      void Promise.resolve(req).catch(() => undefined);
-
-      return {
-        // Parser anexado ⇒ headers do stream chegaram ⇒ guard passou e o Nest
-        // já subscreveu o canal Redis (subscrição síncrona, mesmo tick do pipe).
-        ready: ready.then(() => {
-          // O Response do superagent reemite o ECONNRESET do socket no abort —
-          // sem listener vira uncaught exception e derruba o worker do vitest.
-          responseOf(req).on('error', () => resolveClosed());
-        }),
-        headers: () => responseOf(req).headers ?? {},
-        status: () => responseOf(req).statusCode,
-        messages,
-        firstMessage,
-        closed,
-        abort: () => {
-          try {
-            req.abort();
-          } catch {
-            // Stream já fechado — nada a abortar.
-          }
-        },
-      };
-    };
-
-    // O supertest fecha o server após o end() de cada request que ele próprio
-    // bindou (serverAddress → app.listen(0) quando não há porta; end() →
-    // server.close()). Com um stream SSE aberto, o close() pendura esperando a
-    // conexão e requests seguintes não conectam. Bind explícito uma vez: os
-    // Test passam a reusar a porta e nunca anexam o _server que fecha o app.
-    beforeAll(async () => {
-      const server = app.getHttpServer() as HttpServer;
-      if (!server.listening) {
-        await new Promise<void>((resolve, reject) => {
-          server.once('listening', () => resolve());
-          server.once('error', reject);
-          server.listen(0);
-        });
-      }
-    });
 
     beforeEach(endAllActiveTrips);
 
@@ -1447,6 +1462,249 @@ describe('BoardingController (e2e)', () => {
 
       expect(body.data.students[0].status).toBe('CHECKED_IN');
       expect(body.data.summary).toEqual({ boarded: 1, total: 1 });
+    });
+  });
+
+  describe('Lembrete automático de check-in pendente (Story 4.4)', () => {
+    // The scheduler's interval (60s since app init) would make these tests
+    // non-deterministic: every outcome here triggers runOnce() explicitly.
+    // Nothing before this block seeds a RETURN with relatedTripId, so not
+    // even the interval that ran until now created any reminder.
+    beforeAll(() => {
+      app.get(ReminderSchedulerService).onModuleDestroy();
+    });
+
+    // findActiveReturnByStudent orders by startedAt desc: ACTIVE leftovers
+    // from previous tests would compete with the seeded trip — end every trip
+    // of this driver/company before each test.
+    const endMyActiveTrips = () =>
+      prisma.trip.updateMany({
+        where: { companyId, driverId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED' },
+      });
+
+    beforeEach(endMyActiveTrips);
+
+    const runOnce = () => app.get(ReminderSchedulerService).runOnce();
+
+    const reminder = (token: string | null) => {
+      const req = request(app.getHttpServer()).get('/api/v1/boarding/reminder');
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req;
+    };
+
+    // COMPLETED outbound with REAL check-ins (via API while the outbound is
+    // active) — the scan crosses those check-ins with the RETURN seeded next.
+    const seedOutboundWithCheckIns = async (studentIds: string[]) => {
+      const outbound = await prisma.trip.create({
+        data: {
+          companyId,
+          routeId,
+          driverId,
+          type: 'OUTBOUND',
+          status: 'ACTIVE',
+        },
+      });
+      for (const studentId of studentIds) {
+        await checkIn(driverToken, randomUUID(), {
+          studentId,
+          tripId: outbound.id,
+        }).expect(201);
+      }
+      await prisma.trip.update({
+        where: { id: outbound.id },
+        data: { status: 'COMPLETED' },
+      });
+      return outbound.id;
+    };
+
+    const seedReturn = async (outboundId: string | null, startedAt: Date) => {
+      const ret = await prisma.trip.create({
+        data: {
+          companyId,
+          routeId,
+          driverId,
+          type: 'RETURN',
+          status: 'ACTIVE',
+          relatedTripId: outboundId,
+          startedAt,
+        },
+      });
+      return ret.id;
+    };
+
+    const seedDueScenario = async (
+      studentIds: string[] = [allowedStudentId],
+    ) => {
+      const outboundId = await seedOutboundWithCheckIns(studentIds);
+      // startedAt 16 minutes ago: past the inclusive 15-minute boundary.
+      return seedReturn(outboundId, new Date(Date.now() - 16 * 60 * 1000));
+    };
+
+    it('runOnce ⇒ boarding.checkin_reminder no stream do motorista com o payload exato e uma única linha persistida', async () => {
+      const returnTripId = await seedDueScenario();
+
+      const stream = openStream(driverToken);
+      await stream.ready;
+      expect(stream.status()).toBe(200);
+
+      await runOnce();
+
+      const first = await stream.firstMessage;
+      expect(first.event).toBe('boarding.checkin_reminder');
+      // The contract payload carries the row's remindedAt — validated below.
+      const remindedAt = String(first.data.remindedAt);
+      expect(first.data).toEqual({
+        tripId: returnTripId,
+        studentId: allowedStudentId,
+        remindedAt,
+      });
+
+      const rows = await prisma.boardingReminder.findMany({
+        where: { tripId: returnTripId },
+      });
+      expect(rows).toHaveLength(1);
+      expect(remindedAt).toBe(rows[0].remindedAt.toISOString());
+
+      stream.abort();
+    });
+
+    it('2º runOnce (re-scan): nada novo — sem segunda linha, sem novo evento', async () => {
+      const returnTripId = await seedDueScenario();
+
+      const first = await runOnce();
+      expect(first).toMatchObject({ remindersCreated: 1 });
+
+      const stream = openStream(driverToken);
+      await stream.ready;
+      await runOnce();
+
+      const second = await runOnce();
+      // scannedTrips is a system-wide sweep: other e2e files run in parallel
+      // and may hold active RETURNs — what is deterministic here is that the
+      // re-execution creates nothing for THIS trip.
+      expect(second.remindersCreated).toBe(0);
+
+      // No new reminder reached the stream after the re-scans.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(stream.messages).toEqual([]);
+      expect(
+        await prisma.boardingReminder.count({
+          where: { tripId: returnTripId },
+        }),
+      ).toBe(1);
+
+      stream.abort();
+    });
+
+    it('GET /reminder: pendente após o disparo — { data: { tripId, remindedAt } } sem nunca ter aberto o stream', async () => {
+      const returnTripId = await seedDueScenario();
+      await runOnce();
+
+      const response = await reminder(studentToken).expect(200);
+
+      const body = response.body as ApiResponse;
+      expect(body.data).toMatchObject({ tripId: returnTripId });
+      expect(Number.isNaN(Date.parse(body.data.remindedAt as string))).toBe(
+        false,
+      );
+      expect(body.meta).toHaveProperty('timestamp');
+    });
+
+    it('GET /reminder sem linha (RETURN elegível, scan ainda não rodou) ⇒ { data: null }', async () => {
+      await seedDueScenario();
+
+      const response = await reminder(studentToken).expect(200);
+
+      expect((response.body as ApiResponse).data).toBeNull();
+    });
+
+    it('check-in na volta: scan não cria lembrete e GET ⇒ { data: null }', async () => {
+      const returnTripId = await seedDueScenario();
+      await checkIn(driverToken, randomUUID(), {
+        studentId: allowedStudentId,
+        tripId: returnTripId,
+      }).expect(201);
+
+      const scan = await runOnce();
+      expect(scan).toMatchObject({ remindersCreated: 0 });
+
+      const response = await reminder(studentToken).expect(200);
+      expect((response.body as ApiResponse).data).toBeNull();
+      expect(
+        await prisma.boardingReminder.count({
+          where: { tripId: returnTripId },
+        }),
+      ).toBe(0);
+    });
+
+    it('ausência ativa: scan não cria lembrete e GET ⇒ { data: null }', async () => {
+      const returnTripId = await seedDueScenario();
+      await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId: returnTripId })
+        .expect(201);
+
+      const scan = await runOnce();
+      expect(scan).toMatchObject({ remindersCreated: 0 });
+
+      const response = await reminder(studentToken).expect(200);
+      expect((response.body as ApiResponse).data).toBeNull();
+      expect(
+        await prisma.boardingReminder.count({
+          where: { tripId: returnTripId },
+        }),
+      ).toBe(0);
+    });
+
+    it('ausência cancelada: o aluno volta a ser elegível — runOnce cria e GET traz pendente', async () => {
+      const returnTripId = await seedDueScenario();
+      await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId: returnTripId })
+        .expect(201);
+      await post('/api/v1/boarding/cancel-absence')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId: returnTripId })
+        .expect(200);
+
+      await runOnce();
+
+      const response = await reminder(studentToken).expect(200);
+      expect((response.body as ApiResponse).data).toMatchObject({
+        tripId: returnTripId,
+      });
+    });
+
+    it('RETURN dentro do período (< 15 min): runOnce não cria linha', async () => {
+      const outboundId = await seedOutboundWithCheckIns([allowedStudentId]);
+      const returnTripId = await seedReturn(outboundId, new Date());
+
+      const scan = await runOnce();
+      // System-wide sweep ⇒ scannedTrips >= 1 is not exact in parallel; what
+      // is deterministic is that a trip outside the period creates nothing.
+      expect(scan.remindersCreated).toBe(0);
+      expect(
+        await prisma.boardingReminder.count({
+          where: { tripId: returnTripId },
+        }),
+      ).toBe(0);
+    });
+
+    it('RETURN órfã (relatedTripId nulo): skip — nenhuma linha', async () => {
+      await seedReturn(null, new Date(Date.now() - 16 * 60 * 1000));
+
+      const scan = await runOnce();
+      expect(scan.remindersCreated).toBe(0);
+    });
+
+    it('GET sem viagem de retorno ativa (aluno fora de rota) ⇒ { data: null } antes de tocar o boarding', async () => {
+      const response = await reminder(outsiderStudentToken).expect(200);
+
+      expect((response.body as ApiResponse).data).toBeNull();
     });
   });
 });
