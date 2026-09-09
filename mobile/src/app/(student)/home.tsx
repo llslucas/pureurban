@@ -67,9 +67,12 @@ export default function StudentHomeScreen() {
   })
 
   // Pending check-in reminder (Story 4.4): the server derives it at read
-  // time — the same outcome the driver sees on the stream. No polling:
-  // refetch on mount/focus + cache removal after the action suffice. A GET
-  // failure only hides the banner — the screen never depends on it.
+  // time — the same outcome the driver sees on the stream. No polling: the
+  // banner is read on mount/remount (after staleTime) and refreshed by the
+  // explicit cache removals after each action — React Native has no window
+  // focus, so while the screen sits open it does not live-refresh (push is
+  // Fase 2). A GET failure only hides the banner — the screen never depends
+  // on it.
   const { data: pendingReminder } = useQuery({
     queryKey: ['studentReminder', tripId ?? 'none'],
     queryFn: () => boardingService.getPendingReminder(),
@@ -153,6 +156,10 @@ export default function StudentHomeScreen() {
       // removeQueries e não setQueryData(key, undefined): no TanStack v5 um
       // resultado undefined é NO-OP — o cache só sai da key com remoção.
       queryClient.removeQueries({ queryKey: ['studentAbsence', currentTripId] })
+      // Cancelar reabre a pendência no servidor (ausência anulada, linha do
+      // lembrete intacta): sem a remoção o cache null responderia primeiro e
+      // o banner só voltaria no próximo remount.
+      queryClient.removeQueries({ queryKey: ['studentReminder', currentTripId] })
       cancelAttemptKeyRef.current = null
     },
     onError: (error, currentTripId) => {

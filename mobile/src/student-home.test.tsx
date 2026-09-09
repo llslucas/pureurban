@@ -525,4 +525,35 @@ describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () =>
       ).toBeNull(),
     )
   })
+
+  it('cancelling the absence also removes the reminder cache: the pending banner comes back without a remount', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    // Server-side sequence: reminder answered (GET null while the absence is
+    // active), then the cancellation reopens the pending state — the next GET
+    // answers the reminder again.
+    mockBoarding.getPendingReminder
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(REMINDER)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+    mockBoarding.cancelAbsence.mockResolvedValue(CANCELLATION)
+
+    renderScreen()
+
+    // Register (2 taps) — the absence card replaces the normal branch.
+    fireEvent.press(await openDialog())
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+
+    // Cancel (1 tap) — the reminder pending state is restored server-side.
+    fireEvent.press(screen.getByText('Cancelar'))
+
+    // Without the cache removal in cancelMutation the stale null (or the
+    // pre-cancel cache) would answer first and the banner would wait for a
+    // remount; with it the evicted query refetches and the banner returns.
+    expect(
+      await screen.findByText(/ainda não confirmou o retorno/),
+    ).toBeTruthy()
+    expect(
+      queryClient.getQueryData(['studentReminder', RETURN_TRIP.id]),
+    ).toMatchObject({ tripId: RETURN_TRIP.id })
+  })
 })
