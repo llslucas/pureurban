@@ -1493,9 +1493,14 @@ describe('BoardingController (e2e)', () => {
       return req;
     };
 
-    // COMPLETED outbound with REAL check-ins (via API while the outbound is
-    // active) — the scan crosses those check-ins with the RETURN seeded next.
-    const seedOutboundWithCheckIns = async (studentIds: string[]) => {
+    // Outbound with REAL check-ins (via API while the outbound is active) —
+    // the scan crosses those check-ins with the RETURN seeded next. Completes
+    // it by default; `finalStatus: 'ACTIVE'` keeps it live for scenarios that
+    // need the trip itself to be visible on the driver's state.
+    const seedOutboundWithCheckIns = async (
+      studentIds: string[],
+      finalStatus: 'ACTIVE' | 'COMPLETED' = 'COMPLETED',
+    ) => {
       const outbound = await prisma.trip.create({
         data: {
           companyId,
@@ -1511,10 +1516,12 @@ describe('BoardingController (e2e)', () => {
           tripId: outbound.id,
         }).expect(201);
       }
-      await prisma.trip.update({
-        where: { id: outbound.id },
-        data: { status: 'COMPLETED' },
-      });
+      if (finalStatus === 'COMPLETED') {
+        await prisma.trip.update({
+          where: { id: outbound.id },
+          data: { status: 'COMPLETED' },
+        });
+      }
       return outbound.id;
     };
 
@@ -1699,6 +1706,42 @@ describe('BoardingController (e2e)', () => {
 
       const scan = await runOnce();
       expect(scan.remindersCreated).toBe(0);
+    });
+
+    it('viagem fora do scan: OUTBOUND ativa e RETURN encerrada com due vencido são ignoradas', async () => {
+      // Matrix row "Viagem fora do scan": the sweep only reads type RETURN +
+      // status ACTIVE. An ACTIVE OUTBOUND holding a REAL check-in (with the
+      // same old startedAt a due RETURN would have) never enters it...
+      const activeOutboundId = await seedOutboundWithCheckIns(
+        [allowedStudentId],
+        'ACTIVE',
+      );
+      const startedAt = new Date(Date.now() - 16 * 60 * 1000);
+      await prisma.trip.update({
+        where: { id: activeOutboundId },
+        data: { startedAt },
+      });
+
+      // ...and neither does a COMPLETED RETURN due 16 min ago, linked to
+      // ANOTHER outbound that also holds a real check-in.
+      const otherOutboundId = await seedOutboundWithCheckIns([
+        allowedStudentId,
+      ]);
+      const completedReturnId = await seedReturn(otherOutboundId, startedAt);
+      await prisma.trip.update({
+        where: { id: completedReturnId },
+        data: { status: 'COMPLETED' },
+      });
+
+      const scan = await runOnce();
+      // System-wide sweep ⇒ scannedTrips >= 1 is not exact in parallel; what
+      // is deterministic is that neither trip produces a reminder.
+      expect(scan.remindersCreated).toBe(0);
+      expect(
+        await prisma.boardingReminder.count({
+          where: { tripId: { in: [activeOutboundId, completedReturnId] } },
+        }),
+      ).toBe(0);
     });
 
     it('GET sem viagem de retorno ativa (aluno fora de rota) ⇒ { data: null } antes de tocar o boarding', async () => {
