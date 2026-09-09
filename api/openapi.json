@@ -1596,6 +1596,76 @@
         ]
       }
     },
+    "/api/v1/boarding/reminder": {
+      "get": {
+        "description": "Deriva na leitura o lembrete disparado pelo scan automático (Story 4.4) para o aluno autenticado (studentId do JWT): pendente somente se a linha BoardingReminder existe E o aluno ainda não fez check-in na viagem E não tem ausência ativa. 200 sempre — data null significa \"sem lembrete\" (sem viagem de retorno ativa, sem linha, ou pendência já resolvida). Permite quem não estava conectado ao stream ver o lembrete ao abrir o app.",
+        "operationId": "BoardingController_reminder",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Envelope { data, meta } com data null ou { tripId, remindedAt }. A viagem ativa é resolvida pelo domínio trip ANTES do boarding — aluno sem viagem de retorno ativa já recebe data null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/PendingReminderResponseDto"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN — role STUDENT exigida (o lembrete é do aluno).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lembrete pendente de check-in na volta",
+        "tags": [
+          "boarding"
+        ]
+      }
+    },
     "/api/v1/boarding/events": {
       "get": {
         "description": "Canal em tempo real do motorista para a viagem ativa. Cada mensagem do stream traz a linha `event:` com o tipo (boarding.not_returning | boarding.absence_cancelled | boarding.checkin_reminder) e a linha `data:` com o payload JSON. A conexão é encerrada elegantemente quando a viagem termina; a reconexão após queda de rede é responsabilidade do cliente (EventSource), sem duplicar entradas na lista.",
@@ -2033,6 +2103,26 @@
         },
         "required": [
           "tripId"
+        ]
+      },
+      "PendingReminderResponseDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem de retorno com lembrete pendente",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "remindedAt": {
+            "type": "string",
+            "description": "Momento do disparo do lembrete (ISO 8601 UTC) — o mesmo remindedAt do evento boarding.checkin_reminder",
+            "example": "2026-09-07T22:15:00.000Z"
+          }
+        },
+        "required": [
+          "tripId",
+          "remindedAt"
         ]
       },
       "BoardingNotReturningEventDto": {
