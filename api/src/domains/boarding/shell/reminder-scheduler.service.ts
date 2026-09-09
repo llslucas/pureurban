@@ -21,6 +21,13 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly boardingService: BoardingService) {}
 
   onModuleInit(): void {
+    // Test kill-switch: every e2e file boots the full AppModule, and the scan
+    // is a system-wide sweep against the one shared PostgreSQL — a stray tick
+    // from a parallel file's app would steal the seeded creation and flake the
+    // Story 4.4 assertions. e2e runs with REMINDER_SCAN_ENABLED=false; the
+    // explicit runOnce() remains the trigger there.
+    if (process.env.REMINDER_SCAN_ENABLED === 'false') return;
+
     this.intervalId = setInterval(() => {
       void this.runOnce();
     }, REMINDER_SCAN_INTERVAL_MS);
