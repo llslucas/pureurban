@@ -15,6 +15,11 @@ import {
   ReminderRepositoryApi,
   BoardingReminderData,
 } from '../ports/reminder-repository.port.js';
+import {
+  TripAccess,
+  TripAccessApi,
+  ActiveReturnTripView,
+} from '../ports/trip-access.port.js';
 
 const NOW = new Date('2026-01-01T12:15:00.000Z');
 
@@ -22,6 +27,15 @@ const input = {
   studentId: 'student-1',
   companyId: 'company-1',
   tripId: 'trip-return-1',
+};
+
+const activeReturnTrip: ActiveReturnTripView = {
+  id: 'trip-return-1',
+  companyId: 'company-1',
+  routeId: 'route-1',
+  driverId: 'driver-1',
+  relatedTripId: 'trip-outbound-1',
+  startedAt: new Date('2026-01-01T11:44:00.000Z'),
 };
 
 const storedReminder: BoardingReminderData = {
@@ -49,11 +63,13 @@ const activeAbsence: BoardingAbsenceData = {
 };
 
 function makeLayer(
+  tripAccess: Partial<TripAccessApi>,
   reminderRepo: Partial<ReminderRepositoryApi>,
   boardingRepo: Partial<BoardingRepositoryApi>,
   absenceRepo: Partial<AbsenceRepositoryApi>,
 ) {
   return Layer.mergeAll(
+    Layer.succeed(TripAccess, tripAccess as TripAccessApi),
     Layer.succeed(ReminderRepository, reminderRepo as ReminderRepositoryApi),
     Layer.succeed(BoardingRepository, boardingRepo as BoardingRepositoryApi),
     Layer.succeed(AbsenceRepository, absenceRepo as AbsenceRepositoryApi),
@@ -61,8 +77,14 @@ function makeLayer(
 }
 
 // Ports satisfied for the pending path — each test overrides only what it
-// needs. Row exists; no check-in on the RETURN; no active absence.
+// needs. Trip is an ACTIVE RETURN; row exists; no check-in on the RETURN; no
+// active absence.
 const happyPorts = () => ({
+  tripAccess: {
+    findActiveReturnTripById: vi
+      .fn()
+      .mockReturnValue(Effect.succeed(activeReturnTrip)),
+  },
   reminderRepo: {
     findByTripAndStudent: vi
       .fn()
@@ -80,7 +102,12 @@ const run = async (ports: ReturnType<typeof happyPorts>) => {
   const [result, events] = await Effect.runPromise(
     getPendingReminder(input).pipe(
       Effect.provide(
-        makeLayer(ports.reminderRepo, ports.boardingRepo, ports.absenceRepo),
+        makeLayer(
+          ports.tripAccess,
+          ports.reminderRepo,
+          ports.boardingRepo,
+          ports.absenceRepo,
+        ),
       ),
     ),
   );
@@ -119,6 +146,25 @@ describe('getPendingReminder', () => {
       ports.boardingRepo.findCheckInByTripAndStudent,
     ).not.toHaveBeenCalled();
     expect(ports.absenceRepo.findActiveByTripAndStudent).not.toHaveBeenCalled();
+  });
+
+  it('trip no longer ACTIVE RETURN ⇒ null without querying the reminder port (defensive re-validation)', async () => {
+    const ports = happyPorts();
+    (
+      ports.tripAccess.findActiveReturnTripById as ReturnType<typeof vi.fn>
+    ).mockReturnValue(Effect.succeed(null));
+
+    const { result, events } = await run(ports);
+
+    expect(ports.tripAccess.findActiveReturnTripById).toHaveBeenCalledWith(
+      'trip-return-1',
+      'company-1',
+    );
+    expect(result).toBeNull();
+    expect(
+      ports.reminderRepo.findByTripAndStudent,
+    ).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
   });
 
   it('check-in on the RETURN exists ⇒ null (pending state resolved by boarding)', async () => {

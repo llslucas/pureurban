@@ -3,6 +3,7 @@ import { noEvents } from '../../../shared/core/events/with-events.js';
 import { AbsenceRepository } from '../ports/absence-repository.port.js';
 import { BoardingRepository } from '../ports/boarding-repository.port.js';
 import { ReminderRepository } from '../ports/reminder-repository.port.js';
+import { TripAccess } from '../ports/trip-access.port.js';
 import type { WithEvents } from '../../../shared/core/events/index.js';
 
 export interface PendingReminderView {
@@ -30,12 +31,23 @@ export const getPendingReminder = (
 ): Effect.Effect<
   WithEvents<PendingReminderView | null>,
   never,
-  ReminderRepository | BoardingRepository | AbsenceRepository
+  ReminderRepository | BoardingRepository | AbsenceRepository | TripAccess
 > =>
   Effect.gen(function* () {
+    const tripAccess = yield* TripAccess;
     const reminderRepo = yield* ReminderRepository;
     const boardingRepo = yield* BoardingRepository;
     const absenceRepo = yield* AbsenceRepository;
+
+    // Defensive re-validation: the shell resolved the trip before this call,
+    // but it can end in between — a pending reminder of an ended trip is null.
+    const trip = yield* tripAccess.findActiveReturnTripById(
+      input.tripId,
+      input.companyId,
+    );
+    if (!trip) {
+      return noEvents(null);
+    }
 
     const reminder = yield* reminderRepo.findByTripAndStudent(
       input.tripId,
