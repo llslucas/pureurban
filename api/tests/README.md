@@ -122,3 +122,74 @@ scripts `test:pw`, `test:pw:e2e`, `test:pw:headed`).
   `console.log` (`[NFR1]` / `[NFR4]`); a folga de ambiente local está nos tetos.
 - **Sem cleanup:** cada spec semeia um tenant isolado via `seedEpic3Scenario`
   (e-mail faker único). Lixo no Postgres de teste local é aceito.
+
+## E2E do Épico 4 (ausência e lembrete — Story 4.5)
+
+`tests/e2e/absence-reminder.e2e.spec.ts` (mesmo projeto `e2e`, mesmos
+pré-requisitos da seção acima) prova o Épico 4 pela UI, em **duas páginas em
+contextos separados sobre a mesma viagem RETURN**: o aluno na home (botão "Não
+vou voltar", banner "E a volta?", card "Ausência registrada") e o motorista na
+lista de embarque (badge "! Não vai voltar", contagem `{boarded}/{total}
+embarcados`, toast). Cobre quatro fluxos: notificar (com NFR3), cancelar dentro
+da janela, fora da janela (UI + API) e o lembrete respondido pelo aluno.
+
+### Cenário semeado
+
+`seedEpic4Scenario` (fixture `epic4`) cria, 100% via API e sem cleanup: empresa
++ admin, motorista, rota, 3 alunos **com credenciais e token** (logináveis),
+vínculos, OUTBOUND com check-in real (header `X-Idempotency-Key`), end da
+OUTBOUND e RETURN ativa com `relatedTripId` — a RETURN é a única viagem ativa,
+que é exatamente o que a home do aluno e a lista do motorista resolvem.
+
+### Aging de timestamps (única escrita direta no banco)
+
+As janelas de 2 min (cancelamento) e 15 min (lembrete) são inviáveis em tempo
+real, e a API não aceita datas no passado. Os timestamps são então "envelhecidos"
+direto no Postgres por `tests/support/helpers/prisma-time.ts` (`ageTrip`,
+`ageAbsence`) — cliente Prisma com adapter `PrismaPg` + dotenv, mesmo padrão do
+`prisma/seed.ts`, rodando no processo do Playwright (precisa de `api/.env` com
+`DATABASE_URL`). Este helper é a ÚNICA exceção à regra "dados só via API": a
+crição continua toda via endpoints; só o relógio é reescrito (precedente do
+supertest `test/boarding.e2e-spec.ts`, que semeia ausências com datas passadas).
+
+### Lembrete: scheduler real, polling de até ~90s
+
+Não há endpoint de trigger manual do scan (decisão da 4.4). O teste envelhece o
+`startedAt` da RETURN e **espera o tick de 60s do scheduler do dev server**
+(`:3000` sobe SEM `REMINDER_SCAN_ENABLED=false` — a kill-switch só existe nos
+testes Vitest), fazendo polling de `GET /api/v1/boarding/reminder` com o token
+do aluno por até 90s. Por isso o teste do lembrete pode demorar ~1–2 min. O
+banner "E a volta?" só aparece depois de um reload: o app não faz polling — o
+lembrete é derivado na abertura do app (requisito da 4.4). Detalhe: o
+`staleTime` GLOBAL do app é de 1 minuto (`mobile/src/lib/query-client.ts`), então
+o reload precisa acontecer DEPOIS de o `null` persistido ficar velho — por isso
+o spec remonta em loop (`expect.toPass`) em vez de recarregar uma vez.
+
+### NFR3 e margem de ambiente
+
+O NFR3 (< 3s) é medido como **wall-clock do clique em "Confirmar" até o
+badge/contagem estar visível na página do motorista** — cross-screen (rede +
+SSE + render), então inclui o round-trip dos dois browsers. O número real vai
+no `console.log` (`[NFR3] ...ms`, visível na saída do Playwright). A prova de
+rede pura <3s já vive no supertest; o budget de 3000ms aqui é folgado de
+propósito para variação do ambiente local (Metro, CDP, primeiro paint).
+
+### Caveats específicos do Épico 4
+
+- **CORS do stream SSE no web (gap de produção, shim de teste):** o cliente SSE
+  do mobile (`react-native-sse`) envia o header `cache-control` no XHR do
+  stream, e a allowlist de CORS da API (`api/src/main.ts`: Content-Type,
+  Authorization, X-Idempotency-Key) não o inclui — no browser o stream é
+  bloqueado e o motorista fica sem realtime (o servidor entrega o evento em
+  <50 ms; a rede não é o problema). Como a 4.5 proíbe mudar `api/src/`, o spec
+  remove o header na camada de transporte, só no contexto do motorista
+  (`allowSseInBrowser` no spec). Follow-up recomendado: acrescentar
+  `cache-control` à allowlist em `api/src/main.ts` e remover o shim.
+- **Aging também no cache do aluno (fora da janela):** a home renderiza o
+  countdown exclusivamente do `cancellableUntil` em cache — não há GET de
+  ausência. Para o card sair do estado "com countdown" para o consolidado sem
+  esperar os 2 min reais, o spec envelhece o timestamp no banco (Prisma) E no
+  cache persistido do app (`ageAbsenceInClientCache`: blob do TanStack no
+  MMKV-web/localStorage, chave `mmkv.default\REACT_QUERY_OFFLINE_CACHE`).
+  O persister sincroniza com throttle de 1s — o spec espera a descarga antes
+  de recarregar a página, senão a escrita se perde no reload.

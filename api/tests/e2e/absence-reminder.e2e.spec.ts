@@ -1,0 +1,396 @@
+/**
+ * Épico 4 — ausência "não vou voltar" e lembrete, ponta a ponta pela UI contra
+ * a API real (sem MSW).
+ *
+ * Duas páginas em contextos separados sobre a MESMA viagem RETURN semeada via
+ * API: o aluno na home (`(student)/home`) e o motorista na lista de embarque
+ * (`(driver)/student-list`). Fluxos dependentes de tempo (janela de 2 min,
+ * lembrete de 15 min) usam aging de timestamps via Prisma
+ * (`support/helpers/prisma-time`) — nunca sono de tempo real nem backdoor de
+ * trigger; o lembrete é disparado pelo scheduler real do dev server (tick de
+ * 60s) e o spec faz polling do `GET /boarding/reminder`.
+ */
+import { randomUUID } from 'node:crypto';
+import { devices } from '@playwright/test';
+import type { BrowserContext, Page, Route } from '@playwright/test';
+import { test, expect } from '../support/merged-fixtures';
+import { API_URL, e2eServersUnavailable } from '../support/helpers/e2e-servers';
+import { loginAsDriver, loginAsStudent } from '../support/helpers/e2e-driver';
+import { ageAbsence, ageTrip } from '../support/helpers/prisma-time';
+import type { Epic3Credentials } from '../support/helpers/seed-helpers';
+
+// Teto da NFR3, medido como WALL-CLOCK do clique em "Confirmar" até o
+// badge/contagem visível na página do motorista (cross-screen: rede + SSE +
+// render). A prova de rede pura <3s já vive no supertest; aqui o budget é
+// folgado para o ambiente local — mesmo critério do NFR1 do happy path.
+const NFR3_BUDGET_MS = 3000;
+
+// O scheduler do dev server tica a cada 60s; o polling cobre ao menos um tick
+// inteiro com folga (timeout >= 90s é parte do desenho da 4.5).
+const REMINDER_POLL_TIMEOUT_MS = 90_000;
+const REMINDER_POLL_INTERVAL_MS = 2_000;
+
+const NOT_RETURNING_BADGE = '! Não vai voltar';
+
+/**
+ * Shim de TESTE (não toca em api/src/) para o stream SSE do motorista no web:
+ * `react-native-sse` envia `cache-control: no-cache` no XHR do stream, e a
+ * allowlist de CORS da API (`api/src/main.ts`: Content-Type, Authorization,
+ * X-Idempotency-Key) não o inclui — o browser bloqueia o stream e o motorista
+ * fica sem realtime. É um gap de produção pré-existente, descoberto por esta
+ * story e fora do seu escopo (Never: sem mudar `api/src/`); aqui o header é
+ * removido na camada de transporte só no contexto do motorista para provar o
+ * fluxo ponta a ponta. Follow-up: acrescentar `cache-control` à allowlist.
+ */
+async function allowSseInBrowser(context: BrowserContext): Promise<void> {
+  const handler = (route: Route) => {
+    const request = route.request();
+    const headers = { ...request.headers() };
+    delete headers['cache-control'];
+    // O preflight carrega a lista original de headers do XHR: sem reescrevê-la,
+    // o browser segue negando o cache-control que acabou de ser removido.
+    if (request.method() === 'OPTIONS') {
+      headers['access-control-request-headers'] = 'authorization';
+    }
+    return route.continue({ headers });
+  };
+  await context.route('**/api/v1/boarding/events*', handler);
+}
+
+async function openDriverRoster(
+  page: Page,
+  driver: Epic3Credentials,
+  countText: string,
+): Promise<void> {
+  await loginAsDriver(page, driver);
+  // "Ver lista" da Code Map: o botão da tela de Viagem que abre a lista
+  // (trip.tsx — label "Alunos da Viagem").
+  await page.getByRole('button', { name: 'Alunos da Viagem' }).click();
+  await expect(page.getByText(countText)).toBeVisible();
+}
+
+/**
+ * Aging do cache do ALUNO no browser (espelho client-side do `ageAbsence`):
+ * a home renderiza o countdown exclusivamente do `cancellableUntil` em cache —
+ * não há GET de ausência —, então envelhecer só o banco não muda a UI; o valor
+ * cached precisa envelhecer junto, senão seria preciso esperar os 2 min reais
+ * da janela (proibido). Edita o blob do TanStack persistido no MMKV-web
+ * (localStorage sob `mmkv.default\`), sem tocar em mobile/src.
+ */
+async function ageAbsenceInClientCache(
+  page: Page,
+  tripId: string,
+  minutesAgo: number,
+): Promise<void> {
+  await page.evaluate(
+    ({ tripId, minutesAgo }) => {
+      const PERSISTER_KEY = 'mmkv.default\\REACT_QUERY_OFFLINE_CACHE';
+      const raw = localStorage.getItem(PERSISTER_KEY);
+      if (raw === null) {
+        throw new Error(`cache persistido ausente em ${PERSISTER_KEY}`);
+      }
+      const client = JSON.parse(raw) as {
+        clientState: {
+          queries: Array<{
+            queryKey: unknown[];
+            state: {
+              data: {
+                absence: {
+                  notifiedAt: string;
+                  cancellableUntil: string;
+                } | null;
+              } | null;
+            };
+          }>;
+        };
+      };
+      const entry = client.clientState.queries.find(
+        (query) =>
+          query.queryKey[0] === 'studentAbsence' &&
+          query.queryKey[1] === tripId,
+      );
+      const absence = entry?.state.data?.absence;
+      if (!absence) {
+        throw new Error(
+          `studentAbsence de ${tripId} não encontrada no cache persistido`,
+        );
+      }
+      const deltaMs = minutesAgo * 60_000;
+      absence.notifiedAt = new Date(
+        Date.parse(absence.notifiedAt) - deltaMs,
+      ).toISOString();
+      absence.cancellableUntil = new Date(
+        Date.parse(absence.cancellableUntil) - deltaMs,
+      ).toISOString();
+      localStorage.setItem(PERSISTER_KEY, JSON.stringify(client));
+    },
+    { tripId, minutesAgo },
+  );
+}
+
+test.describe('Épico 4 — ausência e lembrete', () => {
+  // Os specs do projeto `e2e` dividem um único Expo dev server e rodam seriais
+  // (playwright.config.ts: fullyParallel:false + --workers=1). O retry cobre uma
+  // revalidação lenta do Metro sob carga — ambiente, não regressão.
+  test.describe.configure({ retries: process.env.CI ? 2 : 1 });
+
+  test.beforeAll(async () => {
+    const reason = await e2eServersUnavailable();
+    test.skip(reason !== null, reason ?? '');
+  });
+
+  test('aluno confirma ausência, motorista vê em <3s (NFR3) e cancelar na janela reverte', async ({
+    page,
+    browser,
+    epic4,
+  }) => {
+    test.setTimeout(120_000);
+    const student = epic4.students[0];
+    const total = epic4.students.length;
+
+    // Contexto do motorista sem herdar as opções do projeto (newContext cru):
+    // replica o device do projeto e o timeout de navegação do Metro no
+    // primeiro goto (120s no playwright.config.ts não se aplica aqui).
+    const driverContext = await browser.newContext({
+      ...devices['Desktop Chrome'],
+    });
+    // O SSE do motorista é o canal sob teste (Story 4.2) — sem o shim, o
+    // browser bloqueia o stream e o badge nunca chega (ver allowSseInBrowser).
+    await allowSseInBrowser(driverContext);
+    const driverPage = await driverContext.newPage();
+    driverPage.setDefaultNavigationTimeout(120_000);
+    try {
+      // O motorista JÁ está na lista quando o aluno age: o canal sob teste é o
+      // stream SSE (Story 4.2) — o badge em <3s só é possível com o evento
+      // entregue, e a contagem vem do cache aplicado pelo próprio handler.
+      await openDriverRoster(driverPage, epic4.driver, `0/${total} embarcados`);
+
+      await loginAsStudent(page, student);
+      const notReturning = page.getByRole('button', { name: 'Não vou voltar' });
+      await expect(notReturning).toBeVisible();
+
+      await notReturning.click();
+      const confirm = page.getByRole('button', { name: 'Confirmar' });
+      await expect(confirm).toBeVisible();
+
+      const absenceResponse = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/v1/boarding/not-returning') &&
+          res.request().method() === 'POST',
+      );
+      // NFR3: t0 é o clique em Confirmar — o AC é a EXPERIÊNCIA completa
+      // (toque do aluno → tela do motorista), não só a chamada de rede.
+      const t0 = Date.now();
+      await confirm.click();
+      const response = await absenceResponse;
+      expect(response.status()).toBe(201);
+
+      const badge = driverPage.getByText(NOT_RETURNING_BADGE);
+      await expect(badge).toBeVisible({ timeout: NFR3_BUDGET_MS });
+      const nfr3Ms = Date.now() - t0;
+
+      console.log(
+        `[NFR3] Confirmar → badge/contagem do motorista: ${nfr3Ms}ms (budget ${NFR3_BUDGET_MS}ms)`,
+      );
+      expect(nfr3Ms).toBeLessThan(NFR3_BUDGET_MS);
+
+      // Contagem ajustada (total exclui o ausente) e toast contextual.
+      await expect(
+        driverPage.getByText(`0/${total - 1} embarcados`),
+      ).toBeVisible();
+      await expect(
+        driverPage.getByText(`${student.name} não vai voltar no ônibus`),
+      ).toBeVisible();
+
+      // Home do aluno vira estado registrado com countdown vivo.
+      await expect(page.getByText('Ausência registrada')).toBeVisible();
+      await expect(
+        page.getByText(/Janela de cancelamento \d{1,2}:\d{2}/),
+      ).toBeVisible();
+
+      // Cancelar dentro da janela: home volta ao botão e o motorista reverte.
+      await page.getByRole('button', { name: 'Cancelar' }).click();
+      await expect(notReturning).toBeVisible();
+      await expect(badge).toHaveCount(0);
+      await expect(driverPage.getByText(`0/${total} embarcados`)).toBeVisible();
+    } finally {
+      await driverContext.close();
+    }
+  });
+
+  test('fora da janela: card consolidado sem Cancelar e CANCELLATION_PERIOD_EXPIRED na API', async ({
+    page,
+    request,
+    epic4,
+  }) => {
+    test.setTimeout(120_000);
+    const student = epic4.students[0];
+
+    // Registro DENTRO da janela (via UI: o card nasce do cache da mutation —
+    // é ele que persiste no MMKV e reidrata no reload).
+    await loginAsStudent(page, student);
+    await page.getByRole('button', { name: 'Não vou voltar' }).click();
+    await page.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(page.getByText('Ausência registrada')).toBeVisible();
+    const cancel = page.getByRole('button', { name: 'Cancelar' });
+    await expect(cancel).toBeVisible();
+    await expect(
+      page.getByText(/Janela de cancelamento \d{1,2}:\d{2}/),
+    ).toBeVisible();
+
+    // Aging (única escrita direta no banco): desloca notifiedAt E cancellableUntil
+    // 10 min para trás — o fim da janela (~2 min após o registro) fica então há
+    // ~8 min no passado.
+    await ageAbsence({ tripId: epic4.returnTripId, studentId: student.id }, 10);
+
+    // O card vive no cache reidratado do MMKV (não há GET de ausência) e o
+    // persister sincroniza com throttle de 1s — recarregar antes disso perde
+    // a escrita junto com a página.
+    await page.waitForTimeout(1500);
+    // A UI exibe o countdown do `cancellableUntil` CACHED: envelhecer também o
+    // cache do browser é o que leva o card ao estado consolidado sem esperar
+    // os 2 min reais (ver ageAbsenceInClientCache).
+    await ageAbsenceInClientCache(page, epic4.returnTripId, 10);
+    await page.reload();
+    await expect(page.getByText('Ausência registrada')).toBeVisible();
+    // Consolidado: SEM botão Cancelar e SEM countdown.
+    await expect(cancel).toHaveCount(0);
+    await expect(page.getByText(/Janela de cancelamento/)).toHaveCount(0);
+
+    // API fora da janela: erro tipado com mensagem clara, sem 500.
+    const response = await request.post(
+      `${API_URL}/api/v1/boarding/cancel-absence`,
+      {
+        headers: {
+          Authorization: `Bearer ${student.token}`,
+          'X-Idempotency-Key': randomUUID(),
+        },
+        data: { tripId: epic4.returnTripId },
+      },
+    );
+    expect(response.status()).toBe(409);
+    const body = (await response.json()) as {
+      error?: { code?: string; message?: string };
+    };
+    expect(body.error?.code).toBe('CANCELLATION_PERIOD_EXPIRED');
+    expect(
+      typeof body.error?.message === 'string' && body.error.message.length > 0,
+    ).toBe(true);
+
+    // A ausência persiste: novo reload mantém o card consolidado.
+    await page.reload();
+    await expect(page.getByText('Ausência registrada')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Não vou voltar' }),
+    ).toHaveCount(0);
+  });
+
+  test('lembrete: scheduler real dispara, banner aparece no reload e respondê-lo registra a ausência', async ({
+    page,
+    request,
+    browser,
+    epic4,
+  }) => {
+    // Polling do scheduler real (tick de 60s), dois logins e a espera pelo
+    // staleTime de 1 min do app (loop do banner) — o timeout do arquivo (60s)
+    // não cobre; o de 15s do expect não chega perto.
+    test.setTimeout(300_000);
+    const student = epic4.students[0];
+    const total = epic4.students.length;
+
+    // Antes do aging o GET resolve null — assert intermediária: sem linha, sem
+    // banner (o lembrete é derivado na leitura, não existe "agendado").
+    const reminderRead = page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/v1/boarding/reminder') &&
+        res.request().method() === 'GET',
+    );
+    await loginAsStudent(page, student);
+    const firstRead = await reminderRead;
+    expect(firstRead.status()).toBe(200);
+    expect(((await firstRead.json()) as { data: unknown }).data).toBeNull();
+    await expect(page.getByText('E a volta?')).toHaveCount(0);
+
+    // Aging: RETURN iniciada há ~16 min (além da fronteira INCLUSIVA de 15 min)
+    // com o aluno tendo check-in na ida e nada na volta — elegível no próximo
+    // tick. O disparo é o scheduler real do dev server: a 4.4 proibiu backdoor
+    // de trigger, então o spec ESPERA por ele.
+    await ageTrip(epic4.returnTripId, 16);
+
+    const reminderOf = async (): Promise<{
+      tripId: string;
+      remindedAt: string;
+    } | null> => {
+      const poll = await request.get(`${API_URL}/api/v1/boarding/reminder`, {
+        headers: { Authorization: `Bearer ${student.token}` },
+      });
+      // Resposta não-200 (instabilidade do dev server em rebuild, por exemplo)
+      // não deve abortar o teste: a amostra é descartada e o deadline decide.
+      if (poll.status() !== 200) return null;
+      return (
+        (await poll.json()) as {
+          data: {
+            tripId: string;
+            remindedAt: string;
+          } | null;
+        }
+      ).data;
+    };
+
+    const deadline = Date.now() + REMINDER_POLL_TIMEOUT_MS;
+    let reminder = await reminderOf();
+    while (reminder === null && Date.now() < deadline) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, REMINDER_POLL_INTERVAL_MS),
+      );
+      reminder = await reminderOf();
+    }
+    if (reminder === null) {
+      throw new Error(
+        `GET /boarding/reminder seguiu null após ${REMINDER_POLL_TIMEOUT_MS}ms — o scheduler do dev server não disparou o lembrete (tick de 60s). Ver tests/README.md.`,
+      );
+    }
+    expect(reminder.tripId).toBe(epic4.returnTripId);
+    expect(Number.isNaN(Date.parse(reminder.remindedAt))).toBe(false);
+
+    // O app não faz polling: o banner só aparece no remount — é o requisito
+    // "derivável na abertura do app" para quem não estava no stream. Mas o
+    // staleTime GLOBAL do app é de 1 minuto: remontar antes disso reidrata o
+    // null persistido como fresco e não refaz o GET. Por isso o spec REMONTA
+    // em loop até o banner aparecer — o refetch dispara no primeiro mount
+    // depois do cache ficar velho.
+    const notReturning = page.getByRole('button', { name: 'Não vou voltar' });
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByText('E a volta?')).toBeVisible({
+        timeout: 5_000,
+      });
+    }).toPass({ timeout: 120_000, intervals: [1_000, 5_000] });
+    // Banner E botão da home: responder por qualquer um é a MESMA mutation.
+    await expect(notReturning).toHaveCount(2);
+    await notReturning.first().click();
+    await page.getByRole('button', { name: 'Confirmar' }).click();
+
+    // Mesmo estado do botão da 4.1, e o banner some com a pendência resolvida.
+    await expect(page.getByText('Ausência registrada')).toBeVisible();
+    await expect(page.getByText('E a volta?')).toHaveCount(0);
+
+    // O motorista vê o badge: roster aberto depois reflete o servidor
+    // (reconcile por refetch no mount), com o total excluindo o ausente.
+    const driverContext = await browser.newContext({
+      ...devices['Desktop Chrome'],
+    });
+    const driverPage = await driverContext.newPage();
+    driverPage.setDefaultNavigationTimeout(120_000);
+    try {
+      await openDriverRoster(
+        driverPage,
+        epic4.driver,
+        `0/${total - 1} embarcados`,
+      );
+      await expect(driverPage.getByText(NOT_RETURNING_BADGE)).toBeVisible();
+    } finally {
+      await driverContext.close();
+    }
+  });
+});
