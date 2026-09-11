@@ -7,10 +7,10 @@ import type {
   TripRepositoryApi,
 } from '../../core/ports/trip-repository.port.js';
 import { TripNotFound } from '../../core/errors/trip.errors.js';
+import { toInfraError as makeInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-// Helper: mapeia erro desconhecido para TripNotFound (adapter de infra)
-const toInfraError = (msg: string) => (e: unknown) =>
-  new TripNotFound({ code: 'INFRA_ERROR', message: `${msg}: ${String(e)}` });
+const toInfraError = (msg: string) =>
+  makeInfraError(msg, (m) => new TripNotFound({ code: 'INFRA_ERROR', message: m }));
 
 @Injectable()
 export class PrismaTripAdapter implements TripRepositoryApi {

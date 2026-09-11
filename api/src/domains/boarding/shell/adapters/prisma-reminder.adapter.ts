@@ -7,9 +7,8 @@ import type {
   BoardingReminderData,
   CreateReminderResult,
 } from '../../core/ports/reminder-repository.port.js';
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-const toInfraError = (msg: string) => (e: unknown) =>
-  new Error(`${msg}: ${String(e)}`);
 
 const isUniqueViolation = (e: unknown): boolean =>
   e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';

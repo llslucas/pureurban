@@ -14,6 +14,7 @@ import {
   AssignmentAlreadyExistsError,
   AssignmentNotFoundError,
 } from '../../core/errors/routing.errors.js';
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 // Constraints únicos esperados (Prisma define em schema.prisma com @@unique)
 const ROUTE_STUDENT_UNIQUE = ['routeId', 'studentId'] as const;
@@ -56,13 +57,6 @@ async function classifyAssignmentMiss(
   return 'assignment_not_found';
 }
 
-// Helper: mapeia erros de infra para string legível
-const toInfraError = (msg: string) => (e: unknown) => {
-  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
-    return new Error(`${msg}: FK constraint failed`);
-  }
-  return new Error(`${msg}: ${String(e)}`);
-};
 
 // Tipos discriminados para resultados internos do $transaction
 type AssignStudentTxResult =

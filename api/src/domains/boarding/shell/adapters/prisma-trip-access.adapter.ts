@@ -6,9 +6,8 @@ import type {
   ActiveTripView,
   ActiveReturnTripView,
 } from '../../core/ports/trip-access.port.js';
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-const toInfraError = (msg: string) => (e: unknown) =>
-  new Error(`${msg}: ${String(e)}`);
 
 // Select shared by both reminder-scan reads (4.4).
 const returnTripSelect = {
