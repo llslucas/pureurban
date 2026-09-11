@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Effect, Layer, Runtime } from 'effect';
-import { TestClock, TestContext } from 'effect';
 import { cancelAbsence } from './cancel-absence.use-case.js';
+import { createTestClock } from '../../../shared/testing/test-clock.js';
 import {
   AbsenceRepository,
   AbsenceRepositoryApi,
@@ -76,17 +76,7 @@ function makeLayer(
 // o Runtime é capturado UMA vez em módulo e o relógio só é reajustado quando o
 // now pedido difere do instante corrente — cada teste declara o instante em
 // que roda e o estado persiste entre runs no mesmo Runtime.
-const testRuntimePromise: Promise<Runtime.Runtime<never>> = Effect.runPromise(
-  Effect.runtime<never>().pipe(Effect.provide(TestContext.TestContext)),
-);
-let clockNowMs = Number.NaN;
-
-const setClock = async (now: Date) => {
-  if (now.getTime() === clockNowMs) return;
-  const runtime = await testRuntimePromise;
-  await Runtime.runPromise(runtime)(TestClock.setTime(now));
-  clockNowMs = now.getTime();
-};
+const { runtime: getRuntime, setClock } = createTestClock();
 
 const runEither = async (
   now: Date,
@@ -96,7 +86,7 @@ const runEither = async (
   studentEligibility: Partial<StudentEligibilityApi>,
 ) => {
   await setClock(now);
-  const runtime = await testRuntimePromise;
+  const runtime = await getRuntime();
   return Runtime.runPromise(runtime)(
     Effect.either(
       cancelAbsence(input).pipe(
@@ -114,7 +104,7 @@ const run = async (
   studentEligibility: Partial<StudentEligibilityApi>,
 ) => {
   await setClock(now);
-  const runtime = await testRuntimePromise;
+  const runtime = await getRuntime();
   return Runtime.runPromise(runtime)(
     cancelAbsence(input).pipe(
       Effect.provide(makeLayer(absenceRepo, tripAccess, studentEligibility)),
