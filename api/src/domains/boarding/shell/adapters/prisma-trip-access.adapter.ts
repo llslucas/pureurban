@@ -8,7 +8,6 @@ import type {
 } from '../../core/ports/trip-access.port.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-
 // Select shared by both reminder-scan reads (4.4).
 const returnTripSelect = {
   id: true,

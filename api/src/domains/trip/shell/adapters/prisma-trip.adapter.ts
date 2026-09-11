@@ -10,7 +10,10 @@ import { TripNotFound } from '../../core/errors/trip.errors.js';
 import { toInfraError as makeInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 const toInfraError = (msg: string) =>
-  makeInfraError(msg, (m) => new TripNotFound({ code: 'INFRA_ERROR', message: m }));
+  makeInfraError(
+    msg,
+    (m) => new TripNotFound({ code: 'INFRA_ERROR', message: m }),
+  );
 
 @Injectable()
 export class PrismaTripAdapter implements TripRepositoryApi {

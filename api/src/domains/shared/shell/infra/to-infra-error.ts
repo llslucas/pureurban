@@ -8,7 +8,10 @@ import { Prisma } from '../../../../generated/prisma/client.js';
 export const toInfraError =
   (msg: string, toError: (message: string) => Error = (m) => new Error(m)) =>
   (e: unknown): Error => {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === 'P2003'
+    ) {
       return toError(`${msg}: FK constraint failed`);
     }
     return toError(`${msg}: ${String(e)}`);

@@ -8,7 +8,6 @@ import type {
 } from '../../core/ports/boarding-status.port.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-
 @Injectable()
 export class PrismaBoardingStatusAdapter implements BoardingStatusApi {
   constructor(private readonly prisma: PrismaService) {}

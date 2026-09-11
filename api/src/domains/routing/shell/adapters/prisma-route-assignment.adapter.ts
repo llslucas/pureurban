@@ -16,16 +16,13 @@ import {
 } from '../../core/errors/routing.errors.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-// Constraints únicos esperados (Prisma define em schema.prisma com @@unique)
-const ROUTE_STUDENT_UNIQUE = ['routeId', 'studentId'] as const;
-const ROUTE_DRIVER_UNIQUE = ['routeId', 'driverId'] as const;
-
 // P2002.meta.target NÃO é confiável nesta stack (Prisma 7 + @prisma/adapter-pg):
 // vem vazio, e os campos só existem em meta.driverAdapterError.cause.constraint
 // .fields, um detalhe interno do driver. Por isso o create trata qualquer P2002
-// como violação do @@unique composto — no create ele é o único constraint
+// como violação do @@unique composto (route_students: routeId+studentId;
+// route_drivers: routeId+driverId) — no create ele é o único constraint
 // violável (o pkey é uuid() gerado pelo banco). Mesma decisão de
-// prisma-boarding.adapter.ts; os consts acima documentam o constraint esperado.
+// prisma-boarding.adapter.ts.
 
 // Classifica internamente o motivo de um 404 em DELETE de assignment, sem vazar
 // existence info ao cliente (que sempre recebe ASSIGNMENT_NOT_FOUND). Usado apenas
@@ -56,7 +53,6 @@ async function classifyAssignmentMiss(
   if (!user) return 'user_not_found';
   return 'assignment_not_found';
 }
-
 
 // Tipos discriminados para resultados internos do $transaction
 type AssignStudentTxResult =

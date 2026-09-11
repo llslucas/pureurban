@@ -4,7 +4,6 @@ import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
 import type { StudentEligibilityApi } from '../../core/ports/student-eligibility.port.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-
 @Injectable()
 export class PrismaStudentEligibilityAdapter implements StudentEligibilityApi {
   constructor(private readonly prisma: PrismaService) {}

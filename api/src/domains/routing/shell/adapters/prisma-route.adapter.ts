@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Effect, pipe } from 'effect';
 import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
-import { Prisma } from '../../../../generated/prisma/client.js';
 import type {
   RouteData,
   CreateRouteData,
@@ -9,7 +8,6 @@ import type {
 } from '../../core/ports/route-repository.port.js';
 import { RouteNotFoundError } from '../../core/errors/routing.errors.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
-
 
 @Injectable()
 export class PrismaRouteAdapter implements RouteRepositoryApi {

@@ -4,7 +4,6 @@ import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
 import type { RouteAccessApi } from '../../core/ports/route-access.port.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-
 @Injectable()
 export class PrismaRouteAccessAdapter implements RouteAccessApi {
   constructor(private readonly prisma: PrismaService) {}

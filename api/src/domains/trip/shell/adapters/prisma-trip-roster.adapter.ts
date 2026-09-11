@@ -7,7 +7,6 @@ import type {
 } from '../../core/ports/trip-roster.port.js';
 import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
-
 @Injectable()
 export class PrismaTripRosterAdapter implements TripRosterApi {
   constructor(private readonly prisma: PrismaService) {}
