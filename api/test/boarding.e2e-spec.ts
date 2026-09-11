@@ -95,9 +95,9 @@ describe('BoardingController (e2e)', () => {
   const login = async (email: string, password: string) => {
     const res = await post('/api/v1/auth/login')
       .send({ email, password })
-      // POST /auth/login retorna 201 (sem @HttpCode override) — comportamento
-      // pré-existente, fora do escopo desta story corrigir.
-      .expect(201);
+      // 200 é o contrato (@HttpCode(OK) no controller desde o hardening
+      // pré-Épico 5; antes o default do @Post devolvia 201).
+      .expect(200);
     return (res.body as ApiResponse).data.accessToken as string;
   };
 

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Effect, Layer, Runtime } from 'effect';
-import { TestClock, TestContext } from 'effect';
 import {
   scanCheckinReminders,
   CHECKIN_REMINDER_DELAY_MS,
 } from './scan-checkin-reminders.use-case.js';
+import { createTestClock } from '../../../shared/testing/test-clock.js';
 import {
   BoardingRepository,
   BoardingRepositoryApi,
@@ -77,17 +77,7 @@ function makeLayer(
 // each): the Runtime is captured ONCE at module scope and the clock is only
 // re-adjusted when the requested now differs from the current instant
 // (cancellation spec pattern).
-const testRuntimePromise: Promise<Runtime.Runtime<never>> = Effect.runPromise(
-  Effect.runtime<never>().pipe(Effect.provide(TestContext.TestContext)),
-);
-let clockNowMs = Number.NaN;
-
-const setClock = async (now: Date) => {
-  if (now.getTime() === clockNowMs) return;
-  const runtime = await testRuntimePromise;
-  await Runtime.runPromise(runtime)(TestClock.setTime(now));
-  clockNowMs = now.getTime();
-};
+const { runtime: getRuntime, setClock } = createTestClock();
 
 type Ports = {
   tripAccess: Partial<TripAccessApi>;
@@ -101,7 +91,7 @@ const run = async (
   ports: Ports,
 ): Promise<{ result: unknown; events: unknown[] }> => {
   await setClock(now);
-  const runtime = await testRuntimePromise;
+  const runtime = await getRuntime();
   const [result, events] = await Runtime.runPromise(runtime)(
     scanCheckinReminders().pipe(
       Effect.provide(

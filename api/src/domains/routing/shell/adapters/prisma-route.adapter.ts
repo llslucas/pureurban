@@ -1,22 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Effect, pipe } from 'effect';
 import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
-import { Prisma } from '../../../../generated/prisma/client.js';
 import type {
   RouteData,
   CreateRouteData,
   RouteRepositoryApi,
 } from '../../core/ports/route-repository.port.js';
 import { RouteNotFoundError } from '../../core/errors/routing.errors.js';
-
-// Helper: mapeia erro desconhecido para string (adapter de infra)
-// Sanitiza PrismaClientKnownRequestError para não vazar detalhes internos
-const toInfraError = (msg: string) => (e: unknown) => {
-  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
-    return new Error(`${msg}: FK constraint failed`);
-  }
-  return new Error(`${msg}: ${String(e)}`);
-};
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 @Injectable()
 export class PrismaRouteAdapter implements RouteRepositoryApi {

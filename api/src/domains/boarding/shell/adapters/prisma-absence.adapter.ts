@@ -8,9 +8,7 @@ import type {
   CancelAbsenceResult,
   CreateAbsenceResult,
 } from '../../core/ports/absence-repository.port.js';
-
-const toInfraError = (msg: string) => (e: unknown) =>
-  new Error(`${msg}: ${String(e)}`);
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 const isUniqueViolation = (e: unknown): boolean =>
   e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';

@@ -26,7 +26,14 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
     // from a parallel file's app would steal the seeded creation and flake the
     // Story 4.4 assertions. e2e runs with REMINDER_SCAN_ENABLED=false; the
     // explicit runOnce() remains the trigger there.
-    if (process.env.REMINDER_SCAN_ENABLED === 'false') return;
+    if (process.env.REMINDER_SCAN_ENABLED === 'false') {
+      // Silenciar o FR30 (lembretes) sem nenhum sinal fez um ambiente herdar a
+      // flag de docs de e2e e perder a feature (RV7, retro do épico 4).
+      this.logger.warn(
+        'REMINDER_SCAN_ENABLED=false — lembretes de check-in DESLIGADOS',
+      );
+      return;
+    }
 
     this.intervalId = setInterval(() => {
       void this.runOnce();

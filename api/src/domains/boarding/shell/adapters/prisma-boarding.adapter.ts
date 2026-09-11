@@ -9,9 +9,7 @@ import type {
   RecordCheckInResult,
 } from '../../core/ports/boarding-repository.port.js';
 import { DuplicateCheckInError } from '../../core/errors/boarding.errors.js';
-
-const toInfraError = (msg: string) => (e: unknown) =>
-  new Error(`${msg}: ${String(e)}`);
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 const isUniqueViolation = (e: unknown): boolean =>
   e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';

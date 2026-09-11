@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from '../auth.service.js';
 import { RegisterInput } from '../../core/schemas/register.schema.js';
@@ -39,6 +39,10 @@ export class AuthController {
     status: 401,
     description: 'Credenciais inválidas (INVALID_CREDENTIALS)',
   })
+  // Sem @HttpCode o @Post do NestJS devolve 201; o contrato declarado (e o mock
+  // MSW) é 200 — login não cria recurso. Era a suíte vermelha na baseline
+  // (route-assignment.e2e-spec) desde o épico 3.
+  @HttpCode(HttpStatus.OK)
   async login(
     @Body(new EffectSchemaPipe(LoginInput))
     dto: LoginInput,
@@ -54,6 +58,7 @@ export class AuthController {
     status: 401,
     description: 'Refresh token inválido (INVALID_REFRESH_TOKEN)',
   })
+  @HttpCode(HttpStatus.OK)
   async refresh(
     @Body(new EffectSchemaPipe(RefreshInput))
     dto: RefreshInput,

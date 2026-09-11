@@ -2,9 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Effect, pipe } from 'effect';
 import { PrismaService } from '../../../shared/shell/infra/prisma.service.js';
 import type { RouteAccessApi } from '../../core/ports/route-access.port.js';
-
-const toInfraError = (msg: string) => (e: unknown) =>
-  new Error(`${msg}: ${String(e)}`);
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 @Injectable()
 export class PrismaRouteAccessAdapter implements RouteAccessApi {

@@ -6,9 +6,7 @@ import type {
   CheckedInStudent,
   AbsentStudent,
 } from '../../core/ports/boarding-status.port.js';
-
-const toInfraError = (msg: string) => (e: unknown) =>
-  new Error(`${msg}: ${String(e)}`);
+import { toInfraError } from '../../../shared/shell/infra/to-infra-error.js';
 
 @Injectable()
 export class PrismaBoardingStatusAdapter implements BoardingStatusApi {

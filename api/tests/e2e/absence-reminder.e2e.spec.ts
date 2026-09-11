@@ -12,7 +12,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { devices } from '@playwright/test';
-import type { BrowserContext, Page, Route } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test, expect } from '../support/merged-fixtures';
 import { API_URL, e2eServersUnavailable } from '../support/helpers/e2e-servers';
 import { loginAsDriver, loginAsStudent } from '../support/helpers/e2e-driver';
@@ -31,31 +31,6 @@ const REMINDER_POLL_TIMEOUT_MS = 90_000;
 const REMINDER_POLL_INTERVAL_MS = 2_000;
 
 const NOT_RETURNING_BADGE = '! Não vai voltar';
-
-/**
- * Shim de TESTE (não toca em api/src/) para o stream SSE do motorista no web:
- * `react-native-sse` envia `cache-control: no-cache` no XHR do stream, e a
- * allowlist de CORS da API (`api/src/main.ts`: Content-Type, Authorization,
- * X-Idempotency-Key) não o inclui — o browser bloqueia o stream e o motorista
- * fica sem realtime. É um gap de produção pré-existente, descoberto por esta
- * story e fora do seu escopo (Never: sem mudar `api/src/`); aqui o header é
- * removido na camada de transporte só no contexto do motorista para provar o
- * fluxo ponta a ponta. Follow-up: acrescentar `cache-control` à allowlist.
- */
-async function allowSseInBrowser(context: BrowserContext): Promise<void> {
-  const handler = (route: Route) => {
-    const request = route.request();
-    const headers = { ...request.headers() };
-    delete headers['cache-control'];
-    // O preflight carrega a lista original de headers do XHR: sem reescrevê-la,
-    // o browser segue negando o cache-control que acabou de ser removido.
-    if (request.method() === 'OPTIONS') {
-      headers['access-control-request-headers'] = 'authorization';
-    }
-    return route.continue({ headers });
-  };
-  await context.route('**/api/v1/boarding/events*', handler);
-}
 
 async function openDriverRoster(
   page: Page,
@@ -154,9 +129,6 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     const driverContext = await browser.newContext({
       ...devices['Desktop Chrome'],
     });
-    // O SSE do motorista é o canal sob teste (Story 4.2) — sem o shim, o
-    // browser bloqueia o stream e o badge nunca chega (ver allowSseInBrowser).
-    await allowSseInBrowser(driverContext);
     const driverPage = await driverContext.newPage();
     driverPage.setDefaultNavigationTimeout(120_000);
     try {
