@@ -27,7 +27,9 @@ export async function loginAsDriver(
   await page.locator('#login-email').fill(creds.email);
   await page.locator('#login-password').fill(creds.password);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByText('Gestão de Viagem')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Gestão de Viagem')).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /** Da tela de Viagem para a câmera de scan. */
@@ -37,14 +39,34 @@ export async function openScanner(page: Page): Promise<void> {
   await expect(page.getByText(/embarque(s)? nesta sessão/)).toBeVisible();
 }
 
+/**
+ * Mesmo fluxo de `loginAsDriver` — a tela de login é única e o redirecionamento
+ * por papel leva o aluno a `/(student)/home`, cujo primeiro elemento estável é
+ * o botão "Meu QR Code".
+ */
+export async function loginAsStudent(
+  page: Page,
+  creds: Epic3Credentials,
+): Promise<void> {
+  await page.goto(EXPO_WEB_URL);
+  await page.locator('#login-email').fill(creds.email);
+  await page.locator('#login-password').fill(creds.password);
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page.getByRole('button', { name: 'Meu QR Code' })).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
 /** Injeta uma string de QR bruta no handler de scan. */
 export async function injectScan(page: Page, raw: string): Promise<void> {
   await page.waitForFunction(
-    () => typeof (globalThis as Record<string, unknown>).__E2E_INJECT_SCAN__ === 'function',
+    () =>
+      typeof (globalThis as Record<string, unknown>).__E2E_INJECT_SCAN__ ===
+      'function',
   );
   await page.evaluate((value) => {
-    (globalThis as unknown as { __E2E_INJECT_SCAN__: (r: string) => void }).__E2E_INJECT_SCAN__(
-      value,
-    );
+    (
+      globalThis as unknown as { __E2E_INJECT_SCAN__: (r: string) => void }
+    ).__E2E_INJECT_SCAN__(value);
   }, raw);
 }

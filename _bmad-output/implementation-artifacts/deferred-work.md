@@ -362,3 +362,16 @@ comparativa em vez de afirmação de viabilidade sem controle.
     refletir isso. Limitação app-wide (atinge activeTrip, roster etc.), vizinha do defer
     onlineManager→NetInfo já documentado em student-list.tsx:109 e do action item
     epic-3-retro-item-5. Comportamento da 4.4 conforme a intenção congelada (sem polling).
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-5-e2e-do-epico-4.md`
+  summary: Adicionar `cache-control` à allowlist de CORS em `api/src/main.ts` e remover o
+    shim de teste `allowSseInBrowser` do spec `absence-reminder.e2e.spec.ts` — hoje o
+    stream SSE do motorista é bloqueado pelo preflight no browser (o cliente
+    `react-native-sse` envia o header `cache-control`, que não está na allowlist), deixando
+    o motorista SEM realtime em qualquer implantação web cross-origin (nativo não é
+    afetado; a entrega server-side é <50ms, verificada com stream cru).
+  evidence: Gap de produção pré-existente descoberto pela E2E da 4.5 (Story 4.2 não o
+    cobriu — seu e2e é supertest, sem browser). A spec congelada da 4.5 proíbe tocar em
+    `api/src/`, então o spec remove o header na camada de transporte só no contexto do
+    motorista. Decisão do Lucas (09/09/2026): registrar em deferred (não é story imediata).
+    Fix é 1 linha na allowlist + deletar o shim; pedir verificação do preflight no
+    `test:pw:e2e` sem o shim.

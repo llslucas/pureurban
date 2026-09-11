@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-09-2026 01:00"
+last_updated: "09-09-2026 23:30"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -194,7 +194,7 @@ development_status:
   4-2-canal-sse-e-recebimento-em-tempo-real: done
   4-3-cancelamento-de-ausencia: done
   4-4-lembrete-automatico-de-check-in-pendente: done
-  4-5-e2e-do-epico-4: backlog
+  4-5-e2e-do-epico-4: done
   epic-4-retrospective: optional
 
   # === Epic 5: Localização em Tempo Real ===
