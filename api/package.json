@@ -21,6 +21,7 @@
     "test:pw": "npx playwright test --workers=1",
     "test:pw:api": "npx playwright test --project=api",
     "test:pw:e2e": "npx playwright test --project=e2e --workers=1",
+    "gate": "bash scripts/quality-gate.sh",
     "test:pw:headed": "npx playwright test --headed --workers=1",
     "test:pw:debug": "npx playwright test --debug",
     "openapi:export": "nest build && node dist/scripts/export-openapi.js",
