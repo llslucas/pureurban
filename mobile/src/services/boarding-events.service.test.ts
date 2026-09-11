@@ -108,6 +108,7 @@ const makeHandlers = (): BoardingEventHandlers => ({
   onNotReturning: jest.fn(),
   onAbsenceCancelled: jest.fn(),
   onOpen: jest.fn(),
+  onUnrecoverable: jest.fn(),
 })
 
 const errorEvent = (xhrStatus: number) => ({
@@ -309,5 +310,58 @@ describe('BoardingEventsClient — reconnect (spec-4-2, "Queda de rede")', () =>
 
     expect(instances()).toHaveLength(1)
     expect(lastInstance().options.headers).toEqual({})
+  })
+
+  // RV1 (retro do épico 4): 401 com refresh falhando em loop eterno — numa tela
+  // passiva não há tráfego que dispare o logout do api-client, então a escada
+  // de backoff releria o mesmo token expirado para sempre. Três falhas seguidas
+  // encerram e sinalizam.
+  it('three consecutive 401s with failed refresh close the stream and fire onUnrecoverable', async () => {
+    refreshAccessToken.mockResolvedValue(false)
+    const handlers = makeHandlers()
+    connectBoardingEvents(TRIP_ID, handlers)
+
+    // Falha 1 → backoff de 1s; falha 2 → backoff de 2s; falha 3 → fim.
+    for (const backoff of [1_000, 2_000]) {
+      lastInstance().dispatch('error', errorEvent(401))
+      await flush()
+      expect(handlers.onUnrecoverable).not.toHaveBeenCalled()
+      jest.advanceTimersByTime(backoff)
+      expect(instances().length).toBeGreaterThanOrEqual(2)
+    }
+
+    lastInstance().dispatch('error', errorEvent(401))
+    await flush()
+
+    expect(handlers.onUnrecoverable).toHaveBeenCalledTimes(1)
+    expect(lastInstance().closed).toBe(true)
+    // Encerrado de verdade: tempo grande enough para qualquer backoff não cria conexão.
+    jest.advanceTimersByTime(120_000)
+    expect(instances()).toHaveLength(3)
+  })
+
+  it("a successful 'open' between failures resets the failed-refresh counter", async () => {
+    refreshAccessToken.mockResolvedValue(false)
+    const handlers = makeHandlers()
+    connectBoardingEvents(TRIP_ID, handlers)
+
+    // Falha 1, recupera pela escada, e o open() da nova conexão zera o contador.
+    lastInstance().dispatch('error', errorEvent(401))
+    await flush()
+    jest.advanceTimersByTime(1_000)
+    lastInstance().dispatch('open')
+
+    // Duas novas falhas pós-reset (1s, 2s) ainda NÃO encerram.
+    for (const backoff of [1_000, 2_000]) {
+      lastInstance().dispatch('error', errorEvent(401))
+      await flush()
+      jest.advanceTimersByTime(backoff)
+      expect(handlers.onUnrecoverable).not.toHaveBeenCalled()
+    }
+
+    // Terceira falha pós-reset: agora sim.
+    lastInstance().dispatch('error', errorEvent(401))
+    await flush()
+    expect(handlers.onUnrecoverable).toHaveBeenCalledTimes(1)
   })
 })

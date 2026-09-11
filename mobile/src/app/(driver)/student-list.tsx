@@ -69,6 +69,10 @@ export default function StudentListScreen() {
   const { user, logout } = useAuthStore()
   const queryClient = useQueryClient()
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' })
+  // Stream SSE morto sem recuperação (refresh falhando em sequência — RV1):
+  // a lista segue legível, mas sob o mesmo banner de dado velho do refetch
+  // falho. Recuperação só com conexão nova (remount ou troca de viagem).
+  const [streamStale, setStreamStale] = useState(false)
 
   // MESMA query key de trip.tsx e scan.tsx — reusar, não criar outra (finding de
   // review na 3.2b: key duplicada faz as telas divergirem). Mesmos parâmetros —
@@ -189,10 +193,12 @@ export default function StudentListScreen() {
   // rede chegam só no (re)estabelecimento da conexão.
   useEffect(() => {
     if (!tripId) return
+    setStreamStale(false)
     const connection = connectBoardingEvents(tripId, {
       onNotReturning: handleNotReturning,
       onAbsenceCancelled: handleAbsenceCancelled,
       onOpen: reconcileRoster,
+      onUnrecoverable: () => setStreamStale(true),
     })
     return () => connection.close()
   }, [tripId, handleNotReturning, handleAbsenceCancelled, reconcileRoster])
@@ -307,8 +313,10 @@ export default function StudentListScreen() {
   const { students, summary } = roster.data
   // Estado 7 — erro COM cache: a lista continua legível, com indicador de dado
   // possivelmente velho. `isError && data` cobre tanto a falha de transporte
-  // (offline) quanto um 500 do servidor — sem acoplar a tela ao store global.
-  const showStaleBanner = roster.isError && Boolean(roster.data)
+  // (offline) quanto um 500 do servidor; `streamStale` cobre o canal SSE morto
+  // (stream sem reconexão, rede viva) — sem acoplar a tela ao store global.
+  const showStaleBanner =
+    (roster.isError && Boolean(roster.data)) || streamStale
 
   return (
     <View style={styles.container}>
@@ -321,13 +329,14 @@ export default function StudentListScreen() {
       </View>
 
       {/* Banner persistente, não Snackbar: o estado dura enquanto não houver
-          rede. Texto distinto do OfflineBanner da 3.4b (fila de escrita) — esta
-          tela é leitura (Tier 1), prometer sincronização seria mentira. */}
+          rede ou o stream não for reaberto. Texto distinto do OfflineBanner da
+          3.4b (fila de escrita) — esta tela é leitura (Tier 1), prometer
+          sincronização seria mentira. */}
       <Banner
         visible={showStaleBanner}
         actions={[{ label: 'Atualizar', onPress: () => void roster.refetch() }]}
       >
-        Dados podem estar desatualizados — sem conexão com o servidor
+        Dados podem estar desatualizados — sem atualização em tempo real
       </Banner>
 
       <FlatList
