@@ -270,7 +270,20 @@ action_items:
       corretos, queryOptions compartilhada) e decidir story técnica onlineManager->NetInfo
       antes do Épico 5"
     owner: "Dev"
-    status: open
+    # DONE em 11/09/2026 (hardening pré-Épico 5). DECISÃO: SEM NetInfo. A story
+    # técnica não consertaria o DS7 (onlineManager ligado à NetInfo AINDA pausa
+    # queries quando o rádio cai; o bug é a pausa, não quem a dirige) e relata
+    # rádio, não API — a NFR14 conta "API fora do ar" como offline, e o sinal
+    # honesto já existe: a conectividade derivada da 3.4b (desfecho de
+    # transporte no api-client). O que virou lei: `networkMode: 'always'` como
+    # default GLOBAL do queryClient (query pausada não faz request e starving
+    # o próprio sinal derivado) + factory `lib/trip-queries.ts` (keys
+    # ['activeTrip'] e ['trip', id, 'students'] em 1 lugar, retry sem queimar
+    # 4xx — DS8). Guardas de "erro COM cache" ajustadas nas 4 telas (refetch
+    # offline agora erra em vez de pausar); trip.tsx ganhou estado de erro com
+    # retry. Tranca-regressão: query-never-pauses.test.ts. 16/16 suítes, 157
+    # testes, lint e tsc limpos.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-6-regression-tests"
     epic: 3

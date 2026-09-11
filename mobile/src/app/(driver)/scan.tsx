@@ -12,7 +12,7 @@ import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
 import { boardingService } from '@/services/boarding.service'
 import { ApiClientError } from '@/services/api-client'
-import { tripService, type Trip } from '@/services/trip.service'
+import { activeTripOptions, tripStudentsKey } from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 import { enqueueCheckIn, isTransportFailure } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
@@ -112,14 +112,7 @@ export default function ScanScreen() {
     data: activeTrip,
     status: tripStatus,
     refetch: refetchTrip,
-  } = useQuery<Trip | null>({
-    // MESMA query key de `(driver)/trip.tsx`. Duas keys para o mesmo endpoint
-    // foi finding de review na 3.2b: o cache duplica e as telas divergem.
-    queryKey: ['activeTrip'],
-    queryFn: () => tripService.getActiveTrip(),
-    staleTime: 10_000,
-    retry: 2,
-  })
+  } = useQuery(activeTripOptions())
 
   // O estado 2 manda o motorista às configurações do sistema, mas
   // `useCameraPermissions` não reavalia sozinho quando o app volta ao primeiro
@@ -199,7 +192,7 @@ export default function ScanScreen() {
       // motorista recarregar a tela. Invalidação, não `setQueryData` otimista —
       // `summary` é agregado do servidor (AC #2). `void`: a tela de scan não
       // aguarda o roster; a rede trabalha enquanto o overlay de sucesso aparece.
-      void queryClient.invalidateQueries({ queryKey: ['trip', attempt.tripId, 'students'] })
+      void queryClient.invalidateQueries({ queryKey: tripStudentsKey(attempt.tripId) })
       setBoardedCount((n) => n + 1)
       setResult({
         kind: 'success',
@@ -406,13 +399,13 @@ export default function ScanScreen() {
     return <Loading label="Carregando viagem..." />
   }
 
-  // Erro NÃO é vazio. Sem esta guarda a query que terminou em `error` cai no
+  // Erro NÃO é vazio — sem esta guarda a query que terminou em `error` cai no
   // estado 4 e a tela afirma "Nenhuma viagem ativa" sem nunca ter conseguido
-  // buscar — o finding (b) da 3.2b e a ação #4 da retro do Épico 2, alcançados
-  // pela outra porta. Vale especialmente sem rede: o `onlineManager` nunca foi
-  // ligado ao NetInfo (defer da 3.2b), então a query não pausa — ela queima o
-  // `retry` ladder e falha.
-  if (tripStatus === 'error') {
+  // buscar (finding (b) da 3.2b, ação #4 da retro do Épico 2). Com o
+  // `networkMode: 'always'` global, erro COM viagem em cache (refetch offline
+  // no meio da sessão) não bloqueia: o scan segue do cache e os check-ins
+  // enfileiram offline. Só erro sem dado nenhum é tela de bloqueio.
+  if (tripStatus === 'error' && activeTrip === undefined) {
     return (
       <Blocked
         title="Não foi possível carregar a viagem"

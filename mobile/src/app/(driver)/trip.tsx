@@ -11,8 +11,9 @@ import {
 } from 'react-native-paper'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tripService } from '@/services/trip.service'
-import type { Trip, TripType } from '@/services/trip.service'
+import type { TripType } from '@/services/trip.service'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
+import { activeTripKey, activeTripOptions, tripStudentsOptions } from '@/lib/trip-queries'
 
 function TripStatusChip({ status }: { status: 'ACTIVE' | 'COMPLETED' }) {
   return (
@@ -158,12 +159,12 @@ export default function TripScreen() {
   const queryClient = useQueryClient()
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
 
-  const { data: activeTrip, isLoading: isLoadingTrip } = useQuery<Trip | null>({
-    queryKey: ['activeTrip'],
-    queryFn: () => tripService.getActiveTrip(),
-    staleTime: 10_000,
-    retry: 2,
-  })
+  const {
+    data: activeTrip,
+    status: tripStatus,
+    isLoading: isLoadingTrip,
+    refetch: refetchTrip,
+  } = useQuery(activeTripOptions())
 
   // Driver's routes (Epic 2), from the SAME query key as (driver)/routes.tsx.
   // Fetches only once the active trip has resolved: during a trip the routeId
@@ -194,19 +195,12 @@ export default function TripScreen() {
   // `useEffect`, to save a render (Design Notes).
   const resolvedRouteId = resolveRouteId(routes, selectedRouteId)
 
-  // Contagem real de embarque (FR25), lida da MESMA query key do roster da tela
-  // de alunos com `select`: uma key própria aqui duplicaria o cache e as duas
-  // telas divergiriam (Bloqueador 1 da Story 3.5b, pela outra ponta).
+  // Contagem real de embarque (FR25), lida da MESMA entrada de cache do roster
+  // da tela de alunos (factory compartilhada) com `select`: uma key própria aqui
+  // duplicaria o cache e as duas telas divergiriam (Bloqueador 1 da 3.5b, pela
+  // outra ponta).
   const { data: studentsSummary } = useQuery({
-    queryKey: ['trip', activeTrip?.id, 'students'],
-    queryFn: () => tripService.getTripStudents(activeTrip!.id),
-    enabled: Boolean(activeTrip?.id),
-    staleTime: 15_000,
-    // Mesmo `networkMode` que a query do roster em `student-list.tsx`: as duas
-    // observam a mesma entrada de cache e devem falhar/retomar igual offline.
-    // Aqui o efeito prático é menor (só a contagem), mas divergir seria pegadinha
-    // futura.
-    networkMode: 'always',
+    ...tripStudentsOptions(activeTrip?.id),
     select: (r) => r.summary,
   })
 
@@ -221,7 +215,7 @@ export default function TripScreen() {
       relatedTripId?: string
     }) => tripService.startTrip(routeId, type, relatedTripId),
     onSuccess: (trip) => {
-      queryClient.setQueryData(['activeTrip'], trip)
+      queryClient.setQueryData(activeTripKey, trip)
     },
     onError: (error: Error) => {
       Alert.alert('Erro', error.message ?? 'Não foi possível iniciar a viagem')
@@ -231,7 +225,7 @@ export default function TripScreen() {
   const endMutation = useMutation({
     mutationFn: (tripId: string) => tripService.endTrip(tripId),
     onSuccess: (completedTrip) => {
-      queryClient.setQueryData(['activeTrip'], completedTrip)
+      queryClient.setQueryData(activeTripKey, completedTrip)
     },
     onError: (error: Error) => {
       Alert.alert('Erro', error.message ?? 'Não foi possível encerrar a viagem')
@@ -264,6 +258,21 @@ export default function TripScreen() {
       <View style={styles.centered}>
         <ActivityIndicator size="large" />
         <Text style={styles.loadingText}>Carregando viagem...</Text>
+      </View>
+    )
+  }
+
+  // Com o `networkMode: 'always'` global, o cold start offline ERRA (não pausa):
+  // sem dado em cache, bloqueia com retry em vez de oferecer "Iniciar Viagem"
+  // que só pode falhar (bug DS7 da retro 3, que antes mascarava o `isLoading`).
+  if (tripStatus === 'error' && activeTrip === undefined) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.title}>Não foi possível carregar a viagem</Text>
+        <Text style={styles.loadingText}>Verifique sua conexão e tente novamente.</Text>
+        <Button mode="contained" onPress={() => void refetchTrip()} style={styles.retryButton}>
+          Tentar novamente
+        </Button>
       </View>
     )
   }
@@ -410,6 +419,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1A1A2E',
     marginBottom: 24,
+  },
+  retryButton: {
+    marginTop: 8,
+    paddingHorizontal: 16,
   },
   card: {
     borderRadius: 12,
