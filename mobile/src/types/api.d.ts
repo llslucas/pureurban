@@ -456,6 +456,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tracking/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transmitir a posição GPS do ônibus na viagem ativa
+         * @description Recepção da posição capturada pelo device do motorista (envio automático enquanto a viagem está ativa). Last-write-wins: cada posição substitui a anterior e posições velhas são descartáveis — por isso NÃO usa X-Idempotency-Key (divergência consciente dos POSTs do boarding, que protegem operações na fila offline).
+         */
+        post: operations["TrackingController_ingestLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tracking/trips/{id}/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Última posição conhecida do ônibus na viagem
+         * @description Estado inicial da tela de acompanhamento antes do primeiro evento do stream e o que permanece visível quando o sinal GPS cai. Sem replay/Last-Event-ID no stream — o resync do aluno é este endpoint. A posição não é persistida em PostgreSQL: vive em cache com TTL curto, e a expiração é 404, nunca ponto stale.
+         */
+        get: operations["TrackingController_lastKnownLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tracking/trips/{id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream SSE do acompanhamento do ônibus em tempo real
+         * @description Canal em tempo real do aluno para a viagem: cada mensagem traz a linha `event:` com `location.updated` e a linha `data:` com a posição publicada. Sem replay/Last-Event-ID — após queda de rede, o resync é o GET .../location e a reconexão é responsabilidade do cliente (EventSource com backoff). A conexão é encerrada elegantemente quando a viagem termina. Auth via header Authorization (o token nunca vai na URL).
+         */
+        get: operations["TrackingController_tripLocationStream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -751,6 +811,104 @@ export interface components {
              * @example 2026-09-07T22:15:00.000Z
              */
             remindedAt: string;
+        };
+        LocationIngestResponseDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem cuja posição foi recebida
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Instante do recebimento da posição pelo servidor (ISO 8601 UTC) — last-write-wins: cada posição recebida substitui a anterior, sem acumular histórico
+             * @example 2026-09-11T12:00:00.100Z
+             */
+            receivedAt: string;
+        };
+        LocationIngestRequestDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem ativa em que a posição foi capturada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Latitude da posição em graus WGS84
+             * @example -20.755549
+             */
+            latitude: number;
+            /**
+             * @description Longitude da posição em graus WGS84
+             * @example -42.881728
+             */
+            longitude: number;
+            /**
+             * @description Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.
+             * @example 12.5
+             */
+            accuracy?: number;
+            /**
+             * @description Instante da captura da posição pelo device (ISO 8601 UTC). Não volta em nenhuma resposta do servidor: o ack carrega o receivedAt e o evento do stream carrega o timestamp de publicação.
+             * @example 2026-09-11T12:00:00.000Z
+             */
+            capturedAt: string;
+        };
+        LastKnownLocationDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem a que a posição pertence
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Latitude do último ponto conhecido em graus WGS84
+             * @example -20.755549
+             */
+            latitude: number;
+            /**
+             * @description Longitude do último ponto conhecido em graus WGS84
+             * @example -42.881728
+             */
+            longitude: number;
+            /**
+             * @description Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.
+             * @example 12.5
+             */
+            accuracy?: number;
+            /**
+             * @description Instante da captura da posição pelo device (ISO 8601 UTC) — a idade deste ponto é o que a tela usa para o estado degradado "Sem sinal GPS". Se a posição foi expirada, o endpoint responde 404 NO_LOCATION_AVAILABLE, nunca um ponto stale.
+             * @example 2026-09-11T12:00:00.000Z
+             */
+            capturedAt: string;
+        };
+        /** @description Evento SSE `location.updated`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido aos alunos da rota a cada posição publicada pelo motorista da viagem ativa (Story 5.1). `timestamp` é o instante de publicação pelo servidor — o `capturedAt` do device só aparece no POST de ingestão e no last-known. */
+        LocationUpdatedEventDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem em que a posição foi publicada
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Latitude da posição em graus WGS84
+             * @example -20.755549
+             */
+            latitude: number;
+            /**
+             * @description Longitude da posição em graus WGS84
+             * @example -42.881728
+             */
+            longitude: number;
+            /**
+             * @description Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.
+             * @example 12.5
+             */
+            accuracy?: number;
+            /**
+             * @description Instante da publicação do evento pelo servidor (ISO 8601 UTC) — nunca o capturedAt do device
+             * @example 2026-09-11T12:00:00.150Z
+             */
+            timestamp: string;
         };
     };
     responses: never;
@@ -2413,6 +2571,232 @@ export interface operations {
             };
             /** @description TRIP_NOT_ACTIVE — motorista autenticado sem viagem ativa (inexistente, encerrada ou de outra empresa). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TrackingController_ingestLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationIngestRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Posição recebida — ack com o instante de recebimento do servidor */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LocationIngestResponseDto"];
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID, coordenadas ausentes ou não numéricas, capturedAt não ISO 8601). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description DRIVER_NOT_ON_TRIP — motorista autenticado não é o atribuído à viagem (espelho do STUDENT_NOT_ON_TRIP do boarding). FORBIDDEN — role DRIVER exigida: somente o motorista transmite GPS. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa (posição só é aceita em viagem ativa). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TrackingController_lastKnownLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID da viagem */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Último ponto conhecido da viagem */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LastKnownLocationDto"];
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description VALIDATION_ERROR — id da viagem ausente ou não é UUID. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description STUDENT_NOT_ON_TRIP — aluno não vinculado à rota da viagem (mesmo código/semântica do boarding). FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description NO_LOCATION_AVAILABLE — nenhuma posição armazenada para a viagem (cache vazio ou TTL expirado). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TrackingController_tripLocationStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID da viagem */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stream `text/event-stream` — uma mensagem por posição publicada, com `event:` carregando `location.updated` e `data:` o payload JSON. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["LocationUpdatedEventDto"];
+                };
+            };
+            /** @description VALIDATION_ERROR — id da viagem ausente ou não é UUID. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description STUDENT_NOT_ON_TRIP — aluno não vinculado à rota da viagem (mesmo código/semântica do boarding). FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.2. */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
