@@ -11,7 +11,12 @@ import {
   type BoardingAbsenceCancelledEvent,
   type BoardingNotReturningEvent,
 } from '@/services/boarding-events.service'
-import { tripService, type Trip, type TripStudents } from '@/services/trip.service'
+import { type TripStudents } from '@/services/trip.service'
+import {
+  activeTripOptions,
+  tripStudentsKey,
+  tripStudentsOptions,
+} from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 
 // Eventos aplicados ao cache como NOVO array + novos objetos (StudentCard é
@@ -70,68 +75,26 @@ export default function StudentListScreen() {
   const queryClient = useQueryClient()
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' })
 
-  // MESMA query key de trip.tsx e scan.tsx — reusar, não criar outra (finding de
-  // review na 3.2b: key duplicada faz as telas divergirem). Mesmos parâmetros —
-  // incluindo o `networkMode` default: se esta query errasse offline (estado 3),
-  // a guarda `tripStatus === 'error'` renderizaria "Não foi possível carregar a
-  // viagem" e **mascararia o estado 7**. Offline com viagem em cache, queremos
-  // cair na lista + Banner de dado velho, não numa tela de bloqueio. Só o roster
-  // ganha `networkMode: 'always'`.
   const {
     data: activeTrip,
     status: tripStatus,
     refetch: refetchTrip,
-  } = useQuery<Trip | null>({
-    queryKey: ['activeTrip'],
-    queryFn: () => tripService.getActiveTrip(),
-    staleTime: 10_000,
-    retry: 2,
-  })
+  } = useQuery(activeTripOptions())
 
   const tripId = activeTrip?.id
-  const roster = useQuery({
-    // Segmentada por viagem (ação #4 da retro do Épico 2): uma key sem `tripId`
-    // faria a lista de uma viagem aparecer na seguinte, do cache reidratado.
-    queryKey: ['trip', tripId, 'students'],
-    queryFn: () => tripService.getTripStudents(tripId!),
-    // Sem isto a queryFn roda com `tripId` undefined e o path vira
-    // /api/v1/trips/undefined/students → 404.
-    enabled: Boolean(tripId),
-    staleTime: 15_000,
-    // `networkMode: 'always'` é o que torna o estado 7 (AC #3 / FR24)
-    // demonstrável no alvo web. Sem ele, o DevTools "Offline" dispara o evento
-    // `offline` do window, o `onlineManager` padrão do TanStack fica offline, e
-    // um refetch com o `networkMode: 'online'` default **pausa**
-    // (`fetchStatus: 'paused'`) em vez de errar — `isError` nunca vira true e o
-    // Banner de dado desatualizado nunca aparece. Com `'always'` o refetch
-    // tenta mesmo "offline", falha no transporte, cai em `isError` mantendo o
-    // `data` do cache, e o Banner aparece. Também alinha o comportamento ao
-    // device nativo, onde o `onlineManager` nunca foi ligado ao NetInfo (defer
-    // da 3.2b) e a query já não pausava. Escopo mínimo: só a query do roster —
-    // a `['activeTrip']` fica com o default de propósito (ver comentário nela).
-    networkMode: 'always',
-    // Não retenta erro de negócio 4xx (403 DRIVER_NOT_ASSIGNED, 404
-    // TRIP_NOT_FOUND — estados 10/11): a escada de backoff inteira antes da tela
-    // de bloqueio seria ~3s de spinner à toa.
-    retry: (count, error) =>
-      count < 2 && !(error instanceof ApiClientError && error.status >= 400 && error.status < 500),
-  })
+  const roster = useQuery(tripStudentsOptions(tripId))
 
   // ---- Canal SSE (Story 4.2) ----
 
   // Evento com studentId fora do cache (roster velho, aluno novo na rota):
   // nada a aplicar localmente — só o refetch reconcilia com o servidor.
   const reconcileRoster = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['trip', tripId, 'students'] })
+    void queryClient.invalidateQueries({ queryKey: tripStudentsKey(tripId) })
   }, [queryClient, tripId])
 
   const handleNotReturning = useCallback(
     (event: BoardingNotReturningEvent) => {
-      const rosterCache = queryClient.getQueryData<TripStudents>([
-        'trip',
-        tripId,
-        'students',
-      ])
+      const rosterCache = queryClient.getQueryData<TripStudents>(tripStudentsKey(tripId))
       if (!rosterCache) {
         reconcileRoster()
         return
@@ -148,10 +111,7 @@ export default function StudentListScreen() {
 
       const applied = applyNotReturningToRoster(rosterCache, event)
       if (applied !== rosterCache) {
-        queryClient.setQueryData<TripStudents>(
-          ['trip', tripId, 'students'],
-          applied,
-        )
+        queryClient.setQueryData<TripStudents>(tripStudentsKey(tripId), applied)
         // Toast não bloqueante: o badge na lista é o sinal principal.
         setSnackbar({ visible: true, message: `${student.name} não vai voltar no ônibus` })
       }
@@ -162,18 +122,11 @@ export default function StudentListScreen() {
 
   const handleAbsenceCancelled = useCallback(
     (event: BoardingAbsenceCancelledEvent) => {
-      const rosterCache = queryClient.getQueryData<TripStudents>([
-        'trip',
-        tripId,
-        'students',
-      ])
+      const rosterCache = queryClient.getQueryData<TripStudents>(tripStudentsKey(tripId))
       if (rosterCache) {
         const applied = applyAbsenceCancelledToRoster(rosterCache, event)
         if (applied !== rosterCache) {
-          queryClient.setQueryData<TripStudents>(
-            ['trip', tripId, 'students'],
-            applied,
-          )
+          queryClient.setQueryData<TripStudents>(tripStudentsKey(tripId), applied)
         }
       }
       // Invalida mesmo sem mudança local: a verdade do servidor reconcilia
@@ -222,8 +175,11 @@ export default function StudentListScreen() {
     return <Loading label="Carregando viagem..." />
   }
 
-  // Estado 3 — erro na viagem não é "sem viagem".
-  if (tripStatus === 'error') {
+  // Estado 3 — erro na viagem não é "sem viagem". Com o `networkMode: 'always'`
+  // global, um refetch offline no meio da sessão chega a `error` COM a viagem em
+  // cache: sem a condição `activeTrip === undefined` o bloqueio mascararia o
+  // estado 7 (lista + Banner de dado velho assumem a partir daqui).
+  if (tripStatus === 'error' && activeTrip === undefined) {
     return (
       <Centered
         title="Não foi possível carregar a viagem"

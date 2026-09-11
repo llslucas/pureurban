@@ -10,7 +10,7 @@ import {
   boardingService,
   type NotReturningResponse,
 } from '@/services/boarding.service'
-import { tripService } from '@/services/trip.service'
+import { activeTripOptions } from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 
 // Valor do cache ['studentAbsence', tripId]. `absence: null` significa "o
@@ -43,15 +43,10 @@ export default function StudentHomeScreen() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  // Mesma key do motorista (`['activeTrip']`): para o aluno a API devolve a
-  // viagem de retorno ativa na rota dele (ou null) — a decisão de qual viagem
-  // é do backend, a tela só consome.
-  const { data: activeTrip, status: tripStatus } = useQuery({
-    queryKey: ['activeTrip'],
-    queryFn: () => tripService.getActiveTrip(),
-    staleTime: 10_000,
-    retry: 2,
-  })
+  // Mesma entrada de cache do motorista (factory `activeTripOptions`): para o
+  // aluno a API devolve a viagem de retorno ativa na rota dele (ou null) — a
+  // decisão de qual viagem é do backend, a tela só consome.
+  const { data: activeTrip, status: tripStatus } = useQuery(activeTripOptions())
 
   const tripId = activeTrip?.status === 'ACTIVE' ? activeTrip.id : null
 
