@@ -51,9 +51,11 @@ async function bootstrap() {
   // subir noutra porta, é CORS_ORIGIN que precisa mudar — não a URL da API.
   // X-Idempotency-Key é obrigatório no allowedHeaders: sem ele o preflight do
   // check-in de embarque falha e a requisição volta 400 MISSING_IDEMPOTENCY_KEY.
-  // cache-control vem do cliente SSE (react-native-sse envia `cache-control:
-  // no-cache` em toda conexão de stream — embarque hoje, localização no Épico 5):
-  // sem ele o preflight do stream do motorista falha e o web fica sem realtime.
+  // cache-control e X-Requested-With vêm do cliente SSE (react-native-sse seta
+  // `Cache-Control: no-cache` e `X-Requested-With: XMLHttpRequest` em toda
+  // conexão de stream — embarque hoje, localização no Épico 5). Nenhum dos dois
+  // é safelisted do CORS: sem eles no preflight o browser bloqueia o stream e o
+  // web fica sem realtime. Aceita é safelisted — não precisa de allowlist.
   // A lista é explícita e fechada: um header novo em api-client.ts (extraHeaders)
   // passa nos testes — que montam o AppModule e nunca executam este bootstrap — e
   // só falha no browser. Header novo no cliente ⇒ acrescente-o aqui na mesma PR.
@@ -67,6 +69,7 @@ async function bootstrap() {
       'Authorization',
       'X-Idempotency-Key',
       'cache-control',
+      'X-Requested-With',
     ],
   });
 

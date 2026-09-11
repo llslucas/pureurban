@@ -177,16 +177,20 @@ propósito para variação do ambiente local (Metro, CDP, primeiro paint).
 ### Caveats específicos do Épico 4
 
 - **CORS do stream SSE no web (RESOLVIDO):** o cliente SSE do mobile
-  (`react-native-sse`) envia o header `cache-control` no XHR do stream. Ele
-  entrava no preflight e a allowlist de CORS da API não o incluía — o browser
-  bloqueava o stream e o motorista ficava sem realtime (o servidor entregava o
-  evento em <50 ms; a rede nunca foi o problema). A 4.5 provou o fluxo com um
-  shim de teste (`allowSseInBrowser`) porque não podia tocar em `api/src/`;
-  o fix real (`cache-control` na allowlist de `api/src/main.ts`) e a remoção
-  do shim pousaram juntos no hardening pré-Épico 5 — o spec hoje prova o
-  preflight real, sem reescrita de headers. Qualquer header novo no cliente
-  SSE continua sujeito à regra do comentário em `main.ts`: header novo no
-  cliente ⇒ allowlist na mesma PR.
+  (`react-native-sse`) envia `cache-control: no-cache` e
+  `X-Requested-With: XMLHttpRequest` em toda conexão de stream — nenhum dos
+  dois é safelisted do CORS, e a allowlist de `api/src/main.ts` não os
+  incluía: o preflight real do browser negava e o stream nunca conectava (o
+  servidor entregava o evento em <50 ms; a rede nunca foi o problema). A 4.5
+  provou o fluxo com um shim de teste (`allowSseInBrowser`) que reescrevia o
+  preflight para só `authorization` — mascarando os DOIS headers de uma vez.
+  O fix real (ambos na allowlist) e a remoção do shim pousaram no hardening
+  pré-Épico 5; o spec hoje prova o preflight real. Armadilha de verificação:
+  um curl de preflight pedindo só parte dos headers passa mesmo com a
+  allowlist incompleta — reproduza a lista que o browser pede
+  (`accept,authorization,cache-control,x-requested-with`). Qualquer header
+  novo no cliente SSE continua sujeito à regra do comentário em `main.ts`:
+  header novo no cliente ⇒ allowlist na mesma PR.
 - **Aging também no cache do aluno (fora da janela):** a home renderiza o
   countdown exclusivamente do `cancellableUntil` em cache — não há GET de
   ausência. Para o card sair do estado "com countdown" para o consolidado sem
