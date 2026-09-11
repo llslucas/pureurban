@@ -19,16 +19,12 @@ import {
 const ROUTE_STUDENT_UNIQUE = ['routeId', 'studentId'] as const;
 const ROUTE_DRIVER_UNIQUE = ['routeId', 'driverId'] as const;
 
-// P2002 meta.target costuma vir como string[] (campos do constraint).
-// Verifica se é o constraint esperado para evitar mascarar outros unique violations futuros.
-function isExpectedUniqueViolation(
-  e: Prisma.PrismaClientKnownRequestError,
-  expected: readonly string[],
-): boolean {
-  const target = e.meta?.target;
-  if (!Array.isArray(target)) return false;
-  return expected.every((f) => (target as string[]).includes(f));
-}
+// P2002.meta.target NÃO é confiável nesta stack (Prisma 7 + @prisma/adapter-pg):
+// vem vazio, e os campos só existem em meta.driverAdapterError.cause.constraint
+// .fields, um detalhe interno do driver. Por isso o create trata qualquer P2002
+// como violação do @@unique composto — no create ele é o único constraint
+// violável (o pkey é uuid() gerado pelo banco). Mesma decisão de
+// prisma-boarding.adapter.ts; os consts acima documentam o constraint esperado.
 
 // Classifica internamente o motivo de um 404 em DELETE de assignment, sem vazar
 // existence info ao cliente (que sempre recebe ASSIGNMENT_NOT_FOUND). Usado apenas
@@ -145,10 +141,7 @@ export class PrismaRouteAssignmentAdapter implements RouteAssignmentRepositoryAp
               );
             } catch (e) {
               if (e instanceof Prisma.PrismaClientKnownRequestError) {
-                if (
-                  e.code === 'P2002' &&
-                  isExpectedUniqueViolation(e, ROUTE_STUDENT_UNIQUE)
-                ) {
+                if (e.code === 'P2002') {
                   return { kind: 'duplicate' };
                 }
                 // P2003: FK violation — race com delete de route/user entre findFirst e create.
@@ -310,10 +303,7 @@ export class PrismaRouteAssignmentAdapter implements RouteAssignmentRepositoryAp
               );
             } catch (e) {
               if (e instanceof Prisma.PrismaClientKnownRequestError) {
-                if (
-                  e.code === 'P2002' &&
-                  isExpectedUniqueViolation(e, ROUTE_DRIVER_UNIQUE)
-                ) {
+                if (e.code === 'P2002') {
                   return { kind: 'duplicate' };
                 }
                 if (e.code === 'P2003') {
