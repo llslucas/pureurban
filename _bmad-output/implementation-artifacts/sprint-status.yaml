@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-09-2026 23:30"
+last_updated: "11-09-2026 17:15"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -188,12 +188,25 @@ development_status:
   # CORTADAS -> Fase 2: 4-5a e 4-5b (broadcast do motorista, FR36/FR37).
   # 4.4 troca push notification por lembrete in-app; o scheduler e o use case do core
   # que decide "quem deve ser lembrado" são preservados integralmente.
-  epic-4: in-progress
+  # FECHADO em 11/09/2026: todas as 6 stories done, encerrado pelo merge do PR #30
+  # (4-5). Retro ainda não rodada (optional).
+  epic-4: done
   4-0-contrato-de-api-ausencia: done
   4-1-registro-de-ausencia-nao-vou-voltar: done
   4-2-canal-sse-e-recebimento-em-tempo-real: done
   4-3-cancelamento-de-ausencia: done
   4-4-lembrete-automatico-de-check-in-pendente: done
+  # FECHADA pelo merge do PR #30 em 11/09/2026. Suíte Playwright
+  # (absence-reminder.e2e.spec) prova pela UI, contra a API real, os 4 fluxos do
+  # épico: notificar (NFR3 wall-clock 110-137ms vs budget 3s), cancelar na janela,
+  # fora da janela (card consolidado + CANCELLATION_PERIOD_EXPIRED) e o lembrete
+  # disparado pelo scheduler real (tick 60s) e respondido pelo banner. Aging de
+  # timestamps via prisma-time (única escrita direta no banco); seed 100% via API.
+  # Review: 26 achados triados (7 patches, 18 rejeitados, 1 defer). Achado de
+  # produção levado pela E2E e DEFERIDO: SSE do motorista bloqueado no browser por
+  # cache-control fora da allowlist CORS em api/src/main.ts (shim de teste
+  # allowSseInBrowser no spec; fix de 1 linha + remoção do shim em deferred-work.md).
+  # Drift check (openapi:check) verde; zero mudanças em api/src/ e mobile/src/.
   4-5-e2e-do-epico-4: done
   epic-4-retrospective: optional
 
