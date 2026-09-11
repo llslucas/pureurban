@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-11-2026 17:41"
+last_updated: "09-11-2026 21:55"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -229,14 +229,24 @@ action_items:
     action: "CI/script de gate minimo: unit + e2e + test:pw:api + test:pw:e2e (E2E_SERVERS_UP=1)
       + openapi:check"
     owner: "Lucas"
-    status: open
+    # DONE em 11/09/2026 (hardening pré-Épico 5, PR #31): `npm run gate` em api/
+    # encadeia unit + e2e supertest + test:pw:api + test:pw:e2e sob
+    # E2E_SERVERS_UP=1 (infra ausente FALHA, não skipa) + openapi:check; sobe
+    # docker/API/Expo Web e desliga só o que iniciou. Gate completo verde
+    # (GATE-EXIT=0): 293 unit, 161 supertest, 2 pw:api, 7 pw:e2e.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-2-fix-baseline-red-e2e"
     epic: 3
     action: "Corrigir suíte vermelha na baseline (route-assignment.e2e-spec: login
       201x200) que mascara o bug de P2002 do routing"
     owner: "Dev"
-    status: open
+    # DONE em 11/09/2026 (hardening pré-Épico 5, PR #31): causa raiz era o
+    # default 201 do @Post no login/refresh (contrato diz 200 — @HttpCode(OK)).
+    # Sem a máscara, o bug de P2002 previsto apareceu (duplicata → 500, pois
+    # P2002.meta.target vem vazio no Prisma 7 + adapter-pg) e foi corrigido no
+    # mesmo PR. Suíte 19/19; pins .expect(201) de boarding/trip alinhados.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-3-offline-queue-outcome"
     epic: 3
@@ -290,7 +300,13 @@ action_items:
       e2e e re-verificar o preflight sem shim (o stream de localizacao do Epico 5
       herda o bloqueio)"
     owner: "Lucas + Dev"
-    status: open
+    # DONE em 11/09/2026 (hardening pré-Épico 5, PR #31): cache-control E
+    # X-Requested-With (ambos enviados pelo react-native-sse, nenhum
+    # safelisted) na allowlist de main.ts; shim allowSseInBrowser REMOVIDO —
+    # o e2e do NFR3 prova o preflight real (100ms, budget 3s). O Epico 5
+    # herda o canal livre. Armadilha do curl parcial documentada em
+    # api/tests/README.md.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-4-retro-item-10-sse-mobile-no-caminho-401-com-refresh-fa"
     epic: 4
@@ -298,7 +314,11 @@ action_items:
       e sinalizar roster potencialmente velho na student-list (reusar o banner de
       staleness)"
     owner: "Dev"
-    status: open
+    # DONE em 11/09/2026 (hardening pré-Épico 5, PR #31): 3 refreshes falhos
+    # consecutivos (reset a cada open bem-sucedido) encerram o stream e
+    # disparam onUnrecoverable; student-list reusa o banner de dado velho.
+    # Rede instável continua se auto-recuperando pela escada.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-4-retro-item-11-bateria-de-testes-das-fronteiras-2-aluno"
     epic: 4
@@ -313,7 +333,8 @@ action_items:
     action: "Tornar REMINDER_SCAN_ENABLED observavel: log de aviso quando desligado
       + documentar a flag em api/.env.example"
     owner: "Dev"
-    status: open
+    # DONE em 11/09/2026 (hardening pré-Épico 5, PR #31).
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-4-retro-item-13-divida-de-forma-antes-do-epico-5-extrair"
     epic: 4
@@ -321,5 +342,10 @@ action_items:
       (11 copias) e o harness de TestClock (2 copias); fatiar api/test/boarding.e2e-spec.ts
       (1753 linhas) por bloco de story; acompanhar home.tsx (413 linhas)"
     owner: "Dev"
+    # PARCIAL em 11/09/2026 (hardening pré-Épico 5, PR #31): toInfraError
+    # (11 copias → 1, factory para canais tipados) e harness de TestClock
+    # (2 → 1) EXTRAÍDOS. Ficam: fatiar boarding.e2e-spec.ts (1753 linhas) e
+    # acompanhar home.tsx (413 linhas) — a fatiar durante o Épico 5 se o
+    # spec de tracking crescer junto.
     status: open
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
