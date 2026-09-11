@@ -15,6 +15,7 @@ import { ResponseWrapperInterceptor } from './domains/shared/shell/interceptors/
 import { TripModule } from './domains/trip/shell/trip.module.js';
 import { RoutingModule } from './domains/routing/shell/routing.module.js';
 import { BoardingModule } from './domains/boarding/shell/boarding.module.js';
+import { TrackingModule } from './domains/tracking/shell/tracking.module.js';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { BoardingModule } from './domains/boarding/shell/boarding.module.js';
     TripModule,
     RoutingModule,
     BoardingModule,
+    TrackingModule,
   ],
   controllers: [AppController],
   providers: [
