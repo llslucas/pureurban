@@ -176,15 +176,17 @@ propósito para variação do ambiente local (Metro, CDP, primeiro paint).
 
 ### Caveats específicos do Épico 4
 
-- **CORS do stream SSE no web (gap de produção, shim de teste):** o cliente SSE
-  do mobile (`react-native-sse`) envia o header `cache-control` no XHR do
-  stream, e a allowlist de CORS da API (`api/src/main.ts`: Content-Type,
-  Authorization, X-Idempotency-Key) não o inclui — no browser o stream é
-  bloqueado e o motorista fica sem realtime (o servidor entrega o evento em
-  <50 ms; a rede não é o problema). Como a 4.5 proíbe mudar `api/src/`, o spec
-  remove o header na camada de transporte, só no contexto do motorista
-  (`allowSseInBrowser` no spec). Follow-up recomendado: acrescentar
-  `cache-control` à allowlist em `api/src/main.ts` e remover o shim.
+- **CORS do stream SSE no web (RESOLVIDO):** o cliente SSE do mobile
+  (`react-native-sse`) envia o header `cache-control` no XHR do stream. Ele
+  entrava no preflight e a allowlist de CORS da API não o incluía — o browser
+  bloqueava o stream e o motorista ficava sem realtime (o servidor entregava o
+  evento em <50 ms; a rede nunca foi o problema). A 4.5 provou o fluxo com um
+  shim de teste (`allowSseInBrowser`) porque não podia tocar em `api/src/`;
+  o fix real (`cache-control` na allowlist de `api/src/main.ts`) e a remoção
+  do shim pousaram juntos no hardening pré-Épico 5 — o spec hoje prova o
+  preflight real, sem reescrita de headers. Qualquer header novo no cliente
+  SSE continua sujeito à regra do comentário em `main.ts`: header novo no
+  cliente ⇒ allowlist na mesma PR.
 - **Aging também no cache do aluno (fora da janela):** a home renderiza o
   countdown exclusivamente do `cancellableUntil` em cache — não há GET de
   ausência. Para o card sair do estado "com countdown" para o consolidado sem
