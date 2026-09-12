@@ -4,9 +4,13 @@ import {
   HttpCode,
   HttpStatus,
   NotImplementedException,
+  Param,
   Post,
+  Body,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -21,7 +25,9 @@ import { JwtAuthGuard } from '../../../auth/shell/guards/jwt-auth.guard.js';
 import { TenantGuard } from '../../../shared/shell/guards/tenant.guard.js';
 import { RolesGuard } from '../../../shared/shell/guards/roles.guard.js';
 import { Roles } from '../../../shared/shell/decorators/roles.decorator.js';
+import { TenantId } from '../../../shared/shell/decorators/tenant-id.decorator.js';
 import { ApiDataResponse } from '../../../shared/shell/decorators/api-data-response.decorator.js';
+import { EffectSchemaPipe } from '../../../shared/shell/pipes/effect-schema.pipe.js';
 import { ErrorResponseDto } from '../../../shared/shell/http/error-response.dto.js';
 import {
   LastKnownLocationDto,
@@ -29,19 +35,27 @@ import {
   LocationIngestResponseDto,
 } from './dtos/index.js';
 import { LocationUpdatedEventDto } from './dtos/tracking-events.dto.js';
+import {
+  LocationIngestInput,
+  TripIdParam,
+} from '../../core/schemas/location-ingest.schema.js';
+import { TrackingService } from '../tracking.service.js';
 
-// Story 5.0 declares the contract only: handlers are typed 501 stubs and the
-// core (Effect) + adapters land with the 5.1/5.2 vertical slices. The stream
-// stays @Get (NOT @Sse) on purpose: with the global ResponseWrapperInterceptor,
-// an error thrown inside a @Sse handler never reaches the EffectExceptionFilter
+// Story 5.1 wired POST /location and GET /trips/:id/location to the real core
+// (Effect use cases + Redis behind LocationBus). The stream stays @Get (NOT
+// @Sse) and 501 on purpose: with the global ResponseWrapperInterceptor, an
+// error thrown inside a @Sse handler never reaches the EffectExceptionFilter
 // and comes back as 200 `event: error`. 5.2 flips it to @Sse in the same commit
-// as the real stream (precedent: boarding 4.0 -> 4.2).
+// as the real stream (precedent: boarding 4.0 -> 4.2). Swagger decorators are
+// the frozen 5.0 contract — openapi.json must not drift.
 @ApiTags('tracking')
 @ApiBearerAuth()
 @Controller('api/v1/tracking')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Roles(['STUDENT'])
 export class TrackingController {
+  constructor(private readonly trackingService: TrackingService) {}
+
   @Post('location')
   @Roles(['DRIVER'])
   @HttpCode(HttpStatus.OK)
@@ -88,10 +102,18 @@ export class TrackingController {
       'NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1.',
     type: ErrorResponseDto,
   })
-  ingestLocation() {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 5.0 — implementação na Story 5.1',
+  async ingestLocation(
+    @TenantId() companyId: string,
+    @Req() req: Request & { user: { userId: string } },
+    @Body(new EffectSchemaPipe(LocationIngestInput, 'VALIDATION_ERROR'))
+    body: LocationIngestInput,
+  ) {
+    // O motorista vem do token, nunca do body: é ele que autoriza a transmissão
+    // (mesmo padrão do driverId no check-in do boarding).
+    return this.trackingService.ingestLocation({
+      ...body,
+      companyId,
+      driverId: req.user.userId,
     });
   }
 
@@ -149,10 +171,18 @@ export class TrackingController {
       'NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1.',
     type: ErrorResponseDto,
   })
-  lastKnownLocation() {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 5.0 — implementação na Story 5.1',
+  lastKnownLocation(
+    @TenantId() companyId: string,
+    @Req() req: Request & { user: { userId: string } },
+    @Param('id', new EffectSchemaPipe(TripIdParam, 'VALIDATION_ERROR'))
+    tripId: string,
+  ) {
+    // O aluno vem do token, nunca da URL — quem consulta é a identidade
+    // autenticada (mesmo padrão do studentId nos POSTs do boarding).
+    return this.trackingService.getLastKnownLocation({
+      tripId,
+      companyId,
+      studentId: req.user.userId,
     });
   }
 
