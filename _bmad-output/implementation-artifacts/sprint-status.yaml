@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "09-11-2026 21:55"
+last_updated: "09-11-2026 21:05"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -216,8 +216,8 @@ development_status:
   # distância/ETA ao ponto do aluno — elimina a dependência de biblioteca de mapas com
   # suporte web (nunca escolhida) e preserva SSE + Redis Pub/Sub. A antiga 5-3b
   # (comportamento degradado) foi incorporada à 5-2.
-  epic-5: backlog
-  5-0-contrato-de-api-localizacao: backlog
+  epic-5: in-progress
+  5-0-contrato-de-api-localizacao: review
   5-1-ingestao-e-transmissao-de-gps: backlog
   5-2-acompanhamento-do-onibus-em-tempo-real: backlog
   5-3-e2e-do-epico-5: backlog

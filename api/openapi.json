@@ -1733,6 +1733,320 @@
           "boarding"
         ]
       }
+    },
+    "/api/v1/tracking/location": {
+      "post": {
+        "description": "Recepção da posição capturada pelo device do motorista (envio automático enquanto a viagem está ativa). Last-write-wins: cada posição substitui a anterior e posições velhas são descartáveis — por isso NÃO usa X-Idempotency-Key (divergência consciente dos POSTs do boarding, que protegem operações na fila offline).",
+        "operationId": "TrackingController_ingestLocation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationIngestRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Posição recebida — ack com o instante de recebimento do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/LocationIngestResponseDto"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR — body malformado (tripId ausente ou não é UUID, coordenadas ausentes ou não numéricas, capturedAt não ISO 8601).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "DRIVER_NOT_ON_TRIP — motorista autenticado não é o atribuído à viagem (espelho do STUDENT_NOT_ON_TRIP do boarding). FORBIDDEN — role DRIVER exigida: somente o motorista transmite GPS.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa (posição só é aceita em viagem ativa).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Transmitir a posição GPS do ônibus na viagem ativa",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/api/v1/tracking/trips/{id}/location": {
+      "get": {
+        "description": "Estado inicial da tela de acompanhamento antes do primeiro evento do stream e o que permanece visível quando o sinal GPS cai. Sem replay/Last-Event-ID no stream — o resync do aluno é este endpoint. A posição não é persistida em PostgreSQL: vive em cache com TTL curto, e a expiração é 404, nunca ponto stale.",
+        "operationId": "TrackingController_lastKnownLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID da viagem",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Último ponto conhecido da viagem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/LastKnownLocationDto"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR — id da viagem ausente ou não é UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "STUDENT_NOT_ON_TRIP — aluno não vinculado à rota da viagem (mesmo código/semântica do boarding). FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NO_LOCATION_AVAILABLE — nenhuma posição armazenada para a viagem (cache vazio ou TTL expirado).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Última posição conhecida do ônibus na viagem",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/api/v1/tracking/trips/{id}/stream": {
+      "get": {
+        "description": "Canal em tempo real do aluno para a viagem: cada mensagem traz a linha `event:` com `location.updated` e a linha `data:` com a posição publicada. Sem replay/Last-Event-ID — após queda de rede, o resync é o GET .../location e a reconexão é responsabilidade do cliente (EventSource com backoff). A conexão é encerrada elegantemente quando a viagem termina. Auth via header Authorization (o token nunca vai na URL).",
+        "operationId": "TrackingController_tripLocationStream",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID da viagem",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream `text/event-stream` — uma mensagem por posição publicada, com `event:` carregando `location.updated` e `data:` o payload JSON.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LocationUpdatedEventDto"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR — id da viagem ausente ou não é UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "STUDENT_NOT_ON_TRIP — aluno não vinculado à rota da viagem (mesmo código/semântica do boarding). FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.2.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stream SSE do acompanhamento do ônibus em tempo real",
+        "tags": [
+          "tracking"
+        ]
+      }
     }
   },
   "info": {
@@ -2207,6 +2521,153 @@
           "tripId",
           "studentId",
           "remindedAt"
+        ]
+      },
+      "LocationIngestResponseDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem cuja posição foi recebida",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "receivedAt": {
+            "type": "string",
+            "description": "Instante do recebimento da posição pelo servidor (ISO 8601 UTC) — last-write-wins: cada posição recebida substitui a anterior, sem acumular histórico",
+            "example": "2026-09-11T12:00:00.100Z"
+          }
+        },
+        "required": [
+          "tripId",
+          "receivedAt"
+        ]
+      },
+      "LocationIngestRequestDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem ativa em que a posição foi capturada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude da posição em graus WGS84",
+            "example": -20.755549,
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude da posição em graus WGS84",
+            "example": -42.881728,
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy": {
+            "type": "number",
+            "description": "Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.",
+            "example": 12.5,
+            "minimum": 0
+          },
+          "capturedAt": {
+            "type": "string",
+            "description": "Instante da captura da posição pelo device (ISO 8601 UTC). Não volta em nenhuma resposta do servidor: o ack carrega o receivedAt e o evento do stream carrega o timestamp de publicação.",
+            "example": "2026-09-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "tripId",
+          "latitude",
+          "longitude",
+          "capturedAt"
+        ]
+      },
+      "LastKnownLocationDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem a que a posição pertence",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude do último ponto conhecido em graus WGS84",
+            "example": -20.755549,
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude do último ponto conhecido em graus WGS84",
+            "example": -42.881728,
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy": {
+            "type": "number",
+            "description": "Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.",
+            "example": 12.5,
+            "minimum": 0
+          },
+          "capturedAt": {
+            "type": "string",
+            "description": "Instante da captura da posição pelo device (ISO 8601 UTC) — a idade deste ponto é o que a tela usa para o estado degradado \"Sem sinal GPS\". Se a posição foi expirada, o endpoint responde 404 NO_LOCATION_AVAILABLE, nunca um ponto stale.",
+            "example": "2026-09-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "tripId",
+          "latitude",
+          "longitude",
+          "capturedAt"
+        ]
+      },
+      "LocationUpdatedEventDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem em que a posição foi publicada",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude da posição em graus WGS84",
+            "example": -20.755549,
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude da posição em graus WGS84",
+            "example": -42.881728,
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy": {
+            "type": "number",
+            "description": "Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.",
+            "example": 12.5,
+            "minimum": 0
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Instante da publicação do evento pelo servidor (ISO 8601 UTC) — nunca o capturedAt do device",
+            "example": "2026-09-11T12:00:00.150Z"
+          }
+        },
+        "description": "Evento SSE `location.updated`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido aos alunos da rota a cada posição publicada pelo motorista da viagem ativa (Story 5.1). `timestamp` é o instante de publicação pelo servidor — o `capturedAt` do device só aparece no POST de ingestão e no last-known. Frame no wire:\nevent: location.updated\ndata: {\"tripId\":\"550e8400-e29b-41d4-a716-446655440001\",\"latitude\":-20.755549,\"longitude\":-42.881728,\"accuracy\":12.5,\"timestamp\":\"2026-09-11T12:00:00.150Z\"}",
+        "required": [
+          "tripId",
+          "latitude",
+          "longitude",
+          "timestamp"
         ]
       }
     }
