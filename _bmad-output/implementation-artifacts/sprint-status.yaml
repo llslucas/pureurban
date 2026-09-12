@@ -236,7 +236,9 @@ development_status:
 action_items:
   # === Specs de execução do wrap pós-MVP (12/09/2026) — _bmad-output/implementation-artifacts/ ===
   # Ordem recomendada: wrap-1 → wrap-2 → wrap-3 → wrap-4 → wrap-5.
-  #   spec-wrap-1 (correções de comportamento): itens 4, 7, 14, 15, 16, 20
+  #   spec-wrap-1 (correções de comportamento): itens 4, 7, 14, 15, 16, 20 —
+  #     FECHADO em 12/09/2026 (PR #39); spec status: done, review triage 12
+  #     achados (7 patches, 1 false, 1 low rejeitado, 2 defers → wrap-3).
   #   spec-wrap-2 (bateria de testes das fronteiras): itens 6, 11, 17
   #   spec-wrap-3 (reconciliação de contrato e documentos): itens 8, 18
   #   spec-wrap-4 (dívida de forma — broadcaster SSE + specs e2e): itens 13, 19
@@ -282,7 +284,15 @@ action_items:
       dreno valida envelope 2xx antes de markSent, alinhar disclosure 403/404 em get-trip-students
       vs end-trip"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-1, PR #39): mock MSW reordena para replay ANTES da
+    # janela de occurredAt (espelhando o use case, DS4); dreno valida o registro
+    # 2xx antes de markSent — corpo não-JSON vira falha de transporte, item segue
+    # pending (DS5; guard isCheckInRecord contra o registro desenvolvido pelo
+    # api-client); end-trip responde 403 DRIVER_NOT_ASSIGNED para viagem de outro
+    # motorista, mesmo disclosure do get-trip-students (DS6) — 404 só para
+    # inexistente/outra empresa. Trava: offline-queue.test (2 suítes novas) +
+    # supertest trip.e2e.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-5-mobile-offline-queries"
     epic: 3
@@ -317,7 +327,13 @@ action_items:
     action: "CORS: fail-fast se CORS_ORIGIN ausente em produção + teste de preflight
       cobrindo X-Idempotency-Key"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-1, PR #39): CORS config extraída do bootstrap para
+    # shared/shell/http/cors-config.ts (testável — os testes nunca rodam main.ts);
+    # NODE_ENV=production sem CORS_ORIGIN válida FALHA o boot com erro legível
+    # (dev mantém o default de dev). Prefflight real (express + o MESMO pacote
+    # cors do Nest) cobre X-Idempotency-Key, cache-control e X-Requested-With na
+    # allowlist + origem fora da lista sem ACAO header. @types/cors devDep.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-8-spec-reconciliation"
     epic: 3
@@ -389,7 +405,15 @@ action_items:
       (só aplicar ponto mais novo); corrigir os comentários de track-bus.tsx que descrevem
       a reconciliação inexistente"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-1, PR #39): banner Atualizar e onOpen invalidam a
+    # query trackingLastKnown; guarda monotônica compara capturedAt vs ponto
+    # exibido e consome CADA resposta uma única vez (dataUpdatedAt) — anti-flap
+    # contra skew relógio device×servidor (achado F3 da review; limite residual
+    # documentado, server-stamp roteado ao wrap-3 via deferred-work). Comentários
+    # de track-bus.tsx/track-bus-queries corrigidos (AC3). E2E Playwright prova
+    # UI↔API real; testes de tela: resync aplica, mais velho não regredir,
+    # onOpen refaz. Gate verde: 333 unit / 195 supertest / 2 pw:api / 10 pw:e2e.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-15-guard-de-tipo-no-handlemessage-das-2-cop"
     epic: 5
@@ -397,7 +421,11 @@ action_items:
       e boarding-events.service): rejeitar mensagem não-objeto antes de parsed.type
       - hoje JSON.parse de null derruba o processo no listener do ioredis"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-1, PR #39): guard typeof parsed !== 'object' ||
+    # null || typeof type !== 'string' nas DUAS cópias, com warn distinto do
+    # sintático ("Non-object message"). Unit tests: null, array, string e objeto
+    # sem type descartados sem lançar; canal segue vivo.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-16-classificar-falha-de-envio-no-hook-de-ca"
     epic: 5
@@ -405,7 +433,12 @@ action_items:
       param a captura e invalidam activeTrip; log de aviso nas falhas (falha transitória
       mantém a cadência, como congelado na 5.1)"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-1, PR #39): classificador opcional no controlador
+    # puro (default = transitório, cadência da 5.1 preservada); hook classifica
+    # 409/403 como fatal → para a cadência e invalida ['activeTrip'] (a tela volta
+    # ao estado "sem viagem" pelo gate reativo); toda falha loga warning. Suíte
+    # nova do hook (use-trip-gps-capture.test.tsx) + testes do controlador.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-17-bateria-de-testes-das-fronteiras-do-épic"
     epic: 5
@@ -440,5 +473,11 @@ action_items:
       explícito no cliente SSE (hoje depende do default 5000 da lib); isActive do
       aluno também na descoberta (findActiveTripForStudent)"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-1, PR #39): formatClock renderiza "--:--:--" para
+    # capturedAt inválido (nunca NaN:NaN:NaN, teste de tela); SSE_REPOLL_INTERVAL_MS
+    # = 5000 pinado no cliente + asserção de config na suíte do cliente;
+    # findActiveTripForStudent exige user ativo (Promise.all com os links) —
+    # descoberta devolve data null para aluno desativado e os 3 endpoints
+    # concordam (supertest: discovery null + last-known 403 + stream 403).
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
