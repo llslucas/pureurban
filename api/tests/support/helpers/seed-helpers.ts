@@ -388,3 +388,129 @@ export async function seedEpic4Scenario(
     students,
   };
 }
+
+export interface Epic5Student {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  /** Token de acesso do aluno (STUDENT) — abrir o stream de acompanhamento. */
+  token: string;
+}
+
+export interface Epic5Scenario {
+  adminToken: string;
+  driverToken: string;
+  driver: Epic3Credentials;
+  routeId: string;
+  companyId: string;
+  /** `null` quando o teste inicia a viagem PELA UI (caminho feliz da 5.3). */
+  tripId: string | null;
+  student: Epic5Student;
+}
+
+export interface SeedEpic5Options {
+  /**
+   * Cria OUTBOUND ACTIVE via `POST /trips` (testes degradado e de fim, cuja
+   * viagem não passa pela UI de "Iniciar Viagem"). Default false.
+   */
+  createActiveTrip?: boolean;
+}
+
+/**
+ * Cenário do Épico 5 (Story 5.3): empresa + admin, motorista, rota com vínculos
+ * (driver + aluno) e 1 aluno COM credenciais — SEM check-ins e, por default,
+ * SEM viagem: o caminho feliz inicia pela UI, então o seed entrega só o
+ * cenário pronto. Testes que precisam de viagem já ativa passam
+ * `opts.createActiveTrip`. 100% via API, sem cleanup (padrão 3.6/4.5).
+ */
+export async function seedEpic5Scenario(
+  request: APIRequestContext,
+  opts: SeedEpic5Options = {},
+): Promise<Epic5Scenario> {
+  const adminInput = createPersonInput();
+  const register = await postJson(request, '/auth/register', {
+    name: adminInput.name,
+    email: adminInput.email,
+    password: adminInput.password,
+  });
+  const adminToken = str(register, 'accessToken', 'POST /auth/register');
+  const companyId = str(
+    obj(register, 'company', 'POST /auth/register'),
+    'id',
+    'POST /auth/register → company',
+  );
+
+  const driverInput = createPersonInput();
+  await postJson(request, '/drivers', { ...driverInput }, adminToken);
+  const driverLogin = await postJson(request, '/auth/login', {
+    email: driverInput.email,
+    password: driverInput.password,
+  });
+  const driverToken = str(driverLogin, 'accessToken', 'POST /auth/login');
+  const driverId = str(
+    obj(driverLogin, 'user', 'POST /auth/login'),
+    'id',
+    'POST /auth/login → user',
+  );
+
+  const route = await postJson(
+    request,
+    '/routes',
+    { ...createRouteInput() },
+    adminToken,
+  );
+  const routeId = str(route, 'id', 'POST /routes');
+  await postJson(
+    request,
+    `/routes/${routeId}/drivers`,
+    { driverId },
+    adminToken,
+  );
+
+  const studentInput = createPersonInput();
+  const student = await postJson(
+    request,
+    '/students',
+    { ...studentInput },
+    adminToken,
+  );
+  const studentId = str(student, 'id', 'POST /students');
+  await postJson(
+    request,
+    `/routes/${routeId}/students`,
+    { studentId },
+    adminToken,
+  );
+  const studentLogin = await postJson(request, '/auth/login', {
+    email: studentInput.email,
+    password: studentInput.password,
+  });
+
+  let tripId: string | null = null;
+  if (opts.createActiveTrip) {
+    const trip = await postJson(
+      request,
+      '/trips',
+      { routeId, type: 'OUTBOUND' },
+      driverToken,
+    );
+    tripId = str(trip, 'id', 'POST /trips (OUTBOUND)');
+  }
+
+  return {
+    adminToken,
+    driverToken,
+    driver: { email: driverInput.email, password: driverInput.password },
+    routeId,
+    companyId,
+    tripId,
+    student: {
+      id: studentId,
+      name: studentInput.name,
+      email: studentInput.email,
+      password: studentInput.password,
+      token: str(studentLogin, 'accessToken', 'POST /auth/login (aluno)'),
+    },
+  };
+}
