@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { Clock, Layer, ManagedRuntime } from 'effect';
 import { TrackingController } from './http/tracking.controller.js';
 import { TrackingService, TRACKING_RUNTIME } from './tracking.service.js';
+import { TrackingEventsService } from './tracking-events.service.js';
 import { PrismaTripAccessAdapter } from './adapters/prisma-trip-access.adapter.js';
 import { RedisLocationBusAdapter } from './adapters/redis-location-bus.adapter.js';
 import { TripAccess } from '../core/ports/trip-access.port.js';
@@ -9,14 +10,16 @@ import { LocationBus } from '../core/ports/location-bus.port.js';
 import { SharedKernelModule } from '../../shared/shell/shared-kernel.module.js';
 
 @Module({
-  // RedisService (LocationBus) e PrismaService (TripAccess) vêm do
-  // SharedKernelModule; tracking não importa TripModule — a viagem ativa é
-  // lida direto do schema trip pelo port próprio (precedente boarding).
+  // RedisService (LocationBus e o subscriber do TrackingEventsService) e
+  // PrismaService (TripAccess) vêm do SharedKernelModule; tracking não importa
+  // TripModule — a viagem ativa é lida direto do schema trip pelo port próprio
+  // (precedente boarding).
   imports: [SharedKernelModule],
   controllers: [TrackingController],
   providers: [
     PrismaTripAccessAdapter,
     RedisLocationBusAdapter,
+    TrackingEventsService,
     TrackingService,
     {
       provide: TRACKING_RUNTIME,

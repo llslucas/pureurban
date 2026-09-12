@@ -1839,6 +1839,76 @@
         ]
       }
     },
+    "/api/v1/tracking/trips/active": {
+      "get": {
+        "description": "Descoberta da viagem a acompanhar (Story 5.2): a viagem ativa de QUALQUER perna (ida ou volta) em alguma rota do aluno — diferente de GET /trips/active, cuja branch STUDENT devolve só a viagem de retorno (semântica do \"Não vou voltar\"). A autorização é a própria query: aluno fora de rota ou sem viagem ativa recebe { data: null }, nunca 403 de negócio. Sem viagem, o cliente repete a consulta; quando o motorista inicia a viagem, a tela se reengaja sozinha.",
+        "operationId": "TrackingController_activeTrackingTrip",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Envelope { data, meta } com data null (sem viagem ativa na rota do aluno) ou { tripId, type }.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/ActiveTrackingTripDto"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno (sem viagem é { data: null }, não 403).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Viagem ativa na rota do aluno para acompanhamento em tempo real",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
     "/api/v1/tracking/trips/{id}/location": {
       "get": {
         "description": "Estado inicial da tela de acompanhamento antes do primeiro evento do stream e o que permanece visível quando o sinal GPS cai. Sem replay/Last-Event-ID no stream — o resync do aluno é este endpoint. A posição não é persistida em PostgreSQL: vive em cache com TTL curto, e a expiração é 404, nunca ponto stale.",
@@ -2583,6 +2653,30 @@
           "latitude",
           "longitude",
           "capturedAt"
+        ]
+      },
+      "ActiveTrackingTripDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem ativa na rota do aluno — alimenta o stream e o last-known",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "OUTBOUND",
+              "RETURN"
+            ],
+            "description": "Perna da viagem ativa (ida ou volta) — o acompanhamento serve às duas",
+            "example": "OUTBOUND"
+          }
+        },
+        "required": [
+          "tripId",
+          "type"
         ]
       },
       "LastKnownLocationDto": {

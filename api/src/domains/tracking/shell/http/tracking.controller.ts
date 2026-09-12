@@ -3,14 +3,16 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotImplementedException,
   Param,
   Post,
   Body,
   Req,
+  Sse,
   UseGuards,
+  MessageEvent,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { Observable } from 'rxjs';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -30,6 +32,7 @@ import { ApiDataResponse } from '../../../shared/shell/decorators/api-data-respo
 import { EffectSchemaPipe } from '../../../shared/shell/pipes/effect-schema.pipe.js';
 import { ErrorResponseDto } from '../../../shared/shell/http/error-response.dto.js';
 import {
+  ActiveTrackingTripDto,
   LastKnownLocationDto,
   LocationIngestRequestDto,
   LocationIngestResponseDto,
@@ -40,21 +43,25 @@ import {
   TripIdParam,
 } from '../../core/schemas/location-ingest.schema.js';
 import { TrackingService } from '../tracking.service.js';
+import { TrackingEventsService } from '../tracking-events.service.js';
+import { TrackingStreamGuard } from './tracking-stream.guard.js';
 
 // Story 5.1 wired POST /location and GET /trips/:id/location to the real core
-// (Effect use cases + Redis behind LocationBus). The stream stays @Get (NOT
-// @Sse) and 501 on purpose: with the global ResponseWrapperInterceptor, an
-// error thrown inside a @Sse handler never reaches the EffectExceptionFilter
-// and comes back as 200 `event: error`. 5.2 flips it to @Sse in the same commit
-// as the real stream (precedent: boarding 4.0 -> 4.2). Swagger decorators are
-// the frozen 5.0 contract — openapi.json must not drift.
+// (Effect use cases + Redis behind LocationBus); 5.2 flipped the stream to a
+// real @Sse and added GET /trips/active (the ONLY contract addition of this
+// story). Swagger decorators are the frozen 5.0 contract — openapi.json must
+// not drift (the 501 doc of the stream stays as historical contract, precedent
+// 5.1 where handlers arrived after their docs).
 @ApiTags('tracking')
 @ApiBearerAuth()
 @Controller('api/v1/tracking')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Roles(['STUDENT'])
 export class TrackingController {
-  constructor(private readonly trackingService: TrackingService) {}
+  constructor(
+    private readonly trackingService: TrackingService,
+    private readonly trackingEventsService: TrackingEventsService,
+  ) {}
 
   @Post('location')
   @Roles(['DRIVER'])
@@ -114,6 +121,58 @@ export class TrackingController {
       ...body,
       companyId,
       driverId: req.user.userId,
+    });
+  }
+
+  @Get('trips/active')
+  @ApiOperation({
+    summary: 'Viagem ativa na rota do aluno para acompanhamento em tempo real',
+    description:
+      'Descoberta da viagem a acompanhar (Story 5.2): a viagem ativa de QUALQUER perna (ida ou volta) em alguma ' +
+      'rota do aluno — diferente de GET /trips/active, cuja branch STUDENT devolve só a viagem de retorno ' +
+      '(semântica do "Não vou voltar"). A autorização é a própria query: aluno fora de rota ou sem viagem ativa ' +
+      'recebe { data: null }, nunca 403 de negócio. Sem viagem, o cliente repete a consulta; quando o motorista ' +
+      'inicia a viagem, a tela se reengaja sozinha.',
+  })
+  @ApiExtraModels(ActiveTrackingTripDto)
+  @ApiResponse({
+    status: 200,
+    description:
+      'Envelope { data, meta } com data null (sem viagem ativa na rota do aluno) ou { tripId, type }.',
+    schema: {
+      properties: {
+        data: {
+          allOf: [{ $ref: getSchemaPath(ActiveTrackingTripDto) }],
+          nullable: true,
+        },
+        meta: {
+          type: 'object',
+          properties: { timestamp: { type: 'string', format: 'date-time' } },
+        },
+      },
+      required: ['data', 'meta'],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno (sem viagem é { data: null }, não 403).',
+    type: ErrorResponseDto,
+  })
+  async activeTrackingTrip(
+    @TenantId() companyId: string,
+    @Req() req: Request & { user: { userId: string } },
+  ) {
+    // O aluno vem do token — a viagem é sempre a da rota DELE (mesmo padrão
+    // dos outros endpoints de tracking/boarding).
+    return this.trackingService.getActiveTrackingTrip({
+      studentId: req.user.userId,
+      companyId,
     });
   }
 
@@ -186,7 +245,11 @@ export class TrackingController {
     });
   }
 
-  @Get('trips/:id/stream')
+  // O 400/403/409 de autorização sai do TrackingStreamGuard, ANTES do stream:
+  // erro de guard alcança o exception filter; erro dentro de handler @Sse viria
+  // HTTP 200 `event: error` (a exceção é engolida pelo stream).
+  @Sse('trips/:id/stream')
+  @UseGuards(TrackingStreamGuard)
   @ApiOperation({
     summary: 'Stream SSE do acompanhamento do ônibus em tempo real',
     description:
@@ -243,10 +306,12 @@ export class TrackingController {
       'NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.2.',
     type: ErrorResponseDto,
   })
-  tripLocationStream() {
-    throw new NotImplementedException({
-      code: 'NOT_IMPLEMENTED',
-      message: 'Contrato declarado na Story 5.0 — implementação na Story 5.2',
-    });
+  tripLocationStream(
+    @Req()
+    req: Request & { user: { userId: string }; trackingTripId: string },
+  ): Observable<MessageEvent> {
+    // O tripId validado/anexado pelo guard (não revalidado aqui): alunos da
+    // mesma viagem compartilham o mesmo subscribe Redis no serviço de eventos.
+    return this.trackingEventsService.stream(req.trackingTripId);
   }
 }

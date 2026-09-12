@@ -3,11 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'node:crypto';
+import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from '../src/domains/shared/shell/infra/prisma.service.js';
 import { RedisService } from '../src/domains/shared/shell/infra/redis.service.js';
 import type { Redis } from 'ioredis';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 
 interface ApiResponse {
   data?: Record<string, unknown>;
@@ -43,11 +44,13 @@ const nextMessage = (subscriber: Redis): Promise<StreamMessage> =>
   });
 
 // Story 5.0 locked the roles matrix of the three endpoints as 501 stubs.
-// Story 5.1 wires POST /location and GET /trips/:id/location to the real core
-// (Effect use cases + Redis behind LocationBus) — this spec now locks the I/O
-// matrix of the 5.1 slice. The stream REMAINS a 501 stub: flipping it to @Sse
-// is Story 5.2, and losing it here would silently authorize the wrong side.
-describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => {
+// Story 5.1 wired POST /location and GET /trips/:id/location to the real core
+// (Effect use cases + Redis behind LocationBus) — this spec locks the I/O
+// matrix of the 5.1 slice. Story 5.2 flips the stream to a real @Sse and adds
+// GET /trips/active: the 501 lock is replaced by the stream matrix (happy path
+// < 5s, 400/401/403/409 before any stream byte, two students on one subscribe,
+// trip-end graceful close + 409 on reconnect).
+describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known, stream e descoberta)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let redis: RedisService;
@@ -55,6 +58,7 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
   let driverToken: string;
   let otherDriverToken: string;
   let studentToken: string;
+  let secondStudentToken: string;
   let outsiderStudentToken: string;
   let routeId: string;
   let driverId: string;
@@ -92,6 +96,14 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
     password: 'senha12345',
   };
 
+  // Segundo aluno NA MESMA rota: prova que 2+ alunos da viagem compartilham
+  // um único subscribe Redis no serviço de eventos (Story 5.2).
+  const secondStudentData = {
+    name: 'Segundo Aluno E2E Tracking',
+    email: `student-second-tracking-${stamp}@escola.com`,
+    password: 'senha12345',
+  };
+
   const outsiderStudentData = {
     name: 'Aluno Fora da Rota E2E Tracking',
     email: `student-outsider-tracking-${stamp}@escola.com`,
@@ -120,9 +132,9 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
     return req;
   };
 
-  const stream = (token: string) =>
+  const stream = (token: string, tripId: string = randomUUID()) =>
     request(app.getHttpServer())
-      .get(`/api/v1/tracking/trips/${randomUUID()}/stream`)
+      .get(`/api/v1/tracking/trips/${tripId}/stream`)
       .set('Authorization', `Bearer ${token}`);
 
   const login = async (email: string, password: string) => {
@@ -144,13 +156,16 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
 
   // Viagem nova por teste: a posição fica no Redis por tripId, então reaproveitar
   // viagem cruzaria last-write-wins entre testes.
-  const seedActiveTrip = async (driver = driverId) => {
+  const seedActiveTrip = async (
+    driver = driverId,
+    type: 'OUTBOUND' | 'RETURN' = 'OUTBOUND',
+  ) => {
     const trip = await prisma.trip.create({
       data: {
         companyId,
         routeId,
         driverId: driver,
-        type: 'OUTBOUND',
+        type,
         status: 'ACTIVE',
       },
     });
@@ -179,6 +194,10 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
     driverId = await createUser('/api/v1/drivers', driverData);
     await createUser('/api/v1/drivers', otherDriverData);
     allowedStudentId = await createUser('/api/v1/students', allowedStudentData);
+    const secondStudentId = await createUser(
+      '/api/v1/students',
+      secondStudentData,
+    );
     // O id do aluno de fora não é consumido — só o token dele importa.
     await createUser('/api/v1/students', outsiderStudentData);
 
@@ -190,6 +209,10 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
     studentToken = await login(
       allowedStudentData.email,
       allowedStudentData.password,
+    );
+    secondStudentToken = await login(
+      secondStudentData.email,
+      secondStudentData.password,
     );
     // Token do aluno FORA da rota: prova que STUDENT_NOT_ON_TRIP é regra de
     // negócio (403 do core), não isolamento de tenant disfarçado.
@@ -213,6 +236,12 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
       .post(`/api/v1/routes/${routeId}/students`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ studentId: allowedStudentId })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/routes/${routeId}/students`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ studentId: secondStudentId })
       .expect(201);
 
     await request(app.getHttpServer())
@@ -262,6 +291,20 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
       },
     });
     otherCompanyTripId = otherTrip.id;
+
+    // O supertest fecha o server após o end() de cada request que ele próprio
+    // bindou (serverAddress → app.listen(0) quando não há porta; end() →
+    // server.close()). Com um stream SSE aberto, o close() pendura esperando a
+    // conexão e requests seguintes não conectam. Bind explícito uma vez: os
+    // Test passam a reusar a porta e nunca anexam o _server que fecha o app.
+    const server = app.getHttpServer() as HttpServer;
+    if (!server.listening) {
+      await new Promise<void>((resolve, reject) => {
+        server.once('listening', () => resolve());
+        server.once('error', reject);
+        server.listen(0);
+      });
+    }
   });
 
   afterAll(async () => {
@@ -273,7 +316,7 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
   });
 
   describe('Matriz de roles (congelada na 5.0)', () => {
-    it('sem token, os 3 endpoints dão 401', async () => {
+    it('sem token, os 4 endpoints dão 401', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/tracking/location')
         .send(validBody(randomUUID()))
@@ -281,6 +324,9 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
       await lastKnown(null).expect(401);
       await request(app.getHttpServer())
         .get(`/api/v1/tracking/trips/${randomUUID()}/stream`)
+        .expect(401);
+      await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
         .expect(401);
     });
 
@@ -300,13 +346,6 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
     it('DRIVER no stream dá 403 — o acompanhamento é do aluno', async () => {
       const response = await stream(driverToken).expect(403);
       expect((response.body as ApiResponse).error?.code).toBe('FORBIDDEN');
-    });
-
-    it('o stream permanece 501 NOT_IMPLEMENTED (Story 5.2) mesmo com role correta', async () => {
-      const response = await stream(studentToken).expect(501);
-      expect((response.body as ApiResponse).error?.code).toBe(
-        'NOT_IMPLEMENTED',
-      );
     });
   });
 
@@ -619,6 +658,338 @@ describe('TrackingController (e2e) — Story 5.1 ingestão e last-known', () => 
       expect((response.body as ApiResponse).error?.code).toBe(
         'VALIDATION_ERROR',
       );
+    });
+  });
+
+  // ---- Helpers de stream SSE (espelho do boarding.e2e-spec, com tripId da
+  // URL: no tracking o guard valida o id do path, não resolve a viagem
+  // server-side). ----
+  interface StreamEvent {
+    event: string;
+    data: Record<string, unknown>;
+  }
+
+  interface StreamHandle {
+    ready: Promise<void>;
+    status: () => number | undefined;
+    headers: () => Record<string, unknown>;
+    messages: StreamEvent[];
+    firstMessage: Promise<StreamEvent>;
+    closed: Promise<void>;
+    abort: () => void;
+  }
+
+  // O Response do superagent não resolve tipos sob o eslint-type-checked —
+  // o shape mínimo que o teste usa vem daqui.
+  const responseOf = (
+    r: unknown,
+  ): {
+    statusCode?: number;
+    headers?: Record<string, unknown>;
+    on: (event: string, listener: () => void) => unknown;
+  } =>
+    (
+      r as {
+        response: {
+          statusCode?: number;
+          headers?: Record<string, unknown>;
+          on: (event: string, listener: () => void) => unknown;
+        };
+      }
+    ).response;
+
+  const openStream = (token: string, tripId: string): StreamHandle => {
+    const messages: StreamEvent[] = [];
+    let resolveReady!: () => void;
+    let resolveFirst: (message: StreamEvent) => void = () => {};
+    let resolveClosed: () => void = () => {};
+    const ready = new Promise<void>((resolve) => {
+      resolveReady = resolve;
+    });
+    const firstMessage = new Promise<StreamEvent>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const closed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
+    });
+
+    const req = request(app.getHttpServer())
+      .get(`/api/v1/tracking/trips/${tripId}/stream`)
+      .set('Authorization', `Bearer ${token}`)
+      // Streaming sem buffer: o superagent não resolve a promessa do request
+      // em respostas não terminadas — `ready`, `firstMessage` e `closed`
+      // são resolvidos pelos eventos do parser.
+      .buffer(false)
+      .parse((res: IncomingMessage) => {
+        resolveReady();
+        res.on('error', () => resolveClosed());
+        res.on('end', () => resolveClosed());
+        res.on('close', () => resolveClosed());
+        let raw = '';
+        res.on('data', (chunk: Buffer) => {
+          raw += chunk.toString();
+          let boundary = raw.indexOf('\n\n');
+          while (boundary >= 0) {
+            const block = raw.slice(0, boundary);
+            raw = raw.slice(boundary + 2);
+            boundary = raw.indexOf('\n\n');
+            const lines = block.split('\n');
+            const eventLine = lines.find((line) => line.startsWith('event:'));
+            const dataLine = lines.find((line) => line.startsWith('data:'));
+            if (!eventLine) continue;
+            // Frames sem payload (heartbeat `data: ` vazio) não passam por
+            // JSON.parse — só os eventos de contrato carregam JSON.
+            const rawData = dataLine
+              ? dataLine.slice('data:'.length).trim()
+              : '';
+            const message: StreamEvent = {
+              event: eventLine.slice('event:'.length).trim(),
+              data: rawData
+                ? (JSON.parse(rawData) as Record<string, unknown>)
+                : {},
+            };
+            messages.push(message);
+            resolveFirst(message);
+          }
+        });
+      });
+
+    // O request fica pendente até o abort; sem isso o worker quebra com
+    // unhandled rejection ('Aborted') quando o teste encerra a conexão.
+    void Promise.resolve(req).catch(() => undefined);
+
+    return {
+      // Parser anexado ⇒ headers do stream chegaram ⇒ guard passou e o Nest
+      // já subscreveu o canal Redis (subscrição síncrona, mesmo tick do pipe).
+      ready: ready.then(() => {
+        // O Response do superagent reemite o ECONNRESET do socket no abort —
+        // sem listener vira uncaught exception e derruba o worker do vitest.
+        responseOf(req).on('error', () => resolveClosed());
+      }),
+      headers: () => responseOf(req).headers ?? {},
+      status: () => responseOf(req).statusCode,
+      messages,
+      firstMessage,
+      closed,
+      abort: () => {
+        try {
+          req.abort();
+        } catch {
+          // Stream já fechado — nada a abortar.
+        }
+      },
+    };
+  };
+
+  describe('GET /api/v1/tracking/trips/:id/stream — SSE real (Story 5.2)', () => {
+    it('stream feliz: location.updated com o schema do contrato em < 5s (NFR2)', async () => {
+      const tripId = await seedActiveTrip();
+      const handle = openStream(studentToken, tripId);
+      await handle.ready;
+
+      expect(handle.status()).toBe(200);
+      expect(String(handle.headers()['content-type'])).toMatch(
+        /^text\/event-stream/,
+      );
+
+      const start = Date.now();
+      const response = await ingest(driverToken, validBody(tripId)).expect(200);
+      const first = await handle.firstMessage;
+      const elapsed = Date.now() - start;
+
+      expect(elapsed).toBeLessThan(5000);
+      expect(first.event).toBe('location.updated');
+      expect(first.data).toEqual({
+        tripId,
+        latitude: -20.755549,
+        longitude: -42.881728,
+        accuracy: 12.5,
+        // Verbatim do envelope publicado pela 5.1: o timestamp do evento é o
+        // MESMO instante do receivedAt do ack.
+        timestamp: (response.body as ApiResponse).data!.receivedAt,
+      });
+
+      handle.abort();
+    });
+
+    it('2 alunos na mesma viagem recebem o mesmo evento servidos por UM subscribe Redis', async () => {
+      const tripId = await seedActiveTrip();
+      const handle1 = openStream(studentToken, tripId);
+      const handle2 = openStream(secondStudentToken, tripId);
+      await Promise.all([handle1.ready, handle2.ready]);
+
+      await ingest(driverToken, validBody(tripId)).expect(200);
+      const [toFirst, toSecond] = await Promise.all([
+        handle1.firstMessage,
+        handle2.firstMessage,
+      ]);
+
+      expect(toFirst).toEqual(toSecond);
+
+      // A prova do compartilhamento: PUBSUB NUMSUB é server-wide — 1 significa
+      // que as duas conexões SSE dividem o subscribe dedicado do serviço, e
+      // não há um subscriber Redis por aluno.
+      const numsub = (await redis.pubsub(
+        'NUMSUB',
+        `tracking:trip:${tripId}`,
+      )) as (string | number)[];
+      expect(numsub).toEqual([`tracking:trip:${tripId}`, 1]);
+
+      handle1.abort();
+      handle2.abort();
+    });
+
+    it('id não-UUID: 400 VALIDATION_ERROR no envelope, nunca byte de stream', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/not-a-uuid/stream')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(400);
+
+      const body = response.body as ApiResponse;
+      expect(body.error?.code).toBe('VALIDATION_ERROR');
+      expect(body).not.toHaveProperty('data');
+      expect(body).not.toHaveProperty('meta');
+    });
+
+    it('viagem inexistente, encerrada ou de outra empresa: 409 TRIP_NOT_ACTIVE', async () => {
+      const nonexistent = await stream(
+        studentToken,
+        '00000000-0000-4000-8000-000000000000',
+      ).expect(409);
+      expect((nonexistent.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+
+      const completed = await stream(studentToken, completedTripId).expect(409);
+      expect((completed.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+
+      const otherCompany = await stream(
+        studentToken,
+        otherCompanyTripId,
+      ).expect(409);
+      expect((otherCompany.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+    });
+
+    it('aluno fora da rota: 403 STUDENT_NOT_ON_TRIP mesmo com viagem ativa', async () => {
+      const tripId = await seedActiveTrip();
+
+      const response = await stream(outsiderStudentToken, tripId).expect(403);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'STUDENT_NOT_ON_TRIP',
+      );
+    });
+
+    it('ordem do guard: viagem inativa vence aluno fora da rota ⇒ 409 TRIP_NOT_ACTIVE', async () => {
+      const response = await stream(
+        outsiderStudentToken,
+        completedTripId,
+      ).expect(409);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+    });
+
+    it('end-trip com stream aberto: o stream completa, a transmissão cessa e a reconexão recebe 409', async () => {
+      const tripId = await seedActiveTrip();
+      const handle = openStream(studentToken, tripId);
+      await handle.ready;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/trips/${tripId}/end`)
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(200);
+
+      // Sinal terminal do trip.ended completa o stream (response.end()) —
+      // sem abort(): a resposta já terminou e abortar aqui destruiria o
+      // socket keep-alive com um ECONNRESET órfão.
+      await handle.closed;
+
+      // A captura é amarrada ao ciclo da viagem: encerrada, o POST do
+      // motorista é rejeitado.
+      const latePost = await ingest(driverToken, validBody(tripId)).expect(409);
+      expect((latePost.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+
+      // Reconexão pós-fim: guard responde 409 — o cliente para de reconectar.
+      const response = await stream(studentToken, tripId).expect(409);
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'TRIP_NOT_ACTIVE',
+      );
+    });
+  });
+
+  describe('GET /api/v1/tracking/trips/active — descoberta da viagem (Story 5.2)', () => {
+    // Sobras de viagens ACTIVE dos describes anteriores poluem a descoberta
+    // (qualquer ativa na rota do aluno vence): zerar antes de cada caso.
+    beforeEach(async () => {
+      await prisma.trip.updateMany({
+        where: { routeId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED' },
+      });
+    });
+
+    it('sem viagem ativa: 200 { data: null } com envelope de sucesso', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      const body = response.body as ApiResponse;
+      expect(body.data).toBeNull();
+      expect(body.meta).toHaveProperty('timestamp');
+    });
+
+    it('viagem OUTBOUND ativa na rota: { data: { tripId, type: "OUTBOUND" } }', async () => {
+      const tripId = await seedActiveTrip();
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toEqual({
+        tripId,
+        type: 'OUTBOUND',
+      });
+    });
+
+    it('viagem RETURN ativa na rota: { data: { tripId, type: "RETURN" } } — qualquer perna', async () => {
+      const tripId = await seedActiveTrip(driverId, 'RETURN');
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toEqual({
+        tripId,
+        type: 'RETURN',
+      });
+    });
+
+    it('aluno fora de rota: { data: null } — autorização implícita da query, não 403', async () => {
+      await seedActiveTrip();
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${outsiderStudentToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toBeNull();
+    });
+
+    it('DRIVER: 403 FORBIDDEN — o endpoint é do aluno', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(403);
+
+      expect((response.body as ApiResponse).error?.code).toBe('FORBIDDEN');
     });
   });
 });

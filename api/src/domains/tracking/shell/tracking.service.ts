@@ -2,8 +2,10 @@ import { Injectable, Inject } from '@nestjs/common';
 import type { Clock, ManagedRuntime } from 'effect';
 import { ingestLocation } from '../core/use-cases/ingest-location.use-case.js';
 import { getLastKnownLocation } from '../core/use-cases/get-last-known-location.use-case.js';
+import { getActiveTrackingTrip } from '../core/use-cases/get-active-tracking-trip.use-case.js';
 import type { IngestLocationResult } from '../core/use-cases/ingest-location.use-case.js';
 import type { LastKnownLocation } from '../core/use-cases/get-last-known-location.use-case.js';
+import type { ActiveTrackingTrip } from '../core/use-cases/get-active-tracking-trip.use-case.js';
 import type { LocationIngestInput } from '../core/schemas/location-ingest.schema.js';
 import { TripAccess } from '../core/ports/trip-access.port.js';
 import { LocationBus } from '../core/ports/location-bus.port.js';
@@ -39,5 +41,12 @@ export class TrackingService {
     studentId: string;
   }): Promise<LastKnownLocation> {
     return this.runtime.runPromise(getLastKnownLocation(input));
+  }
+
+  getActiveTrackingTrip(input: {
+    studentId: string;
+    companyId: string;
+  }): Promise<ActiveTrackingTrip | null> {
+    return this.runtime.runPromise(getActiveTrackingTrip(input));
   }
 }

@@ -9,12 +9,27 @@ export interface ActiveTripView {
   driverId: string;
 }
 
+// Descoberta da viagem a acompanhar (GET /tracking/trips/active, 5.2): só o
+// que a resposta carrega — a posição da perna vem do próprio tripId depois.
+export interface ActiveTrackingTripView {
+  tripId: string;
+  type: 'OUTBOUND' | 'RETURN';
+}
+
 export interface TripAccessApi {
   // null quando: não existe | outra empresa | status != ACTIVE
   findActiveTrip(
     tripId: string,
     companyId: string,
   ): Effect.Effect<ActiveTripView | null>;
+
+  // Viagem ativa de QUALQUER perna em alguma rota do aluno (a branch STUDENT
+  // de GET /trips/active é só retorno — não serve para o acompanhamento).
+  // null quando: aluno sem rota na empresa | nenhuma viagem ativa nelas.
+  findActiveTripForStudent(
+    studentId: string,
+    companyId: string,
+  ): Effect.Effect<ActiveTrackingTripView | null>;
 
   // true somente se: user existe, role STUDENT, isActive, mesma company e
   // vinculado à rota via RouteStudent — duas queries, sem JOIN cross-schema
