@@ -29,8 +29,9 @@ export class PrismaTripAccessAdapter implements TripAccessApi {
     );
   }
 
-  // Duas queries, sem JOIN cross-schema (tracking lê routing.route_students e
-  // trip.trips diretamente — mesmo padrão do isStudentOnRoute abaixo).
+  // Três queries, sem JOIN cross-schema (tracking lê auth.users,
+  // routing.route_students e trip.trips diretamente — mesmo padrão do
+  // isStudentOnRoute abaixo).
   findActiveTripForStudent(
     studentId: string,
     companyId: string,
@@ -39,6 +40,21 @@ export class PrismaTripAccessAdapter implements TripAccessApi {
     return pipe(
       Effect.tryPromise({
         try: async () => {
+          // Mesma regra do isStudentOnRoute: aluno desativado não acompanha.
+          // Sem este filtro, a descoberta devolveria viagem a quem o stream e
+          // o last-known negam com 403 — 200 numa ponta, escada de reconexão
+          // infinita na outra (R7).
+          const student = await prisma.user.findFirst({
+            where: {
+              id: studentId,
+              companyId,
+              role: 'STUDENT',
+              isActive: true,
+            },
+            select: { id: true },
+          });
+          if (!student) return null;
+
           const links = await prisma.routeStudent.findMany({
             where: { studentId, companyId },
             select: { routeId: true },
