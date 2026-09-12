@@ -387,3 +387,19 @@ comparativa em vez de afirmação de viabilidade sem controle.
     com GPS sem fix (spoofing desligado) observando se a captura para após o primeiro
     tick, ou ler o source do expo-location quanto a timeout default; se confirmado,
     cercar o `getLocation` do hook com `Promise.race` + rejectAfter (~10s) e teste.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-2-acompanhamento-do-onibus-em-tempo-real.md`
+  summary: Resolver a divergência entre AGENTS.md ("comentários de código em inglês") e a
+    prática repo-wide (comentários em português em boarding, tracking, e2e specs).
+  evidence: Achado low (BH-12) da review da 5.2 — os comentários novos seguem a prática
+    existente do repositório; alinhar exige editar o AGENTS.md (arquivo de contexto de
+    agente), rota defer por regra.
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-2-acompanhamento-do-onibus-em-tempo-real.md`
+  summary: Reentrância do handleError do cliente SSE (mobile tracking-stream e boarding
+    events): um segundo evento 'error' durante o await do refresh/reconnect poderia abrir
+    duas conexões (ECH-4).
+  evidence: maybe-false, não verificado — dependeria do comportamento do react-native-sse
+    após close() (se emite segundo 'error' pós-abort). Se real, medium (conexões órfãs
+    duplicando handlers); boarding tem o mesmo shape desde a 4.2. Assentaria: ler o source
+    da lib quanto a emissão pós-close e instrumentar o cliente com duas dispatches
+    encadeadas num teste.
