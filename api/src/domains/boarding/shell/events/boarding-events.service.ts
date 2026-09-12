@@ -165,17 +165,30 @@ export class BoardingEventsService implements OnModuleDestroy {
     const entry = this.channels.get(channel);
     if (!entry) return;
 
-    let parsed: { type: string; data?: unknown };
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(message) as { type: string; data?: unknown };
+      parsed = JSON.parse(message);
     } catch {
-      // Mensagem malformada num canal ativo não pode derrubar o processo
-      // (uncaught exception no listener 'message' do ioredis): descarta.
+      // JSON sintaticamente quebrado num canal ativo não pode derrubar o
+      // processo (uncaught exception no listener 'message' do ioredis).
       this.logger.warn(`Malformed message on ${channel} — dropped`);
       return;
     }
 
-    if (parsed.type === TRIP_ENDED_SIGNAL) {
+    // JSON.parse de null/array/string NÃO lança: sem este guard, o acesso a
+    // `parsed.type` explode dentro do listener do ioredis — o mesmo modo de
+    // falha do catch acima, numa forma que ele não cobre.
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      typeof (parsed as { type?: unknown }).type !== 'string'
+    ) {
+      this.logger.warn(`Malformed message on ${channel} — dropped`);
+      return;
+    }
+    const envelope = parsed as { type: string; data?: unknown };
+
+    if (envelope.type === TRIP_ENDED_SIGNAL) {
       // Fora do mapa ANTES do complete: nenhuma mensagem nova entra num
       // subject em processo de encerramento.
       this.channels.delete(channel);
@@ -190,8 +203,8 @@ export class BoardingEventsService implements OnModuleDestroy {
     }
 
     entry.subject.next({
-      type: parsed.type,
-      data: JSON.stringify(parsed.data),
+      type: envelope.type,
+      data: JSON.stringify(envelope.data),
     });
   }
 }
