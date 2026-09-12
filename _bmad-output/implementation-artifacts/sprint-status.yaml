@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "12-09-2026 17:05"
+last_updated: "12-09-2026 17:33"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -216,7 +216,14 @@ development_status:
   # distância/ETA ao ponto do aluno — elimina a dependência de biblioteca de mapas com
   # suporte web (nunca escolhida) e preserva SSE + Redis Pub/Sub. A antiga 5-3b
   # (comportamento degradado) foi incorporada à 5-2.
-  epic-5: in-progress
+  # FECHADO em 12/09/2026: todas as 4 stories done e a retro rodada no mesmo dia
+  # (veredito accepted-with-open-items — epic-5-retro-2026-09-12.md). Marco do épico
+  # provado ao vivo no gate completo: SSE + Redis Pub/Sub ponta a ponta pela UI contra
+  # a API real, NFR2 a 25ms (budget 5000ms). Os 7 achados da retro viraram os action
+  # items 14-20, roteados para os specs de wrap pós-MVP (spec-wrap-1 a spec-wrap-5).
+  # Fase 1 (Épicos 1-5) funcionalmente completa; restam os action items abertos e a
+  # Story 1.7 (validação em device) para a defesa.
+  epic-5: done
   # FECHADA pelo merge do PR #34 em 12/09/2026 — contrato de tracking declarado
   # (3 endpoints stub 501 + 4 DTOs com Swagger completo), e2e de roles/status 4/4,
   # drift check do openapi verde e types do mobile regenerados.
@@ -224,7 +231,7 @@ development_status:
   5-1-ingestao-e-transmissao-de-gps: done
   5-2-acompanhamento-do-onibus-em-tempo-real: done
   5-3-e2e-do-epico-5: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
 action_items:
   - id: "epic-3-retro-item-1-ci-gate"
@@ -365,3 +372,63 @@ action_items:
     # spec de tracking crescer junto.
     status: open
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
+  - id: "epic-5-retro-item-14-implementar-o-resync-que-o-contrato-prom"
+    epic: 5
+    action: "Implementar o resync que o contrato promete: refazer o last-known no
+      banner Atualizar e no onOpen do stream, com guarda monotônica de capturedAt
+      (só aplicar ponto mais novo); corrigir os comentários de track-bus.tsx que descrevem
+      a reconciliação inexistente"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+  - id: "epic-5-retro-item-15-guard-de-tipo-no-handlemessage-das-2-cop"
+    epic: 5
+    action: "Guard de tipo no handleMessage das 2 copias (tracking-events.service
+      e boarding-events.service): rejeitar mensagem não-objeto antes de parsed.type
+      - hoje JSON.parse de null derruba o processo no listener do ioredis"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+  - id: "epic-5-retro-item-16-classificar-falha-de-envio-no-hook-de-ca"
+    epic: 5
+    action: "Classificar falha de envio no hook de captura GPS: 409/403 determinísticos
+      param a captura e invalidam activeTrip; log de aviso nas falhas (falha transitória
+      mantém a cadência, como congelado na 5.1)"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+  - id: "epic-5-retro-item-17-bateria-de-testes-das-fronteiras-do-épic"
+    epic: 5
+    action: "Bateria de testes das fronteiras do épico 5: (a) e2e da descoberta com
+      OUTBOUND+RETURN ativas (tie-break startedAt desc, id desc); (b) teste do corpo
+      do hook de captura com permissão negada => 0 POSTs (NFR10); (c) clause accuracy
+      -5 => 400; (d) pin determinístico de que ping não alimenta o markSignal"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+  - id: "epic-5-retro-item-18-reconciliação-de-contrato-documento-rege"
+    epic: 5
+    action: "Reconciliação de contrato-documento (regenerar openapi.json + tipos no
+      mesmo PR): descrição do LastKnownLocationDto (staleness por chegada, não por
+      idade do capturedAt) e capturedAt com até 3 casas fracionárias (ou ampliar o
+      pattern)"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+  - id: "epic-5-retro-item-19-dívida-de-forma-extrair-broadcaster-sse"
+    epic: 5
+    action: "Dívida de forma: extrair broadcaster SSE compartilhado em shared/shell
+      (4 copias: tracking/boarding services API + 2 clientes mobile) e fatiar tracking.e2e-spec.ts
+      (995 linhas) junto do boarding.e2e-spec.ts (1753, restante do item 13 da retro
+      4)"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+  - id: "epic-5-retro-item-20-baratas-de-1-linha-nan-guard-no-formatcl"
+    epic: 5
+    action: "Baratas de 1 linha: NaN guard no formatClock de track-bus.tsx; pollingInterval
+      explícito no cliente SSE (hoje depende do default 5000 da lib); isActive do
+      aluno também na descoberta (findActiveTripForStudent)"
+    owner: "Dev"
+    status: open
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
