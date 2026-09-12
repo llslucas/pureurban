@@ -43,23 +43,25 @@ export class PrismaTripAccessAdapter implements TripAccessApi {
           // Mesma regra do isStudentOnRoute: aluno desativado não acompanha.
           // Sem este filtro, a descoberta devolveria viagem a quem o stream e
           // o last-known negam com 403 — 200 numa ponta, escada de reconexão
-          // infinita na outra (R7).
-          const student = await prisma.user.findFirst({
-            where: {
-              id: studentId,
-              companyId,
-              role: 'STUDENT',
-              isActive: true,
-            },
-            select: { id: true },
-          });
-          if (!student) return null;
-
-          const links = await prisma.routeStudent.findMany({
-            where: { studentId, companyId },
-            select: { routeId: true },
-          });
-          if (links.length === 0) return null;
+          // infinita na outra (R7). Aluno e links são independentes: em
+          // paralelo, como no isStudentOnRoute (a descoberta é o endpoint que
+          // o aluno repete a cada ~10s enquanto não há viagem).
+          const [student, links] = await Promise.all([
+            prisma.user.findFirst({
+              where: {
+                id: studentId,
+                companyId,
+                role: 'STUDENT',
+                isActive: true,
+              },
+              select: { id: true },
+            }),
+            prisma.routeStudent.findMany({
+              where: { studentId, companyId },
+              select: { routeId: true },
+            }),
+          ]);
+          if (!student || links.length === 0) return null;
 
           const trip = await prisma.trip.findFirst({
             // Mais recente vence: duas ativas na mesma rota acontecem no fluxo

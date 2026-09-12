@@ -76,7 +76,7 @@ export function useTripGpsCapture(
             void queryClient.invalidateQueries({ queryKey: activeTripKey })
           }
           // Transmissão morta em silêncio era o achado R3: toda falha loga.
-          console.warn('[gps-capture] falha ao transmitir posição:', error)
+          console.warn('[gps-capture] falha de captura/transmissão:', error)
           return deterministic ? 'fatal' : 'transient'
         },
       }),

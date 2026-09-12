@@ -146,7 +146,7 @@ export class TrackingEventsService implements OnModuleDestroy {
       parsed === null ||
       typeof (parsed as { type?: unknown }).type !== 'string'
     ) {
-      this.logger.warn(`Malformed message on ${channel} — dropped`);
+      this.logger.warn(`Non-object message on ${channel} — dropped`);
       return;
     }
     const envelope = parsed as { type: string; data?: unknown };

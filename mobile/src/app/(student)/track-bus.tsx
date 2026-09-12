@@ -75,11 +75,12 @@ export default function TrackBusScreen() {
 
   // Estado inicial: último ponto conhecido. 404 NO_LOCATION_AVAILABLE vira
   // null na query — "aguardando a primeira posição", não erro. A desestruturação
-  // NÃO é estilo: o acesso a `.data` no render é o que a torna uma propriedade
-  // rastreada pelo react-query — lida só no effect abaixo, o refetch do resync
-  // atualizava o cache sem re-renderizar a tela.
+  // NÃO é estilo: o acesso a `.data`/`.dataUpdatedAt` no render é o que os torna
+  // propriedades rastreadas pelo react-query — lidos só no effect abaixo, o
+  // refetch do resync atualizava o cache sem re-renderizar a tela.
   const {
     data: lastKnownPoint,
+    dataUpdatedAt: lastKnownUpdatedAt,
     isError: lastKnownError,
   } = useQuery(lastKnownLocationOptions(tripId ?? undefined))
 
@@ -127,8 +128,21 @@ export default function TrackBusScreen() {
   // reabertura do stream, banner "Atualizar") passa pela guarda monotônica —
   // é o resync que o contrato 5.0 promete para a recuperação pós-queda, sem
   // regredir a posição para um ponto mais velho que o último evento.
+  //
+  // Cada RESPOSTA é avaliada UMA vez (o dataUpdatedAt muda a cada fetch): sem
+  // isso o ponto cacheado seria reavaliado a cada atualização do stream e,
+  // com o relógio do motorista adiantado (capturedAt é eco do device; o
+  // timestamp do evento é hora do SERVIDOR), desfaria o ponto fresco em um
+  // vai-e-vem. A comparação de capturedAt entre fontes tem esse limite de
+  // domínio de relógio — o fix de contrato (servidor carimbar o last-known)
+  // pertence ao wrap-3.
+  const appliedResyncRef = React.useRef(0)
   React.useEffect(() => {
     if (!lastKnownPoint) return
+    if (lastKnownUpdatedAt === 0 || appliedResyncRef.current === lastKnownUpdatedAt) {
+      return
+    }
+    appliedResyncRef.current = lastKnownUpdatedAt
     if (!isStrictlyNewer(lastKnownPoint.capturedAt, bus?.at ?? null)) return
     setBus({
       latitude: lastKnownPoint.latitude,
@@ -139,7 +153,7 @@ export default function TrackBusScreen() {
     // Aplicar ponto é chegada de posição: o MESMO timer de 15s do degradado
     // corre a partir daqui, mesmo que nenhum evento do stream chegue.
     markSignal()
-  }, [lastKnownPoint, bus, markSignal])
+  }, [lastKnownPoint, lastKnownUpdatedAt, bus, markSignal])
 
   // ---- Canal SSE (um cliente por viagem; fecha no 409 de fim de viagem) ----
   // Época do stream: o banner "Atualizar" precisa reabrir a conexão morta,

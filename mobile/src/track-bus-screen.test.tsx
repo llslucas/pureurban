@@ -433,5 +433,56 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     expect(await screen.findByText(/Posição de --:--:--/)).toBeTruthy()
     expect(screen.queryByText(/NaN/)).toBeNull()
   })
-})
 
+  it('ponto REST já aplicado NÃO é reavaliado a cada evento do stream (anti-flap, R3-review)', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    // Resync aplica o ponto REST (12:00:30).
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: -20.761,
+      longitude: -42.889,
+      accuracy: 9,
+      capturedAt: '2026-09-12T12:00:30.000Z',
+    })
+    act(() => mockStreamHandlers!.onUnrecoverable?.())
+    fireEvent.press(await screen.findByText('Atualizar'))
+    expect(await screen.findByText(/-20\.76100, -42\.88900/)).toBeTruthy()
+
+    // Evento do stream com timestamp "mais velho" que o capturedAt do device
+    // (relógios diferentes): o ponto VIVO é aplicado direto...
+    dispatchLocation({ timestamp: '2026-09-12T12:00:20.000Z' })
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // ...e o ponto REST consumido não volta: a resposta foi avaliada uma vez.
+    act(() => jest.advanceTimersByTime(20_000))
+    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByText(/-20\.76100/)).toBeNull()
+  })
+
+  it('resync com capturedAt inválido não desloca o ponto vivo do stream', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    dispatchLocation({ timestamp: '2026-09-12T12:00:05.000Z' })
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // capturedAt inválido não é comparável: não pode deslocar ponto nenhum.
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: -10.0,
+      longitude: -10.0,
+      accuracy: 1,
+      capturedAt: '2026-13-45T25:99:99Z',
+    })
+    act(() => mockStreamHandlers!.onUnrecoverable?.())
+    fireEvent.press(await screen.findByText('Atualizar'))
+
+    await waitFor(() =>
+      expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
+    )
+    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByText(/-10\.00000/)).toBeNull()
+  })
+})

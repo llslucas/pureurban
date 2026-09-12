@@ -999,9 +999,9 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(204);
 
-      // Os 3 endpoints concordam: a descoberta nega com { data: null }, do
-      // mesmo jeito que last-known nega com 403 STUDENT_NOT_ON_TRIP
-      // (isStudentOnRoute já exigia isActive).
+      // Os 3 endpoints concordam: a descoberta nega com { data: null }, o
+      // last-known nega com 403 STUDENT_NOT_ON_TRIP (isStudentOnRoute já
+      // exigia isActive) e o stream nega com o mesmo 403 no guard.
       const after = await request(app.getHttpServer())
         .get('/api/v1/tracking/trips/active')
         .set('Authorization', `Bearer ${secondStudentToken}`)
@@ -1013,6 +1013,14 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
         .set('Authorization', `Bearer ${secondStudentToken}`)
         .expect(403);
       expect((lastKnownRes.body as ApiResponse).error?.code).toBe(
+        'STUDENT_NOT_ON_TRIP',
+      );
+
+      const streamRes = await request(app.getHttpServer())
+        .get(`/api/v1/tracking/trips/${tripId}/stream`)
+        .set('Authorization', `Bearer ${secondStudentToken}`)
+        .expect(403);
+      expect((streamRes.body as ApiResponse).error?.code).toBe(
         'STUDENT_NOT_ON_TRIP',
       );
     });
