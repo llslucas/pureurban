@@ -254,6 +254,17 @@ export default function StudentHomeScreen() {
           Meu QR Code
         </Button>
 
+        {/* Acompanhamento em tempo real (Story 5.2): entrada ao lado do QR —
+            a viagem (ida ou volta) é descoberta dentro da tela. */}
+        <Button
+          mode="contained-tonal"
+          contentStyle={styles.buttonContent}
+          icon="bus-clock"
+          onPress={() => router.navigate('/(student)/track-bus')}
+        >
+          Acompanhar ônibus
+        </Button>
+
         {/* Reminder (4.4) between the QR and the absence branch: it answers
             with the EXACT 4.1 mutation — the banner only opens the existing
             dialog. It disappears when the absence is registered or the GET

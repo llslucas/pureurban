@@ -476,6 +476,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tracking/trips/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Viagem ativa na rota do aluno para acompanhamento em tempo real
+         * @description Descoberta da viagem a acompanhar (Story 5.2): a viagem ativa de QUALQUER perna (ida ou volta) em alguma rota do aluno — diferente de GET /trips/active, cuja branch STUDENT devolve só a viagem de retorno (semântica do "Não vou voltar"). A autorização é a própria query: aluno fora de rota ou sem viagem ativa recebe { data: null }, nunca 403 de negócio. Sem viagem, o cliente repete a consulta; quando o motorista inicia a viagem, a tela se reengaja sozinha.
+         */
+        get: operations["TrackingController_activeTrackingTrip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tracking/trips/{id}/location": {
         parameters: {
             query?: never;
@@ -852,6 +872,20 @@ export interface components {
              * @example 2026-09-11T12:00:00.000Z
              */
             capturedAt: string;
+        };
+        ActiveTrackingTripDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem ativa na rota do aluno — alimenta o stream e o last-known
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Perna da viagem ativa (ida ou volta) — o acompanhamento serve às duas
+             * @example OUTBOUND
+             * @enum {string}
+             */
+            type: "OUTBOUND" | "RETURN";
         };
         LastKnownLocationDto: {
             /**
@@ -2650,6 +2684,50 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TrackingController_activeTrackingTrip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Envelope { data, meta } com data null (sem viagem ativa na rota do aluno) ou { tripId, type }. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ActiveTrackingTripDto"] | null;
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN — role STUDENT exigida: o acompanhamento é do aluno (sem viagem é { data: null }, não 403). */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
