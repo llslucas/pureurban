@@ -234,6 +234,16 @@ development_status:
   epic-5-retrospective: done
 
 action_items:
+  # === Specs de execução do wrap pós-MVP (12/09/2026) — _bmad-output/implementation-artifacts/ ===
+  # Ordem recomendada: wrap-1 → wrap-2 → wrap-3 → wrap-4 → wrap-5.
+  #   spec-wrap-1 (correções de comportamento): itens 4, 7, 14, 15, 16, 20
+  #   spec-wrap-2 (bateria de testes das fronteiras): itens 6, 11, 17
+  #   spec-wrap-3 (reconciliação de contrato e documentos): itens 8, 18
+  #   spec-wrap-4 (dívida de forma — broadcaster SSE + specs e2e): itens 13, 19
+  #   spec-wrap-5 (desfecho da fila offline — GATED na matriz de decisão): item 3
+  # Um item só vira `done` quando o PR do spec correspondente mergear e a evidência
+  # estiver verificada (padrão das retro: evidência contra o HEAD, não contra o
+  # comentário).
   - id: "epic-3-retro-item-1-ci-gate"
     epic: 3
     action: "CI/script de gate minimo: unit + e2e + test:pw:api + test:pw:e2e (E2E_SERVERS_UP=1)
