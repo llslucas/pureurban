@@ -1,5 +1,6 @@
 import {
   connectTrackingEvents,
+  SSE_REPOLL_INTERVAL_MS,
   type TrackingStreamHandlers,
 } from '@/services/tracking-stream.service'
 
@@ -162,6 +163,15 @@ describe('TrackingEventsClient — conexão e reconexão (spec-5-2)', () => {
     connectTrackingEvents(TRIP_ID, makeHandlers())
 
     expect(lastInstance().options.headers).toEqual({})
+  })
+
+  it('declares pollingInterval explicitly — the re-poll after graceful close is not hostage to the lib default (AC8/R6)', () => {
+    connectTrackingEvents(TRIP_ID, makeHandlers())
+
+    expect(lastInstance().options.pollingInterval).toBe(
+      SSE_REPOLL_INTERVAL_MS,
+    )
+    expect(SSE_REPOLL_INTERVAL_MS).toBe(5_000)
   })
 
   it('location.updated forwards the parsed payload; ping and corrupt data are ignored', () => {
