@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TripScreen from '@/app/(driver)/trip'
 import { tripService, type Trip } from '@/services/trip.service'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
+import { useForegroundPermissions } from 'expo-location'
+import type { LocationPermissionResponse } from 'expo-location'
+import { useTripGpsCapture } from '@/hooks/use-trip-gps-capture'
 
 // Lives at src/ root, not src/app/: Expo Router turns every file under src/app/
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap and
@@ -35,8 +38,29 @@ jest.mock('@/services/routes.service', () => ({
   routesService: { getMyRoutes: jest.fn() },
 }))
 
+// A captura de GPS (Story 5.1) é mockada inteira: o comportamento de cadência
+// e gating vive nos testes de utils/gps-capture; aqui a tela só renderiza — e
+// sem o mock a cadeia tracking.service → api-client → MMKV carregaria nativos
+// que o jest-expo não tem.
+jest.mock('@/hooks/use-trip-gps-capture', () => ({
+  useTripGpsCapture: jest.fn(),
+}))
+
+// Mesmo tratamento do useCameraPermissions do scan (nunca exercitado sob
+// jest-expo): o hook de permissão da expo carrega módulos nativos e derruba a
+// árvore renderizada. Permissão concedida por padrão — o card não aparece.
+jest.mock('expo-location', () => ({
+  useForegroundPermissions: jest.fn(() => [
+    { granted: true, canAskAgain: true },
+    jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true })),
+    jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true })),
+  ]),
+  Accuracy: { Balanced: 3 },
+}))
+
 const mockTrip = jest.mocked(tripService)
 const mockRoutes = jest.mocked(routesService)
+const mockCapture = jest.mocked(useTripGpsCapture)
 
 const ROUTE_A: AssignedRoute = {
   id: '880e8400-e29b-41d4-a716-446655440200',
@@ -121,6 +145,9 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
     renderScreen()
 
     expect(await screen.findByText('Carregando rotas...')).toBeTruthy()
+    // Gate do GPS (Story 5.1): sem viagem ativa, a captura fica desligada
+    // mesmo com a permissão concedida.
+    expect(mockCapture).toHaveBeenCalledWith(null, true)
 
     // Settle the promise so it does not dangle past the test.
     resolveRoutes([ROUTE_A])
@@ -232,7 +259,8 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
 
 describe('TripScreen — active trip (spec-3-1)', () => {
   it('reflects the active trip and does NOT call /routes/mine', async () => {
-    mockTrip.getActiveTrip.mockResolvedValue(makeTrip())
+    const trip = makeTrip()
+    mockTrip.getActiveTrip.mockResolvedValue(trip)
     mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
 
     renderScreen()
@@ -240,6 +268,10 @@ describe('TripScreen — active trip (spec-3-1)', () => {
     expect(await screen.findByText('Escanear QR Code')).toBeTruthy()
     expect(screen.getByText('Encerrar Viagem')).toBeTruthy()
     expect(screen.getByText('Alunos da Viagem')).toBeTruthy()
+
+    // Gate do GPS (Story 5.1): viagem ACTIVE + permissão concedida ⇒ captura
+    // ligada com o id da viagem corrente.
+    expect(mockCapture).toHaveBeenCalledWith(trip.id, true)
 
     // Wait an extra tick to make sure the routes query never fires.
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalled())
@@ -289,5 +321,76 @@ describe('TripScreen — active trip (spec-3-1)', () => {
 
     const startButton = await screen.findByText('Iniciar Viagem')
     await waitFor(() => expect(startButton).not.toBeDisabled())
+
+    // Gate do GPS (Story 5.1): viagem encerrada ⇒ captura desligada (última
+    // chamada do hook, não qualquer chamada anterior da viagem ativa).
+    expect(mockCapture).toHaveBeenLastCalledWith(null, true)
+  })
+})
+
+describe('TripScreen — permissão de localização (Story 5.1)', () => {
+  // O screen só lê `granted` e `canAskAgain` da resposta real da expo.
+  const permission = (granted: boolean, canAskAgain: boolean) =>
+    ({ granted, canAskAgain }) as unknown as LocationPermissionResponse
+
+  const request = () => Promise.resolve(permission(true, true))
+
+  const mockPermissions = jest.mocked(useForegroundPermissions)
+
+  const setPermission = (granted: boolean, canAskAgain: boolean) =>
+    mockPermissions.mockReturnValue([
+      permission(granted, canAskAgain),
+      () => request(),
+      () => request(),
+    ])
+
+  beforeEach(() => {
+    // Default explícito: concedida (o clearAllMocks acima preserva
+    // mockReturnValue de testes anteriores — cada teste fixa o seu estado).
+    setPermission(true, true)
+  })
+
+  it('sem permissão e sem viagem: card de justificativa com botão "Permitir acesso" (visível antes da primeira viagem)', async () => {
+    setPermission(false, true)
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    expect(await screen.findByText('Permissão de localização')).toBeTruthy()
+    expect(screen.getByText('Permitir acesso à localização')).toBeTruthy()
+    expect(screen.queryByText('Abrir configurações')).toBeNull()
+  })
+
+  it('sem permissão e viagem ativa: card segue visível junto à viagem em curso', async () => {
+    setPermission(false, true)
+    mockTrip.getActiveTrip.mockResolvedValue(makeTrip())
+
+    renderScreen()
+
+    expect(await screen.findByText('Permissão de localização')).toBeTruthy()
+    expect(screen.getByText('Permitir acesso à localização')).toBeTruthy()
+    expect(screen.getByText('Encerrar Viagem')).toBeTruthy()
+    // Gate do GPS: viagem ativa mas permissão negada ⇒ captura desligada.
+    expect(mockCapture).toHaveBeenLastCalledWith('trip-outbound-1', false)
+  })
+
+  it('permissão negada permanente: o card manda para as configurações', async () => {
+    setPermission(false, false)
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    expect(await screen.findByText('Permissão de localização')).toBeTruthy()
+    expect(screen.getByText('Abrir configurações')).toBeTruthy()
+    expect(screen.queryByText('Permitir acesso à localização')).toBeNull()
+  })
+
+  it('permissão concedida: nenhum card', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    await screen.findByText('Gestão de Viagem')
+    expect(screen.queryByText('Permissão de localização')).toBeNull()
   })
 })

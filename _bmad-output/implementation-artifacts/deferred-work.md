@@ -375,3 +375,15 @@ comparativa em vez de afirmação de viabilidade sem controle.
     motorista. Decisão do Lucas (09/09/2026): registrar em deferred (não é story imediata).
     Fix é 1 linha na allowlist + deletar o shim; pedir verificação do preflight no
     `test:pw:e2e` sem o shim.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-1-ingestao-e-transmissao-de-gps.md`
+  summary: Verificar timeout de `Location.getCurrentPositionAsync` (eh-8): se a promise
+    puder nunca resolver (Geolocation API web sem fix, timeout default Infinity), o
+    `inFlight` do gps-capture fica preso e a transmissão morre em silêncio pelo resto da
+    viagem.
+  evidence: Achado maybe-false da review da 5.1 (edge-case-hunter), não verificado —
+    o comportamento real do expo-location quanto a timeout default não está decidido.
+    Se verdadeiro, medium (feature morre sem erro visível). Assentaria: rodar o app web
+    com GPS sem fix (spoofing desligado) observando se a captura para após o primeiro
+    tick, ou ler o source do expo-location quanto a timeout default; se confirmado,
+    cercar o `getLocation` do hook com `Promise.race` + rejectAfter (~10s) e teste.

@@ -1,6 +1,6 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { router } from 'expo-router'
-import { View, StyleSheet, ScrollView, Alert } from 'react-native'
+import { AppState, Linking, View, StyleSheet, ScrollView, Alert } from 'react-native'
 import {
   Button,
   Card,
@@ -10,9 +10,12 @@ import {
   SegmentedButtons,
 } from 'react-native-paper'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { LocationPermissionResponse } from 'expo-location'
+import { useForegroundPermissions } from 'expo-location'
 import { tripService } from '@/services/trip.service'
 import type { TripType } from '@/services/trip.service'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
+import { useTripGpsCapture } from '@/hooks/use-trip-gps-capture'
 import { activeTripKey, activeTripOptions, tripStudentsOptions } from '@/lib/trip-queries'
 
 function TripStatusChip({ status }: { status: 'ACTIVE' | 'COMPLETED' }) {
@@ -44,6 +47,70 @@ function resolveRouteId(
     return selectedRouteId
   }
   return null
+}
+
+interface LocationPermissionCardProps {
+  permission: LocationPermissionResponse
+  requestPermission: () => Promise<LocationPermissionResponse>
+}
+
+// Card de justificativa da permissão de localização (padrão scan.tsx): a
+// captura de GPS é automática, então este card é a ÚNICA porta de entrada do
+// motorista para autorizar — visível no estado inicial e durante a viagem sem
+// permissão. Negado permanente: abrir configurações é a única saída.
+function LocationPermissionCard({ permission, requestPermission }: LocationPermissionCardProps) {
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  return (
+    <Card style={styles.card}>
+      <Card.Content>
+        <Text style={styles.permissionTitle}>Permissão de localização</Text>
+        <Text style={styles.permissionText}>
+          O PureUrban usa sua localização para transmitir a posição do ônibus aos
+          alunos enquanto a viagem está em andamento. Nada é coletado fora da
+          viagem ativa.
+        </Text>
+        {permission.canAskAgain ? (
+          <Button
+            mode="contained"
+            onPress={() => {
+              setActionError(null)
+              requestPermission().catch(() =>
+                setActionError(
+                  'Não foi possível pedir a permissão. Libere a localização nas configurações do sistema.',
+                ),
+              )
+            }}
+            style={styles.primaryButton}
+            contentStyle={styles.buttonContent}
+            labelStyle={styles.buttonLabel}
+            icon="map-marker-radius"
+          >
+            Permitir acesso à localização
+          </Button>
+        ) : (
+          <Button
+            mode="contained"
+            onPress={() => {
+              setActionError(null)
+              Linking.openSettings().catch(() =>
+                setActionError(
+                  'Não foi possível abrir as configurações. Abra manualmente e libere a localização para o PureUrban.',
+                ),
+              )
+            }}
+            style={styles.primaryButton}
+            contentStyle={styles.buttonContent}
+            labelStyle={styles.buttonLabel}
+            icon="cog"
+          >
+            Abrir configurações
+          </Button>
+        )}
+        {actionError && <Text style={styles.permissionError}>{actionError}</Text>}
+      </Card.Content>
+    </Card>
+  )
 }
 
 interface StartOutboundSectionProps {
@@ -204,6 +271,43 @@ export default function TripScreen() {
     select: (r) => r.summary,
   })
 
+  // ---- GPS da viagem (Story 5.1): permissão + captura automática ----
+  // Tudo AQUI, antes dos early returns: o gate da captura reage ao cache da
+  // viagem via react-query (setQueryData das mutações), nunca a um toque.
+
+  const [locationPermission, requestLocationPermission, refreshLocationPermission] =
+    useForegroundPermissions()
+
+  // `useForegroundPermissions` não reavalia sozinho no retorno ao primeiro
+  // plano (mesmo finding do scan.tsx com a permissão da câmera): quem concede
+  // a permissão nas configurações e volta continua vendo o card de bloqueio
+  // sem este listener.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshLocationPermission()
+    })
+    return () => subscription.remove()
+  }, [refreshLocationPermission])
+
+  // Captura montada sempre (hooks antes dos early returns): o controlador só
+  // roda com viagem ACTIVE no cache E permissão concedida — NFR10.
+  useTripGpsCapture(
+    activeTrip && activeTrip.status === 'ACTIVE' ? activeTrip.id : null,
+    locationPermission?.granted ?? false,
+  )
+
+  const showLocationCard = locationPermission !== null && !locationPermission.granted
+
+  // Um único bloco JSX para os dois ramos de render (estado inicial e viagem
+  // ativa) — cópias verbatim entre branches driftam.
+  const permissionCard =
+    showLocationCard && locationPermission ? (
+      <LocationPermissionCard
+        permission={locationPermission}
+        requestPermission={requestLocationPermission}
+      />
+    ) : null
+
   const startMutation = useMutation({
     mutationFn: ({
       routeId,
@@ -285,6 +389,7 @@ export default function TripScreen() {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Gestão de Viagem</Text>
+        {permissionCard}
         {activeTrip && activeTrip.status === 'COMPLETED' && (
           <Card style={styles.card}>
             <Card.Content>
@@ -336,6 +441,7 @@ export default function TripScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Gestão de Viagem</Text>
+      {permissionCard}
       <Card style={styles.card}>
         <Card.Content>
           <TripTypeLabel type={activeTrip.type} />
@@ -455,6 +561,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#555',
     marginTop: 6,
+  },
+  permissionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  permissionText: {
+    fontSize: 15,
+    color: '#555',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  permissionError: {
+    fontSize: 13,
+    color: '#B3261E',
+    marginTop: 8,
   },
   routesLoading: {
     alignItems: 'center',

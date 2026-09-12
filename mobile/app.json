@@ -43,6 +43,12 @@
           "recordAudioAndroid": false,
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O PureUrban usa sua localização para transmitir a posição do ônibus aos alunos enquanto a viagem está em andamento. Nada é coletado fora da viagem ativa."
+        }
       ]
     ],
     "experiments": {
