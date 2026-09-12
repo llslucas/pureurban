@@ -403,3 +403,20 @@ comparativa em vez de afirmação de viabilidade sem controle.
     duplicando handlers); boarding tem o mesmo shape desde a 4.2. Assentaria: ler o source
     da lib quanto a emissão pós-close e instrumentar o cliente com duas dispatches
     encadeadas num teste.
+- source_spec: `_bmad-output/implementation-artifacts/spec-wrap-1-correcoes-de-comportamento.md`
+  summary: Atualizar a descrição do 403 de PATCH /trips/:id/end no Swagger (e regenerar
+    openapi.json) para nomear DRIVER_NOT_ASSIGNED — roteado ao wrap-3.
+  evidence: O AC12 do wrap-1 mudou o comportamento para 403 DRIVER_NOT_ASSIGNED (mesmo
+    disclosure do get-trip-students, DS6), dentro do status 403 já declarado no contrato —
+    nenhuma regeneração foi permitida pelas Boundaries do wrap-1. A descrição do 403 ficou
+    "FORBIDDEN — somente motoristas", sem nomear o código de negócio que o endpoint agora
+    também devolve. Regenerar openapi.json + tipos (se houver drift) pertence ao wrap-3
+    (item 18 do sprint-status, mesma mecânica).
+- source_spec: `_bmad-output/implementation-artifacts/spec-wrap-1-correcoes-de-comportamento.md`
+  summary: Domínio de relógio do resync do aluno — servidor carimbar o last-known com o
+    instante de recebimento (receivedAt) para a guarda monotônica comparar maçãs com maçãs.
+  evidence: Hoje capturedAt (REST) é eco do relógio do DEVICE do motorista e o timestamp do
+    evento SSE é hora do SERVIDOR (ingest-location.use-case.ts) — a comparação entre eles na
+    tela do aluno é sensível a skew de relógio (limitada a 1 deslocamento por resync após o
+    anti-flap do wrap-1, mas não eliminada). Exige DTO/cache change (rota wrap-3, item 18) ou
+    a extração do broadcaster (wrap-4). Detectado na review do wrap-1 (achado F3).
