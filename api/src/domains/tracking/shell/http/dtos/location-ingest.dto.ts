@@ -12,6 +12,8 @@ export class LocationIngestRequestDto {
     type: 'number',
     description: 'Latitude da posição em graus WGS84',
     example: -20.755549,
+    minimum: -90,
+    maximum: 90,
   })
   latitude!: number;
 
@@ -19,6 +21,8 @@ export class LocationIngestRequestDto {
     type: 'number',
     description: 'Longitude da posição em graus WGS84',
     example: -42.881728,
+    minimum: -180,
+    maximum: 180,
   })
   longitude!: number;
 
@@ -27,6 +31,7 @@ export class LocationIngestRequestDto {
     description:
       'Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.',
     example: 12.5,
+    minimum: 0,
   })
   accuracy?: number;
 

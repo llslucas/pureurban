@@ -7,7 +7,9 @@ import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 
 @ApiSchema({
   description:
-    'Evento SSE `location.updated`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido aos alunos da rota a cada posição publicada pelo motorista da viagem ativa (Story 5.1). `timestamp` é o instante de publicação pelo servidor — o `capturedAt` do device só aparece no POST de ingestão e no last-known.',
+    'Evento SSE `location.updated`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido aos alunos da rota a cada posição publicada pelo motorista da viagem ativa (Story 5.1). `timestamp` é o instante de publicação pelo servidor — o `capturedAt` do device só aparece no POST de ingestão e no last-known. Frame no wire:\n' +
+    'event: location.updated\n' +
+    'data: {"tripId":"550e8400-e29b-41d4-a716-446655440001","latitude":-20.755549,"longitude":-42.881728,"accuracy":12.5,"timestamp":"2026-09-11T12:00:00.150Z"}',
 })
 export class LocationUpdatedEventDto {
   @ApiProperty({
@@ -21,6 +23,8 @@ export class LocationUpdatedEventDto {
     type: 'number',
     description: 'Latitude da posição em graus WGS84',
     example: -20.755549,
+    minimum: -90,
+    maximum: 90,
   })
   latitude!: number;
 
@@ -28,6 +32,8 @@ export class LocationUpdatedEventDto {
     type: 'number',
     description: 'Longitude da posição em graus WGS84',
     example: -42.881728,
+    minimum: -180,
+    maximum: 180,
   })
   longitude!: number;
 
@@ -36,6 +42,7 @@ export class LocationUpdatedEventDto {
     description:
       'Precisão da leitura em metros (accuracy da Geolocation API). Opcional: o browser pode não fornecer o valor.',
     example: 12.5,
+    minimum: 0,
   })
   accuracy?: number;
 

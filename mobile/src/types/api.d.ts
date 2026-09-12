@@ -881,7 +881,11 @@ export interface components {
              */
             capturedAt: string;
         };
-        /** @description Evento SSE `location.updated`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido aos alunos da rota a cada posição publicada pelo motorista da viagem ativa (Story 5.1). `timestamp` é o instante de publicação pelo servidor — o `capturedAt` do device só aparece no POST de ingestão e no last-known. */
+        /**
+         * @description Evento SSE `location.updated`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido aos alunos da rota a cada posição publicada pelo motorista da viagem ativa (Story 5.1). `timestamp` é o instante de publicação pelo servidor — o `capturedAt` do device só aparece no POST de ingestão e no last-known. Frame no wire:
+         *     event: location.updated
+         *     data: {"tripId":"550e8400-e29b-41d4-a716-446655440001","latitude":-20.755549,"longitude":-42.881728,"accuracy":12.5,"timestamp":"2026-09-11T12:00:00.150Z"}
+         */
         LocationUpdatedEventDto: {
             /**
              * Format: uuid
