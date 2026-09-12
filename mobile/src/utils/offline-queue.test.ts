@@ -517,14 +517,24 @@ describe('drainQueue', () => {
 describe('buildCheckInSender — o POST que o dreno realmente emite', () => {
   // Os testes acima usam um `send` inline, que só afirma o mapeamento que eles
   // mesmos escrevem. Este exercita o sender de PRODUÇÃO: é o único ponto onde a
-  // NFR12 (occurredAt do escaneamento) e o replay idempotente são observáveis.
-  function fakeApi() {
+  // NFR12 (occurredAt do escaneamento), o replay idempotente e o guard de
+  // registro 2xx são observáveis. O `api-client` DESENVOLVE o envelope
+  // (`{ data, meta }` → `data`), então o fake resolve o registro puro — mesmo
+  // shape que `boardingService.checkIn` entrega ao sender em produção.
+  const RECORD = {
+    id: 'c1',
+    studentId: ANA,
+    tripId: TRIP_ID,
+    checkedInAt: '2026-09-01T07:05:01.000Z',
+    status: 'CHECKED_IN',
+  }
+  function fakeApi(response: unknown = RECORD) {
     const calls: { input: unknown; key: string }[] = []
     return {
       calls,
       checkIn: (input: { studentId: string; tripId: string; occurredAt?: string }, key: string) => {
         calls.push({ input, key })
-        return Promise.resolve({ status: 201 })
+        return Promise.resolve(response)
       },
     }
   }
@@ -582,5 +592,43 @@ describe('buildCheckInSender — o POST que o dreno realmente emite', () => {
         key: 'b',
       },
     ])
+  })
+
+  it('2xx sem registro (corpo não-JSON vira undefined/{} no unwrap do api-client): NÃO marca sent — item segue pending como offline (AC11/DS5)', async () => {
+    for (const captive of [undefined, {}]) {
+      const api = fakeApi()
+      // Sobrescreve DEPOIS do default: o `undefined` explícito não pode cair no
+      // parâmetro default do fake — é exatamente o shape que queremos testar.
+      api.checkIn = () => Promise.resolve(captive)
+      const storage = createFakeStorage([
+        pendingItem({ id: 'a', payload: { studentId: ANA, tripId: TRIP_ID } }),
+      ])
+      const send = buildCheckInSender(api)
+
+      const summary = await drainQueue(storage, send)
+
+      // O passo é 'offline' (falha de transporte), NÃO 'sent': o servidor nunca
+      // confirmou o embarque.
+      expect(summary.steps).toEqual([
+        { kind: 'offline', id: 'a', reason: expect.stringContaining('registro') },
+      ])
+      expect(summary.sent).toBe(0)
+      const [row] = [...storage.rows.values()]
+      expect(row.status).toBe('pending')
+      expect(row.attempts).toBe(0)
+    }
+  })
+
+  it('registro com campos incompletos (sem id/status): mesmo desfecho de transporte', async () => {
+    const api = fakeApi({ studentId: ANA, tripId: TRIP_ID })
+    const storage = createFakeStorage([
+      pendingItem({ id: 'a', payload: { studentId: ANA, tripId: TRIP_ID } }),
+    ])
+
+    const summary = await drainQueue(storage, buildCheckInSender(api))
+
+    expect(summary.sent).toBe(0)
+    const [row] = [...storage.rows.values()]
+    expect(row.status).toBe('pending')
   })
 })
