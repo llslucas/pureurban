@@ -199,3 +199,72 @@ propósito para variação do ambiente local (Metro, CDP, primeiro paint).
   MMKV-web/localStorage, chave `mmkv.default\REACT_QUERY_OFFLINE_CACHE`).
   O persister sincroniza com throttle de 1s — o spec espera a descarga antes
   de recarregar a página, senão a escrita se perde no reload.
+
+## E2E do Épico 5 (localização em tempo real — Story 5.3)
+
+`tests/e2e/tracking-live.e2e.spec.ts` (mesmo projeto `e2e`, mesmos
+pré-requisitos das seções acima) prova o pipeline inteiro pela UI —
+REST → Redis Pub/Sub → SSE → render — sem nenhum mock de tracking: o motorista
+inicia a viagem e o GPS transmite sozinho (`POST /tracking/location` a cada
+~5s); o aluno abre "Acompanhar ônibus" e vê posição + distância/ETA; o
+motorista muda de ponto e o texto do aluno atualiza em <5s (NFR2); ~15s sem
+sinal, o chip "Sem sinal GPS" aparece com o último ponto mantido e volta a
+"Em tempo real" com o texto reatualizado na recuperação; e "Encerrar Viagem"
+fecha o stream do aluno ("Nenhuma viagem ativa no momento") e para a captura
+(0 POSTs numa janela de 7s).
+
+O cenário é semeado pela fixture `epic5` / `seedEpic5Scenario`: empresa+admin,
+motorista, rota com vínculos e 1 aluno COM credenciais, sem check-ins e sem
+cleanup (padrão 3.6/4.5). No caminho feliz a viagem é iniciada PELA UI; os
+testes degradado e de fim recebem OUTBOUND ACTIVE do seed
+(`opts.createActiveTrip`).
+
+### Geolocation mockada nos DOIS contextos
+
+No alvo web o expo-location delega à Geolocation API do browser
+(`node_modules/expo-location/build/ExpoLocation.web.js`), então o Playwright
+dirige a captura do motorista E a posição do aluno sem hook de injeção e sem
+tocar em `mobile/src`: os contextos nascem com `permissions: ['geolocation']`
++ coordenadas fixas. As coordenadas são escolhidas para que distância/ETA
+sejam funções puras das posições: aluno parado em S, motorista em A (~222 m do
+aluno) e B (~55,6 km); os asserts usam os textos EXATOS que
+`mobile/src/lib/geo.ts` produz para esses pontos (haversine +
+`formatDistance`/`formatEta` replicados no spec).
+
+**Movimentar o motorista é `setGeolocation(B)` + `reload()` na página dele.**
+Armadilha do Chromium: o expo-location web chama `getCurrentPosition` com
+`maximumAge: Infinity`, e o cache de posição do browser é POR DOCUMENTO — o
+`setGeolocation` sozinho troca o mock, mas o tick de captura continua lendo a
+primeira fix (em cache) para sempre. O reload abre um documento novo (cache
+vazio), o app reidrata o login do MMKV e retoma a captura sozinho, agora já em
+B — o `waitForResponse` do spec só aceita o POST cujo body carrega a latitude
+de B, então o NFR2 nunca começa num POST velho.
+
+### Por que a espera REAL de 15s no degradado
+
+O timer de staleness do chip é `setTimeout` no browser
+(`GPS_SIGNAL_TIMEOUT_MS = 15_000` em `track-bus.tsx`): não há timestamp de
+banco a envelhecer, então o aging de `prisma-time` (Épico 4) NÃO se aplica —
+o spec espera os 15s reais + margem (chip visível em ≤25s), dentro do
+precedente das esperas longas da 4.5 (polling de 90s do scheduler). A
+recuperação também é real: `setOffline(false)` e o próximo tick transmite. Os
+pings (`heartbeat` do SSE) chegam durante o degradado e NÃO resetam o
+indicador — o chip aparecer com a conexão viva é a prova de que só
+`location.updated` conta como sinal.
+
+### NFR2: âncora no POST e margem de ambiente
+
+O NFR2 (< 5s) fala da ENTREGA (Redis Pub/Sub → SSE → render), não da captura:
+o tick de ≤5s do produtor fica FORA da conta. O spec marca t0 na RESPOSTA do
+`POST /tracking/location` que já carrega o ponto novo (o predicado do
+`waitForResponse` confere a latitude no body) e termina quando o texto de
+distância/ETA atualizado fica visível na tela do aluno. O número real vai no
+`console.log` (`[NFR2] ...ms`, visível na saída do Playwright). A prova de
+entrega pura <5s já vive no supertest (`test/tracking.e2e-spec.ts`); o budget
+aqui é folgado de propósito para o ambiente local (Metro, CDP, primeiro
+paint), mesmo critério do NFR3.
+
+Caveat: o "estado inicial" do motorista após encerrar uma OUTBOUND é o botão
+"Iniciar Retorno" (branch `isReturn` de `trip.tsx`) — é isso que o spec de fim
+de viagem assertiona, junto com o chip "✅ Concluída" e o sumiço de
+"Encerrar Viagem".
