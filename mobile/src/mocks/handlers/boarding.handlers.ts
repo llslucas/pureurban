@@ -152,22 +152,12 @@ export const boardingHandlers = [
       )
     }
 
-    if (body.occurredAt !== undefined) {
-      const parsed = Date.parse(body.occurredAt)
-      const age = Date.now() - parsed
-      // Espelha a janela do use case: 5min de tolerância de relógio, 24h de idade.
-      if (Number.isNaN(parsed) || age < -5 * 60 * 1000 || age > 24 * 60 * 60 * 1000) {
-        return errorResponse(
-          400,
-          'INVALID_QR_CODE',
-          'occurredAt ausente da janela aceita',
-        )
-      }
-    }
-
     // Só SUCESSOS são replayados. Cachear erros pinaria um TRIP_NOT_ACTIVE
     // transitório naquela key para sempre — e a fila offline reenvia com a MESMA
     // key, então o item nunca conseguiria sair da fila.
+    // O replay vem ANTES da janela de occurredAt (DS4): o use case real responde
+    // o registro já armazenado sem rever regra de negócio — um item drenado >24h
+    // depois recebe 201 replayado na API e não pode virar 400 aqui.
     const cached = idempotentSuccesses.get(idempotencyKey)
     if (cached) {
       // Mesma key para um par [aluno, viagem] diferente é reuso indevido, não
@@ -184,6 +174,19 @@ export const boardingHandlers = [
         )
       }
       return HttpResponse.json(cached, { status: 201 })
+    }
+
+    if (body.occurredAt !== undefined) {
+      const parsed = Date.parse(body.occurredAt)
+      const age = Date.now() - parsed
+      // Espelha a janela do use case: 5min de tolerância de relógio, 24h de idade.
+      if (Number.isNaN(parsed) || age < -5 * 60 * 1000 || age > 24 * 60 * 60 * 1000) {
+        return errorResponse(
+          400,
+          'INVALID_QR_CODE',
+          'occurredAt ausente da janela aceita',
+        )
+      }
     }
 
     if (body.tripId === MOCK_OTHER_DRIVER_TRIP_ID) {

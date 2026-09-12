@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   activeTrackingTripKey,
   activeTrackingTripOptions,
+  lastKnownLocationKey,
   lastKnownLocationOptions,
 } from '@/lib/track-bus-queries'
 import {
@@ -39,8 +40,24 @@ const toBusPosition = (event: LocationUpdatedEvent): BusPosition => ({
   at: event.timestamp,
 })
 
+// Guarda monotônica do resync (AI1/R13): o ponto REST só vence o exibido se
+// for ESTRITAMENTE mais novo — a resposta pode chegar depois de um evento SSE
+// e mais velha que ele. capturedAt inválido (o contrato só ecoa o device) não
+// desloca ponto nenhum, mas semeia o primeiro: posição vale mais que relógio.
+const isStrictlyNewer = (incoming: string, current: string | null): boolean => {
+  if (current === null) return true
+  const incomingMs = Date.parse(incoming)
+  if (Number.isNaN(incomingMs)) return false
+  const currentMs = Date.parse(current)
+  if (Number.isNaN(currentMs)) return true
+  return incomingMs > currentMs
+}
+
 const formatClock = (iso: string): string => {
   const date = new Date(iso)
+  // Schema do contrato valida só o formato, não o calendário — um capturedAt
+  // tipo "2026-13-45T25:99:99Z" chega aqui como Invalid Date (R5).
+  if (Number.isNaN(date.getTime())) return '--:--:--'
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
@@ -57,8 +74,15 @@ export default function TrackBusScreen() {
   const tripId = activeTrip?.tripId ?? null
 
   // Estado inicial: último ponto conhecido. 404 NO_LOCATION_AVAILABLE vira
-  // null na query — "aguardando a primeira posição", não erro.
-  const lastKnown = useQuery(lastKnownLocationOptions(tripId ?? undefined))
+  // null na query — "aguardando a primeira posição", não erro. A desestruturação
+  // NÃO é estilo: o acesso a `.data`/`.dataUpdatedAt` no render é o que os torna
+  // propriedades rastreadas pelo react-query — lidos só no effect abaixo, o
+  // refetch do resync atualizava o cache sem re-renderizar a tela.
+  const {
+    data: lastKnownPoint,
+    dataUpdatedAt: lastKnownUpdatedAt,
+    isError: lastKnownError,
+  } = useQuery(lastKnownLocationOptions(tripId ?? undefined))
 
   const [bus, setBus] = React.useState<BusPosition | null>(null)
   const [gpsStale, setGpsStale] = React.useState(false)
@@ -84,12 +108,9 @@ export default function TrackBusScreen() {
     }, GPS_SIGNAL_TIMEOUT_MS)
   }, [clearSignalTimer])
 
-  const seededFromLastKnownRef = React.useRef(false)
-
   // Viagem nova (ou nenhuma): zera o estado do ciclo anterior, inclusive o
   // timer — o indicador de sinal é por viagem.
   React.useEffect(() => {
-    seededFromLastKnownRef.current = false
     setBus(null)
     setTripEnded(false)
     setStreamStale(false)
@@ -103,24 +124,36 @@ export default function TrackBusScreen() {
 
   // ---- Posição do ônibus ----
 
-  // O last-known semeia a posição UMA vez: daí em diante o stream é a fonte —
-  // um refetch do endpoint pode trazer ponto mais velho que um evento já
-  // recebido (o cache expira em 60s; o evento, em ~5s).
+  // O last-known semeia E reconcilia: cada chegada do endpoint (montagem,
+  // reabertura do stream, banner "Atualizar") passa pela guarda monotônica —
+  // é o resync que o contrato 5.0 promete para a recuperação pós-queda, sem
+  // regredir a posição para um ponto mais velho que o último evento.
+  //
+  // Cada RESPOSTA é avaliada UMA vez (o dataUpdatedAt muda a cada fetch): sem
+  // isso o ponto cacheado seria reavaliado a cada atualização do stream e,
+  // com o relógio do motorista adiantado (capturedAt é eco do device; o
+  // timestamp do evento é hora do SERVIDOR), desfaria o ponto fresco em um
+  // vai-e-vem. A comparação de capturedAt entre fontes tem esse limite de
+  // domínio de relógio — o fix de contrato (servidor carimbar o last-known)
+  // pertence ao wrap-3.
+  const appliedResyncRef = React.useRef(0)
   React.useEffect(() => {
-    const point = lastKnown.data
-    if (!point || seededFromLastKnownRef.current) return
-    seededFromLastKnownRef.current = true
+    if (!lastKnownPoint) return
+    if (lastKnownUpdatedAt === 0 || appliedResyncRef.current === lastKnownUpdatedAt) {
+      return
+    }
+    appliedResyncRef.current = lastKnownUpdatedAt
+    if (!isStrictlyNewer(lastKnownPoint.capturedAt, bus?.at ?? null)) return
     setBus({
-      latitude: point.latitude,
-      longitude: point.longitude,
-      accuracy: point.accuracy,
-      at: point.capturedAt,
+      latitude: lastKnownPoint.latitude,
+      longitude: lastKnownPoint.longitude,
+      accuracy: lastKnownPoint.accuracy,
+      at: lastKnownPoint.capturedAt,
     })
-    // Semear já é chegada de posição: o ponto last-known não é fresco para
-    // sempre — o MESMO timer de 15s do degradado corre a partir daqui, mesmo
-    // que nenhum evento do stream chegue.
+    // Aplicar ponto é chegada de posição: o MESMO timer de 15s do degradado
+    // corre a partir daqui, mesmo que nenhum evento do stream chegue.
     markSignal()
-  }, [lastKnown.data, markSignal])
+  }, [lastKnownPoint, lastKnownUpdatedAt, bus, markSignal])
 
   // ---- Canal SSE (um cliente por viagem; fecha no 409 de fim de viagem) ----
   // Época do stream: o banner "Atualizar" precisa reabrir a conexão morta,
@@ -138,7 +171,15 @@ export default function TrackBusScreen() {
         setBus(toBusPosition(event))
         markSignal()
       },
-      onOpen: () => setStreamStale(false),
+      onOpen: () => {
+        setStreamStale(false)
+        // Resync contratado na reconexão (AI1): o que foi publicado durante a
+        // queda do stream só existe no REST — a guarda monotônica decide se o
+        // ponto trazido vence o exibido.
+        void queryClient.invalidateQueries({
+          queryKey: lastKnownLocationKey(tripId),
+        })
+      },
       onTripEnded: () => {
         setTripEnded(true)
         setGpsStale(false)
@@ -231,10 +272,15 @@ export default function TrackBusScreen() {
           {
             label: 'Atualizar',
             // Epoch nova reabre o stream morto (o effect depende dela); o
-            // refetch reconcilia a descoberta e o last-known pelo caminho REST.
+            // refetch reconcilia a descoberta e o last-known pelo caminho
+            // REST — a guarda monotônica do effect do last-known decide se
+            // o ponto trazido é mais novo que o exibido.
             onPress: () => {
               bumpStreamEpoch()
               void refetchTrip()
+              void queryClient.invalidateQueries({
+                queryKey: lastKnownLocationKey(tripId),
+              })
             },
           },
         ]}
@@ -294,7 +340,7 @@ export default function TrackBusScreen() {
           <Card.Content>
             <Text variant="titleMedium">Aguardando a primeira posição</Text>
             <Text variant="bodyMedium" style={styles.hint}>
-              {lastKnown.isError
+              {lastKnownError
                 ? 'Não foi possível carregar a última posição — o ônibus aparece aqui assim que o motorista começar a transmitir.'
                 : 'O ônibus aparece aqui assim que o motorista começar a transmitir.'}
             </Text>

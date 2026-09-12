@@ -314,6 +314,30 @@ describe('BoardingEventsService — stream com subscribe refcount', () => {
     expect(messages).toHaveLength(1);
   });
 
+  it('mensagem JSON válida mas NÃO-objeto (R2) é descartada sem lançar — null, array, string e objeto sem type', () => {
+    const { messages, observer } = collect();
+    service.stream(TRIP_ID).subscribe(observer);
+
+    // JSON.parse('null') NÃO lança — sem o guard de tipo, `parsed.type`
+    // explode dentro do listener 'message' do ioredis e derruba o processo.
+    for (const raw of ['null', '[1,2,3]', '"texto"', '{"data":{"x":1}}']) {
+      expect(() =>
+        fake.subscriber.deliver(boardingChannel(TRIP_ID), raw),
+      ).not.toThrow();
+    }
+    expect(messages).toEqual([]);
+
+    // O canal segue vivo após as mensagens rejeitadas.
+    fake.subscriber.deliver(
+      boardingChannel(TRIP_ID),
+      JSON.stringify({
+        type: 'boarding.not_returning',
+        data: { tripId: TRIP_ID, studentId: 's1', notifiedAt: 'x' },
+      }),
+    );
+    expect(messages).toHaveLength(1);
+  });
+
   it('sinal terminal completa o stream, desinscreve o canal e limpa a entrada', async () => {
     const first = collect();
     const second = collect();

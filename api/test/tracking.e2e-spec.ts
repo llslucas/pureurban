@@ -64,6 +64,7 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
   let driverId: string;
   let companyId: string;
   let allowedStudentId: string;
+  let secondStudentId: string;
   let completedTripId: string;
   let otherCompanyTripId: string;
 
@@ -194,10 +195,7 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
     driverId = await createUser('/api/v1/drivers', driverData);
     await createUser('/api/v1/drivers', otherDriverData);
     allowedStudentId = await createUser('/api/v1/students', allowedStudentData);
-    const secondStudentId = await createUser(
-      '/api/v1/students',
-      secondStudentData,
-    );
+    secondStudentId = await createUser('/api/v1/students', secondStudentData);
     // O id do aluno de fora não é consumido — só o token dele importa.
     await createUser('/api/v1/students', outsiderStudentData);
 
@@ -981,6 +979,50 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
         .expect(200);
 
       expect((response.body as ApiResponse).data).toBeNull();
+    });
+
+    it('aluno desativado: { data: null } — isActive vale também na descoberta (R7)', async () => {
+      // Antes da desativação, o segundo aluno (na rota) enxerga a viagem como
+      // qualquer outro: prova que o null abaixo vem do isActive, não do roster.
+      const tripId = await seedActiveTrip();
+      const before = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${secondStudentToken}`)
+        .expect(200);
+      expect((before.body as ApiResponse).data).toEqual({
+        tripId,
+        type: 'OUTBOUND',
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/students/${secondStudentId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(204);
+
+      // Os 3 endpoints concordam: a descoberta nega com { data: null }, o
+      // last-known nega com 403 STUDENT_NOT_ON_TRIP (isStudentOnRoute já
+      // exigia isActive) e o stream nega com o mesmo 403 no guard.
+      const after = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${secondStudentToken}`)
+        .expect(200);
+      expect((after.body as ApiResponse).data).toBeNull();
+
+      const lastKnownRes = await request(app.getHttpServer())
+        .get(`/api/v1/tracking/trips/${tripId}/location`)
+        .set('Authorization', `Bearer ${secondStudentToken}`)
+        .expect(403);
+      expect((lastKnownRes.body as ApiResponse).error?.code).toBe(
+        'STUDENT_NOT_ON_TRIP',
+      );
+
+      const streamRes = await request(app.getHttpServer())
+        .get(`/api/v1/tracking/trips/${tripId}/stream`)
+        .set('Authorization', `Bearer ${secondStudentToken}`)
+        .expect(403);
+      expect((streamRes.body as ApiResponse).error?.code).toBe(
+        'STUDENT_NOT_ON_TRIP',
+      );
     });
 
     it('DRIVER: 403 FORBIDDEN — o endpoint é do aluno', async () => {

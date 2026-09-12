@@ -347,3 +347,142 @@ describe('TrackBusScreen — posição do device do aluno (OQ-1)', () => {
     expect(screen.getByText(/-20\.75555/)).toBeTruthy()
   })
 })
+
+describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', () => {
+  it('stream morto com evento perdido: "Atualizar" reconcilia o last-known pelo REST (AC1)', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    // Último evento recebido antes de o stream morrer.
+    dispatchLocation({
+      latitude: BUS_POINT.latitude,
+      longitude: BUS_POINT.longitude,
+      timestamp: '2026-09-12T12:00:05.000Z',
+    })
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // O que foi publicado durante a janela morta só existe no REST — ponto
+    // mais novo, em coordenada diferente.
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: -20.761,
+      longitude: -42.889,
+      accuracy: 9,
+      capturedAt: '2026-09-12T12:00:30.000Z',
+    })
+
+    act(() => mockStreamHandlers!.onUnrecoverable?.())
+    fireEvent.press(await screen.findByText('Atualizar'))
+
+    // A chamada REST aconteceu e o ponto trazido venceu o exibido.
+    await waitFor(() =>
+      expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
+    )
+    expect(await screen.findByText(/-20\.76100, -42\.88900/)).toBeTruthy()
+  })
+
+  it('resync com capturedAt mais velho que o evento exibido NÃO regredir a posição (AC2/R13)', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    dispatchLocation({ timestamp: '2026-09-12T12:00:05.000Z' })
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // Resposta REST chegando DEPOIS do evento, com capturedAt mais velho: a
+    // guarda monotônica descarta — a posição exibida não pode regredir.
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: -10.0,
+      longitude: -10.0,
+      accuracy: 1,
+      capturedAt: '2026-09-12T11:59:55.000Z',
+    })
+
+    act(() => mockStreamHandlers!.onUnrecoverable?.())
+    fireEvent.press(await screen.findByText('Atualizar'))
+
+    await waitFor(() =>
+      expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
+    )
+    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByText(/-10\.00000/)).toBeNull()
+  })
+
+  it('onOpen do stream refaz o last-known — resync contratado na reconexão', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    const callsBefore = mockTracking.getLastKnownLocation.mock.calls.length
+    act(() => mockStreamHandlers!.onOpen?.())
+
+    await waitFor(() =>
+      expect(
+        mockTracking.getLastKnownLocation.mock.calls.length,
+      ).toBeGreaterThan(callsBefore),
+    )
+  })
+
+  it('capturedAt calendaricamente inválido: "--:--:--", nunca "NaN:NaN:NaN" (AC7/R5)', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    // O schema do contrato valida só o formato ISO — mês/dia/hora absurdos
+    // atravessam e viram Invalid Date na tela.
+    dispatchLocation({ timestamp: '2026-13-45T25:99:99Z' })
+
+    expect(await screen.findByText(/Posição de --:--:--/)).toBeTruthy()
+    expect(screen.queryByText(/NaN/)).toBeNull()
+  })
+
+  it('ponto REST já aplicado NÃO é reavaliado a cada evento do stream (anti-flap, R3-review)', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    // Resync aplica o ponto REST (12:00:30).
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: -20.761,
+      longitude: -42.889,
+      accuracy: 9,
+      capturedAt: '2026-09-12T12:00:30.000Z',
+    })
+    act(() => mockStreamHandlers!.onUnrecoverable?.())
+    fireEvent.press(await screen.findByText('Atualizar'))
+    expect(await screen.findByText(/-20\.76100, -42\.88900/)).toBeTruthy()
+
+    // Evento do stream com timestamp "mais velho" que o capturedAt do device
+    // (relógios diferentes): o ponto VIVO é aplicado direto...
+    dispatchLocation({ timestamp: '2026-09-12T12:00:20.000Z' })
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // ...e o ponto REST consumido não volta: a resposta foi avaliada uma vez.
+    act(() => jest.advanceTimersByTime(20_000))
+    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByText(/-20\.76100/)).toBeNull()
+  })
+
+  it('resync com capturedAt inválido não desloca o ponto vivo do stream', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+
+    dispatchLocation({ timestamp: '2026-09-12T12:00:05.000Z' })
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // capturedAt inválido não é comparável: não pode deslocar ponto nenhum.
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: -10.0,
+      longitude: -10.0,
+      accuracy: 1,
+      capturedAt: '2026-13-45T25:99:99Z',
+    })
+    act(() => mockStreamHandlers!.onUnrecoverable?.())
+    fireEvent.press(await screen.findByText('Atualizar'))
+
+    await waitFor(() =>
+      expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
+    )
+    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByText(/-10\.00000/)).toBeNull()
+  })
+})

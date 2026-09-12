@@ -32,8 +32,11 @@ export function activeTrackingTripOptions() {
 
 /**
  * `GET /tracking/trips/:id/location` — último ponto conhecido da viagem.
- * 404 NO_LOCATION_AVAILABLE não é erro: é o estado "aguardando a primeira
- * posição" (o cache está vazio ou o TTL expirou — nunca um ponto stale).
+ * Estado inicial da tela e o resync contratado (contrato 5.0): é por aqui que
+ * o aluno recupera o que foi publicado durante uma queda do stream — a tela o
+ * refaz na reabertura da conexão e no banner "Atualizar". 404
+ * NO_LOCATION_AVAILABLE não é erro: é o estado "aguardando a primeira posição"
+ * (o cache está vazio ou o TTL expirou — nunca um ponto stale).
  */
 export function lastKnownLocationOptions(tripId: string | undefined) {
   return queryOptions({

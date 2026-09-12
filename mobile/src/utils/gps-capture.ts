@@ -5,14 +5,19 @@
  * (getLocation, send, schedule) são injetadas, então o teste usa fakes com
  * fake timers e o hook `use-trip-gps-capture` é só a adaptação. Regras:
  * - `start()` dispara o primeiro envio imediatamente e reagenda a cada 5s;
- * - falha de captura OU de envio descarta a posição e mantém a cadência
- *   (posição é last-write-wins e descartável — sem fila, sem retry);
+ * - falha de captura OU de envio descarta a posição; por default (sem
+ *   `classifySendError`) toda falha é transitória e a cadência segue —
+ *   com classificador, erro classificado 'fatal' PARA a captura (o 409 de
+ *   viagem encerrada fora do device não pode virar tempestade infinita);
  * - um envio em voo por vez (tick lento não empilha POSTs);
  * - `stop()` cancela o tick agendado e nada mais é enviado (NFR10).
  */
 
 /** Cadência da 5.1: um POST a cada ~5s enquanto a viagem está ativa. */
 export const GPS_CAPTURE_INTERVAL_MS = 5_000
+
+/** 'fatal' encerra a captura; 'transient' (e ausência de classificador) mantém a cadência. */
+export type SendFailureClass = 'fatal' | 'transient'
 
 export interface GpsPosition {
   latitude: number
@@ -31,6 +36,8 @@ export interface GpsCaptureDeps {
    * (é assim que o stop interrompe a cadência).
    */
   schedule: (delayMs: number | null, tick: () => void) => void
+  /** Classifica a falha; ausente, toda falha é transitória (comportamento da 5.1). */
+  classifySendError?: (error: unknown) => SendFailureClass
 }
 
 export type ScheduleFn = GpsCaptureDeps['schedule']
@@ -71,8 +78,14 @@ export function createGpsCapture(deps: GpsCaptureDeps): GpsCapture {
     void deps
       .getLocation()
       .then((position) => deps.send(position))
-      .catch(() => {
-        // Posição perdida é descartada: velha não tem valor (last-write-wins).
+      .catch((error: unknown) => {
+        // Posição perdida é descartada (last-write-wins), mas a CLASSE do erro
+        // decide a cadência: 'fatal' (409/403 determinísticos) encerra a
+        // transmissão; transitória segue no tick de 5s já agendado.
+        if (deps.classifySendError?.(error) === 'fatal') {
+          running = false
+          deps.schedule(null, tick)
+        }
       })
       .finally(() => {
         inFlight = false

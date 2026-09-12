@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import * as Location from 'expo-location'
 
+import { activeTripKey } from '@/lib/trip-queries'
 import { trackingService } from '@/services/tracking.service'
 import type { LocationIngestRequest } from '@/services/tracking.service'
+import { ApiClientError } from '@/services/api-error'
 import {
   createGpsCapture,
   createTimeoutSchedule,
@@ -21,6 +24,8 @@ export function useTripGpsCapture(
   tripId: string | null,
   permissionGranted: boolean,
 ): void {
+  const queryClient = useQueryClient()
+
   // O send lê o tripId corrente por ref: um tick agendado no fim da viagem
   // nunca deve partir com o id de outra (ou de viagem nenhuma).
   const tripIdRef = useRef(tripId)
@@ -58,8 +63,24 @@ export function useTripGpsCapture(
           return trackingService.ingestLocation(body)
         },
         schedule: createTimeoutSchedule(),
+        classifySendError: (error) => {
+          // 409 TRIP_NOT_ACTIVE / 403: a viagem acabou para este motorista
+          // fora deste device (2º device, ação admin) — postar de novo só
+          // reproduziria o mesmo erro para sempre. Para a captura e devolve
+          // a descoberta ao polling: o gate reativo (tripId → null) faz o
+          // resto. Falha de transporte (status 0) e 5xx são transitórias.
+          const deterministic =
+            error instanceof ApiClientError &&
+            (error.status === 409 || error.status === 403)
+          if (deterministic) {
+            void queryClient.invalidateQueries({ queryKey: activeTripKey })
+          }
+          // Transmissão morta em silêncio era o achado R3: toda falha loga.
+          console.warn('[gps-capture] falha de captura/transmissão:', error)
+          return deterministic ? 'fatal' : 'transient'
+        },
       }),
-    [],
+    [queryClient],
   )
 
   useEffect(() => {

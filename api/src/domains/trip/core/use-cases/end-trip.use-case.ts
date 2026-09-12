@@ -1,7 +1,11 @@
 import { Effect } from 'effect';
 import { TripRepository } from '../ports/trip-repository.port.js';
 import { withEvents } from '../../../shared/core/events/with-events.js';
-import { TripNotFound, InvalidTripTransition } from '../errors/trip.errors.js';
+import {
+  TripNotFound,
+  InvalidTripTransition,
+  DriverNotAssigned,
+} from '../errors/trip.errors.js';
 import type { WithEvents } from '../../../shared/core/events/index.js';
 import type { TripData } from '../ports/trip-repository.port.js';
 
@@ -15,7 +19,7 @@ export const endTrip = (
   input: EndTripInput,
 ): Effect.Effect<
   WithEvents<TripData>,
-  TripNotFound | InvalidTripTransition,
+  TripNotFound | InvalidTripTransition | DriverNotAssigned,
   TripRepository
 > =>
   Effect.gen(function* () {
@@ -24,14 +28,17 @@ export const endTrip = (
     // Buscar viagem e validar que pertence ao driver e está ACTIVE
     const trip = yield* repo.findById(input.tripId, input.tenantId);
 
-    // Viagem de outro motorista responde como inexistente: um 404 não revela a
-    // um motorista que a viagem existe, e "não é sua" não é uma transição de
-    // estado inválida (era 400 antes) — é falta de autorização.
+    // Mesmo disclosure do get-trip-students (DS6/AI4 da retro 3): viagem de
+    // outro motorista é 403 DRIVER_NOT_ASSIGNED nos dois. O 404 não-disclosure
+    // da review 3.1 dividia o mesmo domínio em dois oráculos diferentes para a
+    // mesma condição — e o app mobile trata DRIVER_NOT_ASSIGNED como estado de
+    // tela. 404 segue reservado a inexistente/outra empresa (findById é
+    // tenant-scoped).
     if (trip.driverId !== input.driverId) {
       return yield* Effect.fail(
-        new TripNotFound({
-          code: 'TRIP_NOT_FOUND',
-          message: `Viagem com id ${input.tripId} não encontrada`,
+        new DriverNotAssigned({
+          code: 'DRIVER_NOT_ASSIGNED',
+          message: 'Motorista não é o responsável por esta viagem',
         }),
       );
     }

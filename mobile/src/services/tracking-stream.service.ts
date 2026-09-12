@@ -35,6 +35,12 @@ export interface TrackingEventsConnection {
 const BACKOFF_BASE_MS = 1_000
 const BACKOFF_MAX_MS = 30_000
 
+// Re-poll da lib após close gracioso (2xx de fim de viagem): sem valor
+// explícito, o intervalo é o default 5000ms do react-native-sse — nem contrato
+// nem teste (R6). Pina o MESMO valor observado: mudá-lo é decisão consciente,
+// não dependência silenciosa de terceiro.
+export const SSE_REPOLL_INTERVAL_MS = 5_000
+
 // Refreshes falhados consecutivos no caminho 401 antes de declarar o stream
 // irrecuperável (reset a cada open() bem-sucedido).
 const MAX_FAILED_REFRESHES = 3
@@ -88,6 +94,7 @@ class TrackingEventsClient {
       `${API_BASE_URL}/api/v1/tracking/trips/${this.tripId}/stream`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        pollingInterval: SSE_REPOLL_INTERVAL_MS,
       },
     )
     this.source = source

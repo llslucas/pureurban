@@ -84,7 +84,7 @@ describe('endTrip', () => {
     expect(events[0].type).toBe('trip.ended');
   });
 
-  it('viagem de outro motorista responde como inexistente (TripNotFound, não-disclosure)', async () => {
+  it('viagem de outro motorista falha com DriverNotAssigned — mesmo disclosure do get-trip-students (DS6)', async () => {
     const update = vi.fn(() => Effect.succeed(makeTripData()));
     const repo = makeRepo({
       findById: vi.fn(() =>
@@ -101,8 +101,8 @@ describe('endTrip', () => {
     );
     expect(result._tag).toBe('Left');
     if (result._tag === 'Left') {
-      expect(result.left._tag).toBe('TripNotFound');
-      expect(result.left.code).toBe('TRIP_NOT_FOUND');
+      expect(result.left._tag).toBe('DriverNotAssigned');
+      expect(result.left.code).toBe('DRIVER_NOT_ASSIGNED');
     }
     expect(update).not.toHaveBeenCalled();
   });

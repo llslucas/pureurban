@@ -264,6 +264,25 @@ describe('TripController (e2e)', () => {
       expect((response.body as ApiResponse).data.status).toBe('COMPLETED');
     });
 
+    it('PATCH /api/v1/trips/:id/end de outro motorista da mesma empresa ⇒ 403 DRIVER_NOT_ASSIGNED (mesmo disclosure do GET students, DS6)', async () => {
+      const tripId = await seedActiveTrip();
+      const response = await request(app.getHttpServer())
+        .patch(`/api/v1/trips/${tripId}/end`)
+        .set('Authorization', `Bearer ${otherDriverToken}`)
+        .expect(403);
+
+      expect((response.body as ApiResponse).error?.code).toBe(
+        'DRIVER_NOT_ASSIGNED',
+      );
+
+      // A viagem continua ativa: o 403 não é efeito colateral de encerramento.
+      const stillActive = await prisma.trip.findUnique({
+        where: { id: tripId },
+        select: { status: true },
+      });
+      expect(stillActive?.status).toBe('ACTIVE');
+    });
+
     it('PATCH /api/v1/trips/:id/end com :id inexistente ⇒ 404 TRIP_NOT_FOUND', async () => {
       const response = await request(app.getHttpServer())
         .patch(`/api/v1/trips/${randomUUID()}/end`)

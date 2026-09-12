@@ -2,7 +2,7 @@
 title: 'Wrap 1: Correções de comportamento pós-Épico 5'
 type: 'bugfix'
 created: '2026-09-12'
-status: 'ready-for-dev'
+status: 'done'
 route: 'oneshot'
 review_loop_iteration: 0
 context:
@@ -52,6 +52,39 @@ a Task 1 vira correção de comentários + texto de contrato e o restante migra 
 | `epic-5-retro-item-20` (AI7) | R5, R6, R7 — baratas de 1 linha |
 | `epic-3-retro-item-4` | consistência mock/dreno/disclosure |
 | `epic-3-retro-item-7` | CORS fail-fast + preflight test |
+
+## Implementation Notes
+
+- **AC12 — direção do alinhamento escolhida: `end-trip` 404 → 403 `DRIVER_NOT_ASSIGNED`** (e não o contrário). O app mobile trata `DRIVER_NOT_ASSIGNED` como estado de tela (`student-list.tsx`), o mock MSW espelha o 403 e o `SETTLED_CODES` da fila o conhece — alinhar `get-trip-students` para 404 exigiria mexer no mock, proibido pelas Boundaries. Ambos os endpoints já declaram 403 e 404 no openapi.json (nenhuma regeneração necessária — drift check verde). A decisão de não-disclosure da review 3.1 ficou registrada como substituída pelo critério de consistência (DS6 oferecia "alinhamento barato ou decisão registrada").
+- **AC10 — reordenação no mock = replay ANTES da janela de `occurredAt`** (DS4: "reordenar para espelhar o use case"). O texto do AC10 no spec era ambíguo; o DS4 da retro é inequívoco: o mock validava `occurredAt` antes do lookup de replay e o use case real faz replay antes de qualquer regra — item drenado >24h depois recebia 400 no mock e 201 replayado na API. Validação de shape continua antes do replay (pipe do @Body).
+- **Descoberta do implementador (Task 1):** `lastKnown.data` lido só dentro de `useEffect` é propriedade NÃO-rastreada pelo react-query v5 — o refetch do resync atualizava o cache sem re-renderizar a tela (prova: cache atualizado + effect sem reexecutar). Fix: desestruturar `data`/`isError` no render (o acesso ao getter é o que rastreia). Nota deixada em comentário no código.
+- **Task 3 — forma do fix:** o classificador vive no controlador puro (`classifySendError` opcional; default = tudo transitório, comportamento da 5.1 preservado nos testes existentes). O hook classifica 409/403 como fatal, invalida `['activeTrip']` e loga warning em toda falha. Suíte nova do hook (`use-trip-gps-capture.test.tsx`) finge o MMKV da cadeia `trip-queries → api-client` (Nitro não carrega sob jest-expo).
+- **Task 6 — extração mínima:** `resolveCorsOrigins` + allowlist saíram do `main.ts` para `shared/shell/http/cors-config.ts` (o bootstrap nunca roda nos testes). `@types/cors` adicionado como devDependency para o teste de preflight usar o MESMO pacote `cors` do Nest. Assinatura `env: Record<string, string | undefined>` (default `process.env`) para testabilidade sem mutar env.
+- **Contrato:** nenhuma mudança de DTO/rota; `openapi:check` verde; `openapi.json` intocado.
+- **Ambiente:** o gate requer `E2E_API_URL=http://localhost:3001` nesta máquina (`api/.env` tem `PORT=3001`; default do script é 3000 e ele quase bateu TIMEOUT por causa disso). Servidores dev pré-existentes (Metro 8081 sem o env do gate) foram derrubados para o gate subir os dele.
+- **Correção pós-gate:** o primeiro gate completo FALHOU no e2e Playwright de sync offline — o guard do AC11 validava o envelope `{ data, meta }`, mas o `api-client` já desenvolve e entrega só o `data` (registro puro). O guard virou `isCheckInRecord` (id+status strings) e o fake do teste passou ao shape real. É exatamente o cenário que o AC11 queria prevenir, do lado oposto: validação contra um contrato imaginado em vez do wiring real.
+
+## Spec Change Log
+
+- **Desvio de contrato-documento roteado ao wrap-3:** a descrição do 403 de `PATCH /trips/:id/end` (Swagger/openapi.json) continua "FORBIDDEN — somente motoristas" e não nomeia `DRIVER_NOT_ASSIGNED`, que agora também ocorre nesse status (AC12). O status 403 já estava declarado — nenhum DTO ou regeneração foi necessária — mas o TEXTO da documentação ficou incompleto; as Boundaries deste spec proíbem regenerar `openapi.json`. Registrado em `deferred-work.md`.
+
+## Review Triage Log
+
+Review blind-hunter (subagente, contexto zerado): 12 achados, floor N=9. Triagem verificado contra o código:
+
+- **F1 — guard do envelope validava shape que a produção nunca entrega (high, real):** `api-client` desenvolve `{ data, meta }` e o sender recebia o registro puro; todo dreno real viraria `offline` eterno. Pegado pelo e2e Playwright antes da review; corrigido (`isCheckInRecord` id+status) e fake do teste no shape real. Commit `fix(boarding)` (amend) + evidência: gate VERDE após o fix.
+- **F2 — comentário do DS5 descrevia mecânica errada (`{}` vs `undefined` pós-unwrap) (low, real):** corrigido no mesmo patch do F1.
+- **F3 — guard monotônico comparava relógios de domínios diferentes (high, real):** timestamp do evento é hora do SERVIDOR (`ingest-location.use-case.ts`) e `capturedAt` é eco do relógio do device; clock adiantado faria a tela flappar de volta ao ponto REST velho a cada evento. PATCH: cada resposta do last-known é consumida UMA vez (`dataUpdatedAt`) — a comparação passa a ser feita no máximo uma vez por fetch. Limite residual (skew pode aceitar/rejeitar 1 deslocamento por resync) documentado no código; fix de contrato (servidor carimbar o last-known) roteado ao wrap-3 via deferred-work.
+- **F4 — onOpen invalida o last-known no primeiro open (duplica o fetch do mount) (low real, REJEITADO):** 1 GET extra por (re)conexão; custo desprezível perto do custo da própria reconexão, e a semântica "reconciliar sempre que o stream abre" é a do AI1.
+- **F5 — log do hook chama falha de CAPTURA de "transmissão" (low, real):** patch de 1 linha ("falha de captura/transmissão").
+- **F6 — 401 deixaria POSTs a cada 5s em sessão morta (FALSE):** no caminho 401 o `api-client` desloga e redireciona ANTES de lançar o erro ao hook; o layout autenticado desmonta a tela do motorista e o cleanup do hook para a cadência. Não há tempestade.
+- **F7 — e2e do aluno desativado cobria 2 dos 3 endpoints (low, real):** patch: asserção de stream 403 `STUDENT_NOT_ON_TRIP` adicionada (guard rejeita antes de qualquer byte de stream).
+- **F8 — descrição 403 de `PATCH :id/end` obsoleta no Swagger/openapi.json (real, DEFER):** texto de contrato — Boundaries proíbem regenerar `openapi.json`; roteado ao wrap-3 (Spec Change Log + deferred-work).
+- **F9 — bloco parse/guard duplicado nas 2 cópias + warn idêntico para falhas distintas (duplicação: DEFER implícito ao wrap-4, item 19 já registrado; mensagem: PATCH):** guard de shape agora loga "Non-object message", distinto do "Malformed message" sintático.
+- **F10 — branches do `isStrictlyNewer` sem teste (low, real):** patch: testes de anti-flap e de capturedAt inválido não deslocar ponto vivo.
+- **F11 — `findActiveTripForStudent` com 3 queries sequenciais (low, real):** patch: aluno + links em `Promise.all`, mesma convenção do `isStudentOnRoute` logo abaixo.
+- **F12 — linha em branco extra no EOF do teste de tela (trivial):** corrigida.
+
 
 ## Code Map
 

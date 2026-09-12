@@ -187,14 +187,32 @@ interface CheckInApi {
 }
 
 /**
+ * O registro 2xx é a ÚNICA prova de registro de embarque: um 200/201 não-JSON
+ * (portal cativo, proxy quebrado) chega aqui como `undefined`/`{}` — o
+ * `api-client` extrai `json.data` do envelope e `parseResponseJson` devolve
+ * `{}` em corpo não-JSON. Tratado como sucesso, o dreno marcaria `sent` um
+ * check-in que o servidor nunca viu (DS5). Sem os campos do registro o sender
+ * REJEITA como falha de transporte: o item segue `pending` com tentativas
+ * intactas e o reenvio é replay inofensivo caso o POST original tenha chegado.
+ */
+function isCheckInRecord(response: unknown): boolean {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    typeof (response as { id?: unknown }).id === 'string' &&
+    typeof (response as { status?: unknown }).status === 'string'
+  )
+}
+
+/**
  * Traduz um item da fila no POST do dreno. Exportado por causa do teste: é aqui
  * que moram as duas garantias da NFR12 — o `occurredAt` do ESCANEAMENTO e a
  * chave de idempotência igual ao `id` do item —, e um fake de `send` escrito
  * dentro do teste afirmaria o mapeamento do próprio teste, não este.
  */
 export function buildCheckInSender(api: CheckInApi): CheckInSender {
-  return (item) =>
-    api.checkIn(
+  return async (item) => {
+    const record = await api.checkIn(
       {
         studentId: item.payload.studentId,
         tripId: item.payload.tripId,
@@ -206,6 +224,13 @@ export function buildCheckInSender(api: CheckInApi): CheckInSender {
       // operação nova, mesmo depois de um crash do app.
       item.id,
     )
+    if (!isCheckInRecord(record)) {
+      throw new TypeError(
+        'Resposta 2xx sem registro de check-in — tratada como falha de transporte',
+      )
+    }
+    return record
+  }
 }
 
 /**
