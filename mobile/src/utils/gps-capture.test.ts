@@ -1,3 +1,4 @@
+import { ApiClientError } from '@/services/api-error'
 import {
   createGpsCapture,
   createTimeoutSchedule,
@@ -110,6 +111,63 @@ describe('createGpsCapture', () => {
     await flushMicrotasks()
 
     expect(send).toHaveBeenCalledTimes(2)
+  })
+
+  it('erro classificado fatal (409/403): PARA a captura — sem tick novo e sem envio depois', async () => {
+    const { scheduled, getLocation, send, deps } = createFakeDeps()
+    deps.getLocation.mockResolvedValue(POSITION)
+    send.mockRejectedValue(
+      new ApiClientError('TRIP_NOT_ACTIVE', 'A viagem não está ativa', 409),
+    )
+    const classifySendError = jest.fn(() => 'fatal' as const)
+    const capture = createGpsCapture({ ...deps, classifySendError })
+
+    capture.start()
+    await flushMicrotasks()
+
+    // O classificador viu o erro determinístico e o cancelamento foi pedido.
+    expect(classifySendError).toHaveBeenCalledWith(expect.any(ApiClientError))
+    expect(scheduled).toHaveLength(2)
+    expect(scheduled[1].delayMs).toBeNull()
+
+    // Um tick órfão que dispare depois é no-op: a captura acabou.
+    scheduled[0].tick()
+    await flushMicrotasks()
+    expect(getLocation).toHaveBeenCalledTimes(1)
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('erro classificado transitório: cadência de 5s preservada', async () => {
+    const { scheduled, send, deps } = createFakeDeps()
+    deps.getLocation.mockResolvedValue(POSITION)
+    send.mockRejectedValue(new TypeError('Network request failed'))
+    const capture = createGpsCapture({
+      ...deps,
+      classifySendError: () => 'transient',
+    })
+
+    capture.start()
+    await flushMicrotasks()
+
+    expect(scheduled).toHaveLength(1)
+    expect(scheduled[0].delayMs).toBe(GPS_CAPTURE_INTERVAL_MS)
+
+    send.mockResolvedValue(undefined)
+    scheduled[0].tick()
+    await flushMicrotasks()
+    expect(send).toHaveBeenCalledTimes(2)
+  })
+
+  it('classificador é consultado em TODA falha da cadeia, inclusive de captura', async () => {
+    const { getLocation, deps } = createFakeDeps()
+    getLocation.mockRejectedValue(new Error('Position unavailable'))
+    const classifySendError = jest.fn(() => 'transient' as const)
+    const capture = createGpsCapture({ ...deps, classifySendError })
+
+    capture.start()
+    await flushMicrotasks()
+
+    expect(classifySendError).toHaveBeenCalledTimes(1)
   })
 
   it('falha de captura: idem — descarta e mantém a cadência', async () => {
