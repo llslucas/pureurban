@@ -2,7 +2,6 @@ import React from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
-import { lightPalette } from '@/lib/palette'
 import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 
 interface StatusPresentation {
@@ -17,28 +16,12 @@ interface StatusPresentation {
 
 // Constante de módulo, não `switch` inline no JSX (Task 2.3). `Record` sobre o
 // union: um `status` novo no contrato quebra o typecheck aqui, não a tela.
-// Cores vindas da paleta única (`@/lib/palette`) — as mesmas famílias de
-// `TONE_COLOR` em scan.tsx e do OfflineBanner. Cor nova = token novo na
-// paleta, com decisão registrada na story; nunca um hex local.
+// Cores das mesmas famílias de `TONE_COLOR` em scan.tsx e do OfflineBanner —
+// sem introduzir uma quarta paleta.
 export const STATUS_PRESENTATION: Record<BoardingStatus, StatusPresentation> = {
-  CHECKED_IN: {
-    label: 'Embarcou',
-    color: lightPalette.success,
-    background: lightPalette.successTint,
-    icon: '✓',
-  },
-  NOT_CHECKED_IN: {
-    label: 'Não embarcou',
-    color: lightPalette.textBody,
-    background: lightPalette.neutralTint,
-    icon: '—',
-  },
-  NOT_RETURNING: {
-    label: 'Não vai voltar',
-    color: lightPalette.warning,
-    background: lightPalette.warningTint,
-    icon: '!',
-  },
+  CHECKED_IN: { label: 'Embarcou', color: '#1B7F3B', background: '#E8F5E9', icon: '✓' },
+  NOT_CHECKED_IN: { label: 'Não embarcou', color: '#37474F', background: '#ECEFF1', icon: '—' },
+  NOT_RETURNING: { label: 'Não vai voltar', color: '#B26A00', background: '#FFF4E5', icon: '!' },
 }
 
 function formatCheckedInAt(iso: string): string {
@@ -103,8 +86,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
-    backgroundColor: lightPalette.surface,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
   },
   info: {
     flex: 1,
@@ -112,10 +95,10 @@ const styles = StyleSheet.create({
   },
   name: {
     fontWeight: '600',
-    color: lightPalette.text,
+    color: '#1A1A2E',
   },
   time: {
-    color: lightPalette.textBody,
+    color: '#555',
   },
   // Um nome longo não pode empurrar o status para fora da tela (Task 2.7).
   chip: {

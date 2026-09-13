@@ -2,8 +2,8 @@
 title: 'Story 1.11: Revisão da Paleta de Cores — Unificação sobre o DESIGN.md (Airtable)'
 type: 'feature'
 created: '2026-09-13'
-status: 'review'
-review_loop_iteration: 0
+status: 'in-review'
+review_loop_iteration: 1
 baseline_commit: 'b58b38ea3b9d023676a1e512d278d67a52298945'
 context:
   - '{project-root}/_bmad-output/project-context.md'
@@ -316,3 +316,35 @@ browser; a review rodou o roteiro desta seção e capturou os dois temas). Resul
 
 **Evidência**
 6. Roteiro visual (dois temas) e registros na story.
+
+## Review Triage Log
+
+Review de 2026-09-13 (blind-hunter + edge-case-hunter + verification-gap), 1ª iteração.
+Veredito por finding, com evidência verificada por mim sobre o diff/código:
+
+| # | Camadas | Finding | Veredito | Evidência / rota |
+|---|---------|---------|----------|------------------|
+| 1 | BH1+ECH1+VG-out | Guarda cobre só `#RGB/#RRGGBB`; `rgba()`/8-dígitos passam; 4 `rgba()` funcionais fora da allowlist | low | Real (regex + literals conferidos), mas o contrato frozen da guarda é `#RRGGBB` (matriz I/O); erosão dev-facing → patch |
+| 2 | BH2+ECH4 | `darkPalette.link/info` como texto sobre canvas escuro ~2.8:1 | false | Inalcançável: nenhuma tela consome esses papéis (temas Paper não os mapeiam; telas light-locked) |
+| 3 | BH3+ECH6 | Âmbar < 4.5:1 nos tamanhos efetivos: chip ≈16px/700 → **3.67:1** sobre o tinte (era 3.90:1 no pastel `#FFF4E5`); overlayDetail 18px/700 → 4.23:1 (par pré-existente, inalterado) | medium | Real e causado pela mudança no par do chip (12% alpha rebaixou o contraste); tensão interna do bloco congelado (D3 manter âmbar + regra de tinte vs Always ≥ 4.5:1) — a própria story anotou "trocar o âmbar exigiria renegociar a matriz" → **intent_gap → loopback ao Lucas** |
+| 4 | BH4+VG-outro | Tema escuro ocioso: `useTheme`/`Colors` sem consumidores; telas light-locked; render misto | low | Verificado (zero importers; caminhada); pré-change também era light-locked (MD3 default tinha o mesmo texto claro sobre fundo claro) → defer (story própria de consumo de tema) |
+| 5 | BH5+ECH5 | AC "tudo verde" vs 3 erros tsc; seção Verification diz "0 erros" | low | 3 erros reproduzidos idênticos no baseline; Registro já reconcilia → reject (fix = editar a própria spec) |
+| 6 | BH6 | sprint-status.yaml com comentário obsoleto ("caminhada pendente") | low | Real → patch |
+| 7 | BH7 | Task "8 arquivos — substituição" superconta (2 recebem só comentário) | low | Registro lista corretamente os papéis de cada arquivo → reject (fix = editar spec) |
+| 8 | BH8 | Inversão background=surfaceSoft sem decisão gated | false | Preserva a composição pré-existente (piso `#F5F5F5`, cards brancos) e está registrada na tabela de mudanças visuais; nenhum mau resultado demonstrado |
+| 9 | BH9 | project-context.md não menciona paleta/DESIGN.md | low | Real, dev-facing → defer (fix edita arquivo de contexto de agentes) |
+| 10 | BH10+VG2+ECH3 | Resíduo MD3 (`elevation`/`surfaceContainer*` violeta no Banner: `#F7F3F9`/`#25232A`) + comentário do theme.ts superestimado ("nenhum lavender") + nenhum teste lê o tema | low | Probe confirma; resíduo é pré-existente (Banner já usava elevation defaults antes); o comentário falso foi introduzido agora → patch (escopar o comentário); resíduo → defer |
+| 11 | BH11 | DESIGN.md: peso 575 órfão (prosa cita, token não define) | low | Doc pré-existente que a story não pode tocar (frozen: intocado) → defer |
+| 12 | BH12 | DESIGN.md: aritmética do touch target 48px inconsistente | low | idem → defer |
+| 13 | BH13 | DESIGN.md: cross-ref "Step 6" errada (regra é item 5) | low | idem → defer |
+| 14 | BH14 | DESIGN.md: Known Gaps omite o gap texto-sobre-escuro que forçou o D6 | low | idem → defer |
+| 15 | BH15 | DESIGN.md: `button-secondary-on-dark` byte-idêntico a `button-secondary` | low | idem (o token documenta padrão contextual da fonte) → defer |
+| 16 | BH16 | Suíte não testa pares dos papéis MD3 mapeados | false | Papéis sobrescritos derivam de tokens da paleta com pares testados ou trivialmente seguros (ex.: `onSurfaceVariant` 41454d sobre `surfaceVariant` e0e2e6 ≈ 7.3:1); não-sobrescritos = row 10 |
+| 17 | BH17 | Drift numérico: 6.4:1 (matriz frozen) vs ~6.5:1 (comentário palette.ts) | low | Cômputo confirma ~6.5 → patch (alinhar ao registro frozen) |
+| 18 | VG1 | Bindings migrados sem lock de teste (mutação: trocar `FAILED_COLOR`/`PENDING_COLOR` passa 326/326) | medium | Pré-verificado por demonstração de mutação; a "trava" da story não pega a classe de regressão mais provável → patch (assertions de lock no padrão do repo) |
+| 19 | ECH2 | `withAlpha` sem validação de entrada (rgba(NaN) silencioso) | false | Sem caminho alcançável: todos os call sites passam constantes de módulo |
+
+**Processamento em cascata:** row 3 = intent_gap (raiz dentro do `<frozen-after-approval>`)
+→ loopback; rows 1, 6, 10, 17, 18 (patch) e 4, 9, 10-resíduo, 11–15 (defer) ficam
+registradas e serão rederivadas no ciclo seguinte; rows 2, 5, 7, 8, 16, 19 rejeitadas
+com a refutação acima.
