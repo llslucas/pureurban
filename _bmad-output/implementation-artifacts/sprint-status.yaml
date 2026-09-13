@@ -434,6 +434,16 @@ action_items:
     # (2 → 1) EXTRAÍDOS. Ficam: fatiar boarding.e2e-spec.ts (1753 linhas) e
     # acompanhar home.tsx (413 linhas) — a fatiar durante o Épico 5 se o
     # spec de tracking crescer junto.
+    #
+    # Fatiamento EXECUTADO em 13/09/2026 (wrap-4, branch
+    # refactor/wrap-4-sse-broadcaster-e-e2e-slice, pendente de merge):
+    # boarding.e2e-spec.ts (1753 linhas) dividido por bloco de story em
+    # test/boarding/ — casos 70→70 preservados, asserções intocadas. Detalhe
+    # no comentário do epic-5-retro-item-19 (mesma branch).
+    #
+    # MONITORIA (AC8 do wrap-4, medição de 13/09/2026): home.tsx = 419 linhas,
+    # scan.tsx = 745 linhas — SEM AÇÃO, mesmos valores da retro 5 (precedente
+    # scan.tsx). Reavaliar extração só se crescerem além do padrão atual.
     status: open
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-5-retro-item-14-implementar-o-resync-que-o-contrato-prom"
@@ -525,6 +535,26 @@ action_items:
       (995 linhas) junto do boarding.e2e-spec.ts (1753, restante do item 13 da retro
       4)"
     owner: "Dev"
+    # EXECUTADO em 13/09/2026 (branch refactor/wrap-4-sse-broadcaster-e-e2e-slice,
+    # pendente de merge — só vira done quando o PR mergear, convenção do item 8/18):
+    # (A) API: a maquinaria (canal ref-counted + heartbeat 30s + sentinela +
+    # handleMessage com o guard wrap-1) vive em UMA classe,
+    # shared/shell/sse/sse-broadcaster.service.ts; cada service de domínio a
+    # compõe e mantém só o SEU canal/eventos (instância por domínio preserva a
+    # conexão subscriber dedicada e o mapa por domínio). (B) Mobile: cliente único
+    # services/sse-client.ts (escada 1s..30s, 3 refreshes falhos ⇒ onUnrecoverable,
+    # pollingInterval 5000 explícito p/ ambos os domínios — boarding dependia do
+    # default da lib, mesmo valor); facades por domínio só declaram URL + eventos;
+    # API pública dos 2 módulos inalterada. (C) Specs fatiados: test/boarding/
+    # (check-in, roles-matrix, events-stream, not-returning, cancel-absence,
+    # checkin-reminder) e test/tracking/ (roles-matrix, ingestion-last-known,
+    # stream-discovery), setup compartilhado em test/support/ (supertest-app,
+    # sse-stream, company-scenario). ZERO mudança de asserção: os 23 cases unit
+    # dos services SSE e os 20 cases mobile dos clientes passam SEM edição;
+    # contagem por bloco preservada (boarding 70→70, tracking 36→36, total e2e
+    # 200→200). Gate verde no HEAD da branch: 335 unit / 200 supertest / 2 pw:api
+    # (NFR4 41ms) / 10 pw:e2e (NFR1 11ms, NFR2 8ms, NFR3 103ms) / openapi:check
+    # limpo (contrato não muda, sem regeneração).
     status: open
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-20-baratas-de-1-linha-nan-guard-no-formatcl"

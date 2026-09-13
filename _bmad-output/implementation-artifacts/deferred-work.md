@@ -431,3 +431,9 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/spec-wrap-3-reconciliacao-de-contrato-e-documentos.md`
   summary: `npx tsc --noEmit` do mobile vermelho na baseline em 2 arquivos de teste do wrap-1 — `use-trip-gps-capture.test.tsx:92` (TS2554) e `tracking-stream.service.test.ts:172` (TS2339 `pollingInterval`).
   evidence: Verificado pré-existente via stash contra a árvore limpa da main (13/09/2026); `npm test` passa (252/252) e o gate não roda o tsc do mobile, então só checagem manual expõe. Fix de ~2 linhas (tipar o argumento no teste do classify; ler a config exportada no teste do cliente), sem comportamento.
+
+## Deferred from: review of spec-wrap-4-divida-de-forma-sse-e-e2e.md (2026-09-13)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-wrap-4-divida-de-forma-sse-e-e2e.md`
+  summary: Add a unit case asserting the SSE terminal-signal failure log fires — the log is the ONLY diagnostic when the sentinel publish to Redis fails.
+  evidence: Verification-gap layer (pré-verificado): os 23 casos unit dos services SSE nunca tocam o caminho de falha do publish (deletar o `.catch`/`logger.error` deixa o gate inteiro verde); nenhum e2e força falha de publish. O wrap-4 mudou o shape do log (canal em vez de tripId) — mudança divulgada no risco #1 do spec. Follow-up barato: 1 caso unit com spy no logger e `redis.publish` rejeitando.
