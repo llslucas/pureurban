@@ -257,7 +257,14 @@ action_items:
   #     (NFR1 11ms, NFR2 8ms, NFR3 103ms) / openapi limpo (refatoração pura,
   #     contrato não muda). Follow-up do log de falha da sentinela deferido
   #     (ver deferred-work.md).
-  #   spec-wrap-5 (desfecho da fila offline — GATED na matriz de decisão): item 3
+  #   spec-wrap-5 (desfecho da fila offline — GATED na matriz de decisão): item 3 —
+  #     FECHADO em 13/09/2026 (PR #47); spec status: done, review triage 14
+  #     achados (7 patches, 1 defer → Fase 2, 3 rejeitados com evidência, 1 false,
+  #     2 absorvidos como docs/testes). Matriz D1–D7 aprovada na íntegra (defaults)
+  #     antes de executar. Gate verde: 296 unit mobile / 200 supertest / 2 pw:api
+  #     (NFR4 22ms) / 10 pw:e2e (NFR3 99ms, NFR1 15ms, NFR2 17ms) / openapi limpo.
+  #     Fase 1 (Épicos 1-5) + wrap pós-MVP COMPLETOS; restam os defers registrados
+  #     em deferred-work.md e a Story 1.7 (validação em device) para a defesa.
   # Um item só vira `done` quando o PR do spec correspondente mergear e a evidência
   # estiver verificada (padrão das retro: evidência contra o HEAD, não contra o
   # comentário).
@@ -291,7 +298,16 @@ action_items:
       sent para itens nunca entregues, identidade do motorista no item, logout limpa
       fila, expiração alinhada à janela 24h do occurredAt, invalidar roster pós-dreno"
     owner: "Lucas + Dev"
-    status: open
+    # DONE em 13/09/2026 (wrap-5, PR #47): matriz D1–D7 aprovada na íntegra
+    # (defaults) antes de executar. Migração v1→v2 da offline_queue (user_id/
+    # company_id/updated_at via PRAGMA user_version), dreno escopado ao usuário
+    # logado, EXPIRED local sem POST (janela 24h), logout purga a fila com aviso
+    # de descarte no login, purge de sent > 7 dias no boot (teto 500 por usuário)
+    # e invalidação de roster/activeTrip pós-dreno (reverte o pin DS1 do wrap-1).
+    # Desvio consciente do D5: aviso pós-fato no login (não há botão "Sair" para
+    # motorista — defer da 1.6/3.5b). Trava: baterias QueueStorage (fake + SQLite
+    # real), offline-queue-lifecycle, use-offline-sync e login-screen.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-4-contract-consistency"
     epic: 3
