@@ -549,6 +549,16 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
         'VALIDATION_ERROR',
       );
 
+      // Ampliar a precisão fracionária (wrap-3/R11) não abriu a porta para
+      // não-ISO: âncora Z obrigatória mesmo com casas fracionárias.
+      const noZoneCapturedAt = await ingest(driverToken, {
+        ...validBody(tripId),
+        capturedAt: '2026-09-12T12:00:00.123456789',
+      }).expect(400);
+      expect((noZoneCapturedAt.body as ApiResponse).error?.code).toBe(
+        'VALIDATION_ERROR',
+      );
+
       // Borda accuracy >= 0 do contrato (R16): -5 é coordenada válida de
       // longitude na mão errada — atravessaria Redis/evento/tela com tudo
       // verde se o limite sair do schema.
@@ -565,6 +575,13 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
       await ingest(driverToken, { ...validBody(tripId), accuracy: 0 }).expect(
         200,
       );
+
+      // Lado inclusivo da ampliação (wrap-3/R11): 0 casas fracionárias é a
+      // forma ISO comum à mão — segue aceita, como o contrato da 5.0 promete.
+      await ingest(driverToken, {
+        ...validBody(tripId),
+        capturedAt: '2026-09-12T12:00:00Z',
+      }).expect(200);
     });
   });
 
@@ -823,6 +840,41 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
         // MESMO instante do receivedAt do ack.
         timestamp: (response.body as ApiResponse).data!.receivedAt,
       });
+
+      handle.abort();
+    });
+
+    it('capturedAt com precisão fracionária arbitrária (wrap-3/R11): 200, posição atravessa o stream e o last-known ecoa verbatim', async () => {
+      const tripId = await seedActiveTrip();
+      const handle = openStream(studentToken, tripId);
+      await handle.ready;
+
+      // GPS nativo comum manda mais de 3 casas; o contrato promete ISO 8601
+      // UTC sem teto de precisão — rejeitar quem o segue era aceitar só quem
+      // desvia. O evento NÃO carrega capturedAt: o timestamp do fio é o
+      // receivedAt do servidor; o eco verbatim sai no last-known.
+      const nanos = '2026-09-12T12:00:00.123456789Z';
+      const response = await ingest(driverToken, {
+        ...validBody(tripId),
+        capturedAt: nanos,
+      }).expect(200);
+
+      const first = await handle.firstMessage;
+      expect(first.event).toBe('location.updated');
+      expect(first.data).toEqual({
+        tripId,
+        latitude: -20.755549,
+        longitude: -42.881728,
+        accuracy: 12.5,
+        timestamp: (response.body as ApiResponse).data!.receivedAt,
+      });
+
+      const lastKnownResponse = await lastKnown(studentToken, tripId).expect(
+        200,
+      );
+      expect((lastKnownResponse.body as ApiResponse).data!.capturedAt).toBe(
+        nanos,
+      );
 
       handle.abort();
     });
