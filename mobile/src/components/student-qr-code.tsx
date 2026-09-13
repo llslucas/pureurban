@@ -22,6 +22,9 @@ export function StudentQrCode({ value, size }: StudentQrCodeProps) {
 
   return (
     <View style={styles.wrapper}>
+      {/* Allowlist da guarda de paleta: quiet zone branca PURA e módulos pretos
+          puros são requisito óptico de leitura do QR (borda de silêncio), não
+          cores de UI — trocá-las quebraria o scan. */}
       <QRCode
         value={value}
         size={resolvedSize}
@@ -35,6 +38,7 @@ export function StudentQrCode({ value, size }: StudentQrCodeProps) {
 }
 
 const styles = StyleSheet.create({
+  // Fundo branco puro do wrapper: continuação da quiet zone do QR (allowlist).
   wrapper: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,

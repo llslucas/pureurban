@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "13-09-2026 19:10"
+last_updated: "13-09-2026 19:35"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -112,7 +112,19 @@ development_status:
   # extração do sistema Airtable) como fonte única da paleta. GATED: matriz de
   # decisões D1–D7 (D1 azul #208AEF → tinta #181d26; D6 dark mode derivado) exige
   # aprovação do Lucas ANTES de executar. Não bloqueia nem desbloqueia outras stories.
-  1-11-revisao-da-paleta-de-cores: ready-for-dev
+  # GATE aprovado na íntegra em 13/09. Loopback da review (iteração 1): tensão
+  # âmbar×AA renegociada pelo Lucas (piso 3:1 para badges/overlays). Loopback da
+  # review (iteração 2, row 25): outline/outlineVariant preservados no default
+  # MD3 (gate não-texto WCAG 1.4.11) + emenda com locks de tema/token-pin/
+  # call-site. RE-DERIVAÇÃO DA ITERAÇÃO 2 CONCLUÍDA em 13/09: paleta única em
+  # `mobile/src/lib/palette.ts` + temas Paper/Colors derivados + 8 arquivos
+  # migrados + guarda com 46 testes (varredura hex/rgba + entrada morta +
+  # contraste AA com âmbar no piso 3:1 + gate não-texto + locks). Mutação 5/5.
+  # Gate verde: 342 unit (296 baseline + 46 da guarda), tsc com só os 3 erros
+  # pré-existentes, lint limpo, caminhada visual nos dois temas 34/34 com
+  # bordas outlined SEM regressão vs baseline. Falta abrir o PR — status vira
+  # `done` no merge.
+  1-11-revisao-da-paleta-de-cores: review # re-derivação concluída (iteração 2 + patches da review iteração 3), gates verdes; PR pendente da confirmação do Lucas — status vira `done` no merge
   epic-1-retrospective: done # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
