@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import type { PrismaService } from '../../src/domains/shared/shell/infra/prisma.service.js';
-import type { ApiResponse } from './supertest-app.js';
+import { http, type ApiResponse } from './supertest-app.js';
 
 // Shared seed for the boarding/tracking e2e slices: one company (admin),
 // a route with one allowed student and one driver (plus an unassigned driver
@@ -32,7 +31,7 @@ export const login = async (
   email: string,
   password: string,
 ): Promise<string> => {
-  const res = await request(app.getHttpServer())
+  const res = await http(app)
     .post('/api/v1/auth/login')
     .send({ email, password })
     // 200 é o contrato (@HttpCode(OK) no controller desde o hardening
@@ -47,7 +46,7 @@ export const createUser = async (
   path: string,
   data: Record<string, unknown>,
 ): Promise<string> => {
-  const res = await request(app.getHttpServer())
+  const res = await http(app)
     .post(path)
     .set('Authorization', `Bearer ${adminToken}`)
     .send(data)
@@ -76,7 +75,7 @@ export const checkIn = (
   key: string | null,
   body: Record<string, unknown>,
 ) => {
-  const req = request(app.getHttpServer())
+  const req = http(app)
     .post('/api/v1/boarding/check-in')
     .set('Authorization', `Bearer ${token}`);
   if (key !== null) req.set('X-Idempotency-Key', key);
@@ -123,7 +122,7 @@ export const seedCompanyScenario = async (
     password: 'senha12345',
   };
 
-  const post = (path: string) => request(app.getHttpServer()).post(path);
+  const post = (path: string) => http(app).post(path);
 
   const registerRes = await post('/api/v1/auth/register')
     .send(adminCredentials)

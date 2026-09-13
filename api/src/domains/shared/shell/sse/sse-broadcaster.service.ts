@@ -55,7 +55,7 @@ export class SseBroadcaster {
       .publish(channel, JSON.stringify({ type: TRIP_ENDED_SIGNAL }))
       .catch((error: unknown) => {
         this.logger.error(
-          `Failed to publish terminal signal for trip ${channel}`,
+          `Failed to publish terminal signal for channel ${channel}`,
           error instanceof Error ? error.stack : String(error),
         );
       });
