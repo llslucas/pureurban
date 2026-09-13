@@ -2,7 +2,7 @@
 title: 'Story 1.11: Revisão da Paleta de Cores — Unificação sobre o DESIGN.md (Airtable)'
 type: 'feature'
 created: '2026-09-13'
-status: 'ready-for-dev'
+status: 'review'
 review_loop_iteration: 0
 baseline_commit: 'b58b38ea3b9d023676a1e512d278d67a52298945'
 context:
@@ -94,6 +94,104 @@ escala com qualquer tema.
 
 </frozen-after-approval>
 
+## Registro do GATE
+
+- **2026-09-13:** Matriz D1–D7 aprovada **na íntegra** pelo Lucas, sem desvios —
+  execução das tasks liberada.
+
+## Registro de Execução (2026-09-13)
+
+Implementação concluída na branch `feat/1-11-revisao-da-paleta-de-cores`.
+
+### Arquivos
+
+- **Novos:** `mobile/src/lib/palette.ts` (fonte única) e
+  `mobile/src/lib/palette.guard.test.ts` (guarda + contraste).
+- **Alterados:** `lib/theme.ts` e `constants/theme.ts` (derivam da paleta),
+  `(driver)/trip.tsx`, `(driver)/routes.tsx`, `(driver)/student-list.tsx`,
+  `(driver)/scan.tsx`, `components/student-card.tsx`, `components/offline-banner.tsx`
+  (migração para tokens) e `components/qr-scanner.tsx` +
+  `components/student-qr-code.tsx` (apenas comentário de allowlist — hexes funcionais
+  intocados). `hooks/use-theme.ts` intocado (API mantida).
+- **Intocados:** `DESIGN.md`, `api/`, assets nativos (splash/ícone seguem azuis —
+  rebrand é escopo próprio, "Ask First" respeitado).
+
+### Mudanças visuais intencionais (para conferência na caminhada)
+
+| Onde | Antes | Depois |
+|---|---|---|
+| Botões primários Paper (todas as telas) | azul `#208AEF` | tinta `#181d26`, texto branco (D1) |
+| "Encerrar Viagem" (trip) | `#D32F2F` | `#B3261E` (vermelho único, D2) |
+| Fundo de telas do motorista | `#F5F5F5` | `#f8fafc` (surface-soft) |
+| Cards/headers | `#FFFFFF` | `#ffffff` (canvas) |
+| Bordas divisórias | `#E0E0E0` | `#dddddd` (hairline) |
+| Títulos | `#1A1A2E` | `#181d26` (ink) |
+| Texto corrido | `#333`/`#444`/`#555` | `#333840` (body) |
+| Legendas/hints/labels | `#666`/`#888` | `#41454d` (muted — sobe de ~3.5:1 para ~9.6:1) |
+| Chip "Em Andamento" / "Embarcou" | pastéis `#E8F5E9`/verde `#1B7F3B` | tinte alpha 12% do verde `#006400` (D4) |
+| Chip "Concluída" | pastel `#E3F2FD` | tinte alpha 12% do info `#254fad` (D5) |
+| Chip "Não vai voltar" / avisos | `#FFF4E5`/`#B26A00` | tinte alpha 12% do âmbar `#B26A00` (D3) |
+| Chip "Não embarcou" / faixa offline | slate `#37474F`/`#ECEFF1` | body `#333840` + tinte alpha (família ink/body) |
+| Overlay "Verificando..." (scan) | `#263238` | tinta `#181d26` |
+| Tema escuro (Paper) | MD3 default + azul | mapeamento D6 (canvas `#181d26`, elemento `#1d1f25`, texto `#ffffff`, secundário `#dddddd`, hairline `#41454d`, botão primário branco com texto tinta) |
+| `secondary` do tema Paper | azuis `#E6F4FE`/`#1a3a54` | `#e0e2e6` (light) / `#41454d` (dark) |
+
+### Verificação
+
+- `cd mobile && npm test` — **326 testes passando**, incluindo as 20 novas asserções
+  (guarda de hex + contraste AA). O aviso "worker process has failed to exit" é
+  preexistente (timers de `trip-screen.test.tsx`).
+- `npx tsc --noEmit` — os 3 erros existentes no baseline `b58b38e` permanecem
+  idênticos e **nenhum erro novo foi introduzido**: `scan.tsx` 'user' possibly null,
+  `use-trip-gps-capture.test.tsx` TS2554, `tracking-stream.service.test.ts` TS2339.
+  Fora do escopo desta story (mudança de COR apenas).
+- `npm run lint` — limpo (exit 0).
+- `grep -rEn "#[0-9A-Fa-f]{6}" mobile/src --include="*.tsx" --include="*.ts" |
+  grep -v palette` — só as allowlists (`student-qr-code.tsx`, `qr-scanner.tsx`,
+  `scan.tsx` fundo da câmera).
+- `git diff --stat main` — só `mobile/` + `_bmad-output/`; nenhum arquivo de `api/`.
+- Bundle web compilado no Metro (`entry.bundle` + cada módulo alterado) — HTTP 200,
+  sem erro de resolução/transform; tokens da paleta presentes no bundle.
+
+### Desvios/tensões registrados
+
+1. **Âmbar (D3) no piso 3:1, não 4.5:1:** `#B26A00` sobre branco dá ~4.24:1 — abaixo
+   do AA de texto normal. A decisão congelada D3 mantém o âmbar escolhido na 3.5b; ele
+   entra como rótulo de badge e título de overlay (texto grande/negrito), e o teste de
+   contraste o guarda no piso de 3:1 (AA texto grande/UI), com o par anotado. Trocar o
+   âmbar exigiria renegociar a matriz.
+2. **Scan overlay "offline" usa `body` (`#333840`)**, não `muted`: a tabela de status
+   manda slate→família ink/body; `#333840` mantém o texto branco a ~11.7:1.
+3. **`#FFF4E5` some da paleta:** o par âmbar de D3 continua existindo, mas a metade de
+   superfície passou a ser expressa como tinte alpha da base (regra dos tintes da
+   própria story — "zero cores novas").
+4. **Allowlist do `scan.tsx`:** além de `qr-scanner.tsx` e `student-qr-code.tsx`, os
+   dois `#000000` de fundo da câmera em `scan.tsx` entraram na allowlist — é chrome de
+   câmera previsto na matriz de I/O ("scanner (chrome de câmera)") e a paleta do
+   DESIGN.md não tem preto puro.
+
+### Roteiro visual pendente (para a review, alvo web, dois temas)
+
+Com `cd mobile && npm run web` (usa mocks; senha livre) e o tema alternado no
+DevTools (`prefers-color-scheme`) ou emulando no device toolbar:
+
+1. **Login** (`motorista@pureurban.com`): botão "Entrar" tinta `#181d26` com texto
+   branco.
+2. **Motorista → trip**: fundo `#f8fafc`, cards brancos, botões tinta, "Encerrar
+   Viagem" vermelho `#B3261E`, chip "Em Andamento" com tinte verde claro.
+3. **scan**: com viagem ativa, moldura branca sobre a câmera intacta; contador sobre
+   faixa preta translúcida. (Overlays de resultado exigem escanear — o E2E da 3.6
+   cobre; verificação manual opcional.)
+4. **student-list**: header branco com hairline `#dddddd`, chips por status nos
+   tintes alpha.
+5. **routes**: mesma família — títulos ink, hints muted.
+6. **Aluno** (`aluno@pureurban.com`): home e QR — QR com quiet zone branca intacta
+   (allowlist).
+7. **Banners**: com `motorista-lista-instavel@pureurban.com`, reabrir a lista e ver o
+   Banner de dado velho; faixa offline (fila) nos dois temas.
+8. Repetir 1–7 no tema escuro: nenhum texto ilegível (o par mais claro a observar:
+   texto secundário `#dddddd` sobre `#181d26`).
+
 ## Code Map
 
 - `mobile/src/lib/theme.ts` -- hoje: temas Paper light/dark com `primary: '#208AEF'`.
@@ -126,22 +224,25 @@ escala com qualquer tema.
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
+- [x] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
   aprovadas (D2/D3) + derivação dos temas claro/escuro (D6). JSDoc mínimo apontando o
   DESIGN.md como fonte viva.
-- [ ] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
+- [x] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
   `Colors` derivando da paleta; eliminação dos neutros avulsos.
-- [ ] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
+- [x] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
   (famílias: marinho `#1A1A2E`→tinta; vermelhos→`#B3261E`; slate offline→família
   ink/body; verdes→`#006400`; pastéis→tintes alpha).
-- [ ] `palette.guard.test.ts` -- (a) varredura de hex fora do módulo com allowlist
+- [x] `palette.guard.test.ts` -- (a) varredura de hex fora do módulo com allowlist
   comentada (QR + scanner); (b) contraste AA dos pares do tema.
-- [ ] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
+- [x] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
   student-list, routes) → aluno (home, QR) → banners (offline/stale) nos DOIS temas;
-  mudanças visuais intencionais registradas na story.
-- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
+  mudanças visuais intencionais registradas na story. *(Parcial: o bundle web compila
+  sem erro no Metro e todas as suítes de render passam; a caminhada interativa nos dois
+  temas ficou pendente — browser indisponível nesta sessão do agente. Roteiro pronto na
+  seção Registro de Execução.)*
+- [x] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
   atualizada ao concluir.
-- [ ] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
+- [x] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
 
 **Acceptance Criteria:**
 - Given o app em qualquer tela, when os componentes resolarem cor, then a cor vem do
