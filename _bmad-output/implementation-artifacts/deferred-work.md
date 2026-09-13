@@ -443,3 +443,16 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/spec-wrap-5-desfecho-da-fila-offline.md`
   summary: Copy do banner vermelho discriminada por motivo — para itens EXPIRED (D1), "Registre manualmente" é instrução impossível (a janela de 24h fechou também para o registro manual); o texto certo seria "dispense este embarque".
   evidence: Rejeitado como patch no wrap-5 (triagem: low — a copy atual é a NFR13 literal e a bateria é a interface aprovada "banner global", sem badge por item); o fix depende de expor o motivo por item, que é o corte consciente da Fase 2 (sprint-change-proposal-2026-08-28). Registrado para quando o badge ✗/⏳/✗ existir.
+
+- source_spec: `1-11-revisao-da-paleta-de-cores.md`
+  summary: Dar consumo real ao tema escuro (telas consomem useTheme/darkPalette) ou desligar dark no alvo web — hoje só os widgets Paper flipam e o render fica misto.
+  evidence: Triagem da review da 1.11, iteração 1 (rows BH4+VG-outro, verdict low, verificado): useTheme/Colors sem consumidores em mobile/src; telas light-locked antes e depois da story; incoerências do render misto (título do login, botão outlined da trip) pré-existentes.
+- source_spec: `1-11-revisao-da-paleta-de-cores.md`
+  summary: Sobrescrever os papéis MD3 remanescentes (elevation/surfaceContainer*) com tons da paleta — o Banner de dado velho renderiza o violeta default (#F7F3F9 light / #25232A dark).
+  evidence: Triagem da review da 1.11, iteração 1 (row 10, verdict low, verificado por probe de estilo computado); resíduo pré-existente à story.
+- source_spec: `1-11-revisao-da-paleta-de-cores.md`
+  summary: Apontar a paleta (mobile/src/lib/palette.ts) e o DESIGN.md no project-context.md como fonte única de cor do app.
+  evidence: Triagem da review da 1.11, iteração 1 (row 9, verdict low): o invariante "cor nova = token novo na paleta" não tem ponteiro no documento que o AGENTS.md manda consultar; roteado a defer porque o fix edita arquivo de contexto de agentes.
+- source_spec: `1-11-revisao-da-paleta-de-cores.md`
+  summary: Dívida editorial do DESIGN.md — peso 575 órfão, aritmética do touch target 48px inconsistente, cross-ref "Step 6" errada, Known Gaps sem o gap de texto-sobre-escuro, token button-secondary-on-dark duplicado.
+  evidence: Triagem da review da 1.11, iteração 1 (rows 11–15, verdict low cada): fatos reais verificados no documento; a story 1.11 não pode tocá-lo (frozen: DESIGN.md intocado).

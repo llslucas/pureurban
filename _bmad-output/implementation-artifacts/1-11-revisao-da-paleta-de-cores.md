@@ -45,7 +45,7 @@ desvios anotados pelo Lucas) ANTES de executar qualquer tarefa** (precedente wra
 |---|---------|--------------------------------|------------------------|---------------|
 | D1 | Cor primária da marca | **Adotar tinta `#181d26`** ("black IS the primary") emplace do azul `#208AEF` | Manter azul | O DESIGN.md é inequívoco: primário é a tinta quase-preta; o azul-`link` (`#1b61c9`) é explicitamente "não é a cor do botão primário" |
 | D2 | Erro | **`#B3261E`** (default MD3, já dominante no app; eliminar o `#D32F2F` duplicado) | Coral `#aa2d00` | A fonte NÃO documenta erro ("Known Gaps"); coral é superfície-assinatura full-bleed ("nunca acento pequeno") — usá-lo como cor de texto violaria a própria fonte. `#B3261E` já está no código, 6.4:1 no branco |
-| D3 | Aviso | **Manter par âmbar `#B26A00`/`#FFF4E5`** como extensão app-only documentada | Mostarda `#d9a441`/`#f4d35e` | Mostarda como texto falha contraste (~2.2:1); as pastéis da fonte são superfícies de demo-grid, não semântica de status. Âmbar foi escolhido deliberadamente na 3.5b |
+| D3 | Aviso | **Manter par âmbar `#B26A00`/`#FFF4E5`** como extensão app-only documentada — **com piso 3:1 (AA texto grande/UI) aceito para badges/overlays**, pois `#B26A00` dá ~4.24:1 no branco e ~3.67:1 sobre o próprio tinte (abaixo do 4.5:1 de texto normal) | Mostarda `#d9a441`/`#f4d35e` | Mostarda como texto falha contraste (~2.2:1); as pastéis da fonte são superfícies de demo-grid, não semântica de status. Âmbar foi escolhido deliberadamente na 3.5b. Piso 3:1 renegociado e aprovado pelo Lucas no loopback da review (13/09/2026) |
 | D4 | Sucesso | **Adotar `#006400`** (texto) + `#39bf45` (borda/acentos) emplace de `#1B7F3B` | — | Token documentado na fonte; elimina um verde avulso |
 | D5 | Link / informativo | **Adotar `link #1b61c9`** (ativo `#1a3866`) e `info #254fad`/`#458fff` | — | Tokens documentados; substituem os azuis avulsos restantes |
 | D6 | Tema escuro | **Mapeamento derivado**: canvas→`#181d26`, elemento→`#1d1f25`, texto→`#ffffff`, secundário→`#dddddd`, hairline→`#41454d`, borda-forte→`#9297a0`; **botão primário em dark = branco com texto tinta** (espelha o `button-secondary-on-dark` documentado — "o botão branco fica branco sobre superfícies escuras") | Desligar dark mode | A fonte documenta as superfícies escuras mas não o texto corrido sobre elas; o primário-tinta sobre fundo-tinta não funciona, e o padrão branco-sobre-dark É o padrão documentado da fonte |
@@ -63,7 +63,9 @@ escala com qualquer tema.
 - Ambos os temas (claro/escuro) derivam do mesmo módulo.
 - QR preserva branco puro/preto puro (quiet zone de leitura) — allowlist explícita no
   teste de guarda, com comentário do porquê.
-- Texto×fundo dos pares do tema ≥ 4.5:1 (WCAG AA), verificado por teste determinístico.
+- Texto×fundo dos pares do tema ≥ 4.5:1 (WCAG AA), verificado por teste determinístico —
+  **exceto o âmbar (D3), com piso 3:1 de texto grande/UI para badges/overlays
+  (renegociado no loopback de 13/09/2026).**
 - Roteiro de verificação visual executado no alvo web (sem device — validação nativa é
   da Story 1.7).
 
@@ -98,6 +100,10 @@ escala com qualquer tema.
 
 - **2026-09-13:** Matriz D1–D7 aprovada **na íntegra** pelo Lucas, sem desvios —
   execução das tasks liberada.
+- **2026-09-13 (loopback da review, iteração 1):** tensão âmbar×AA resolvida pelo
+  Lucas — **manter `#B26A00` com piso 3:1 (AA texto grande/UI) para badges/overlays**;
+  matriz frozen atualizada em D3 e no Always correspondente. Código revertido ao
+  baseline para re-derivação conforme o workflow.
 
 ## Registro de Execução (2026-09-13)
 
@@ -242,35 +248,53 @@ browser; a review rodou o roteiro desta seção e capturou os dois temas). Resul
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
-  aprovadas (D2/D3) + derivação dos temas claro/escuro (D6). JSDoc mínimo apontando o
-  DESIGN.md como fonte viva.
-- [x] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
-  `Colors` derivando da paleta; eliminação dos neutros avulsos.
-- [x] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
+
+*Re-derivação pós-loopback (iteração 1) — tasks abaixo recomeçam abertas; o código foi
+revertido ao baseline `b58b38e`. Além do escopo original, incorporam os patches
+verificados na review (triage log rows 1, 6, 10, 17, 18):*
+
+- [ ] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
+  aprovadas (D2/D3, com o piso 3:1 do âmbar renegociado) + derivação dos temas
+  claro/escuro (D6). JSDoc mínimo apontando o DESIGN.md como fonte viva; comentário de
+  contraste do erro alinhado ao registro frozen (`6.4:1`).
+- [ ] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
+  `Colors` derivando da paleta; eliminação dos neutros avulsos. O comentário do
+  `theme.ts` fica ESCOPADO aos papéis sobrescritos (não afirmar "nenhum lavender do
+  MD3" — `elevation`/`surfaceContainer*` permanecem default, resíduo pré-existente
+  registrado no defer).
+- [ ] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
   (famílias: marinho `#1A1A2E`→tinta; vermelhos→`#B3261E`; slate offline→família
   ink/body; verdes→`#006400`; pastéis→tintes alpha).
-- [x] `palette.guard.test.ts` -- (a) varredura de hex fora do módulo com allowlist
-  comentada (QR + scanner); (b) contraste AA dos pares do tema.
-- [x] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
+- [ ] `palette.guard.test.ts` -- (a) varredura de cor fora do módulo: hex `#RGB/#RRGGBB`
+  **e `rgba()`/hex 8-dígitos**, com allowlist comentada (QR quiet zone, chrome de
+  câmera de `qr-scanner.tsx` e `scan.tsx`, faixa branca 92% do `offline-banner.tsx` —
+  cada uma com o porquê); (b) contraste AA dos pares do tema com o **âmbar no piso 3:1
+  (D3 renegociado)**, pares anotados; (c) **locks de binding**: `STATUS_PRESENTATION`,
+  `TONE_COLOR`, `PENDING_COLOR`/`FAILED_COLOR` presos aos papéis da paleta (a migração
+  manual não pode trocar tokens silenciosamente — demonstrado por mutação na review).
+- [ ] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
   student-list, routes) → aluno (home, QR) → banners (offline/stale) nos DOIS temas;
-  mudanças visuais intencionais registradas na story. *(Executada na review — ver
-  "Caminhada visual executada" no Registro de Execução.)*
-- [x] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
-  atualizada ao concluir.
-- [x] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
+  mudanças visuais intencionais registradas na story. *(Já executada uma vez na review
+  anterior — repetir na re-derivação.)*
+- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
+  atualizada ao concluir, com comentário refletindo o estado REAL (sem "pendente"
+  obsoleto).
+- [ ] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
 
 **Acceptance Criteria:**
 - Given o app em qualquer tela, when os componentes resolarem cor, then a cor vem do
   módulo de paleta — zero hex semântico fora dele, provado pelo teste de guarda.
 - Given os dois temas, when alternados, then todos os pares texto×fundo passam AA no
-  teste de contraste e nenhum texto fica ilegível (verificação visual registra os dois).
+  teste de contraste (âmbar no piso 3:1, D3 renegociado) e nenhum texto fica ilegível
+  (verificação visual registra os dois).
 - Given a paleta antiga, when comparada, then: um só vermelho, um só verde, zero
   `#1A1A2E`/`#208AEF`/`#F5F5F5` em componentes.
-- Given `cd mobile && npm test && npx tsc --noEmit && npm run lint`, then tudo verde;
-  `git diff` sem arquivo de `api/`.
+- Given `cd mobile && npm test && npx tsc --noEmit && npm run lint`, then tudo verde
+  (exceto os 3 erros tsc pré-existentes no baseline, documentados); `git diff` sem
+  arquivo de `api/`.
 - Given a matriz D1–D7, then cada default aprovado (ou desvio anotado) ANTES da
-  primeira task de código — registrado nesta story.
+  primeira task de código — registrado nesta story, incluindo a renegociação do piso
+  3:1 do âmbar no loopback.
 
 ## Design Notes
 
@@ -280,6 +304,9 @@ browser; a review rodou o roteiro desta seção e capturou os dois temas). Resul
   erro de formulário.
 - **D3 (âmbar) segue o precedente 3.5b:** o par âmbar foi decisão consciente da review
   da 3.5b; a mostarda da fonte é superfície de demo-grid, não semântica de status.
+  **Renegociado no loopback (13/09/2026):** Lucas aprovou manter `#B26A00` com piso
+  3:1 (AA texto grande/UI) para badges/overlays — o par fica abaixo do 4.5:1 de texto
+  normal por escolha deliberada, registrada na matriz frozen.
 - **Assinaturas registradas mas não adotadas (D7):** o vocabulário de "voltage" da
   fonte (coral/forest/cream full-bleed) é convidente para o card do QR ou banners —
   mas adoção muda composição, não só cor. Story própria, se o Lucas quiser.

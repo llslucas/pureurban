@@ -112,10 +112,12 @@ development_status:
   # extração do sistema Airtable) como fonte única da paleta. GATED: matriz de
   # decisões D1–D7 (D1 azul #208AEF → tinta #181d26; D6 dark mode derivado) exige
   # aprovação do Lucas ANTES de executar. Não bloqueia nem desbloqueia outras stories.
-  # GATE aprovado na íntegra em 13/09; implementação concluída (paleta única em
-  # `mobile/src/lib/palette.ts` + guarda de hex + contraste AA). Pendente na
-  # review: caminhada visual nos dois temas no alvo web (roteiro na story).
-  1-11-revisao-da-paleta-de-cores: review
+  # GATE aprovado na íntegra em 13/09; implementação concluída e revisada (paleta
+  # única em `mobile/src/lib/palette.ts` + guarda + contraste AA + caminhada visual
+  # nos dois temas executada na review). Loopback da review (iteração 1): tensão
+  # âmbar×AA renegociada pelo Lucas (piso 3:1 para badges/overlays); código revertido
+  # ao baseline para re-derivação incorporando os patches verificados.
+  1-11-revisao-da-paleta-de-cores: ready-for-dev
   epic-1-retrospective: done # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
