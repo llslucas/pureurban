@@ -89,8 +89,8 @@ escala com qualquer tema.
 |----------|--------------|---------------------------|----------------|
 | Hex fora do módulo de paleta | `mobile/src/**` com `#RRGGBB` fora do módulo/allowlist | teste de guarda FALHA apontando arquivo:linha | allowlist só para QR (quiet zone) e scanner (chrome de câmera), cada uma comentada |
 | Tema claro | paleta → tema Paper light | primário `#181d26`, canvas `#ffffff`, texto `#181d26`/`#333840`, hairline `#dddddd` | — |
-| Tema escuro | paleta → tema Paper dark | conforme D6; nenhum token ilegível (ex.: `#41454d` sobre `#181d26`) | — |
-| Contraste AA | par texto×fundo de cada papel do tema | ≥ 4.5:1 (≥ 3:1 para texto ≥ 18px), calculado no teste | teste lista os pares reprovados |
+| Tema escuro | paleta → tema Paper dark | conforme D6; nenhum **texto** ilegível (hairline/borda podem ser tons baixos por natureza — ex.: `#41454d` é borda em dark, não texto) | — |
+| Contraste AA | par texto×fundo de cada papel do tema | ≥ 4.5:1 (≥ 3:1 para texto ≥ 18px; **âmbar: piso 3:1 para badges/overlays, ver D3**), calculado no teste | teste lista os pares reprovados |
 | Status do embarque | embarcado / pendente / ausente / offline / erro | verde `#006400`, âmbar `#B26A00`, slate→família ink/body, erro `#B3261E` — **um único vermelho no app** | — |
 | Student card / banners | superfícies pastéis atuais | tintes por alpha da cor base; nenhum pastel avulso restante | — |
 
@@ -228,7 +228,8 @@ browser; a review rodou o roteiro desta seção e capturou os dois temas). Resul
 - `mobile/src/app/(driver)/trip.tsx` -- `#1A1A2E` (texto), `#D32F2F` (botão destrutivo),
   `#B3261E`, `#FFFFFF`.
 - `mobile/src/app/(driver)/routes.tsx` -- `#1A1A2E` ×3, `#F5F5F5`.
-- `mobile/src/app/(driver)/student-list.tsx` -- `#1A1A2E`, `#208AEF`, `#FFFFFF`.
+- `mobile/src/app/(driver)/student-list.tsx` -- `#1A1A2E`, `#FFFFFF`, `#E0E0E0`,
+  `#F5F5F5`.
 - `mobile/src/app/(driver)/scan.tsx` -- mapa de feedback (`warn #B26A00`, `error #B3261E`,
   `offline #37474F`), overlay `#263238`, `#FFFFFF`.
 - `mobile/src/components/student-card.tsx` -- status `#37474F`/`#ECEFF1` (neutro),
@@ -256,7 +257,11 @@ verificados na review (triage log rows 1, 6, 10, 17, 18):*
 - [ ] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
   aprovadas (D2/D3, com o piso 3:1 do âmbar renegociado) + derivação dos temas
   claro/escuro (D6). JSDoc mínimo apontando o DESIGN.md como fonte viva; comentário de
-  contraste do erro alinhado ao registro frozen (`6.4:1`).
+  contraste do erro alinhado ao registro frozen (`6.4:1 (valor frozen; cômputo fino
+  ~6.5)`). Atenção à colisão de nomes: o "secundário" do D6 é **texto secundário**
+  (`#dddddd`); a chave `secondary` do tema Paper mapeia para superfície (`#e0e2e6`
+  light / `#41454d` dark) — usar a tabela "Mudanças visuais intencionais" do Registro
+  como referência do mapeamento Paper.
 - [ ] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
   `Colors` derivando da paleta; eliminação dos neutros avulsos. O comentário do
   `theme.ts` fica ESCOPADO aos papéis sobrescritos (não afirmar "nenhum lavender do
@@ -264,7 +269,10 @@ verificados na review (triage log rows 1, 6, 10, 17, 18):*
   registrado no defer).
 - [ ] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
   (famílias: marinho `#1A1A2E`→tinta; vermelhos→`#B3261E`; slate offline→família
-  ink/body; verdes→`#006400`; pastéis→tintes alpha).
+  ink/body; verdes→`#006400`; pastéis→tintes alpha). *2 deles (`qr-scanner.tsx`,
+  `student-qr-code.tsx`) recebem só o comentário de allowlist — hexes funcionais
+  intocados.* Atualizar o comentário de `scan.tsx` que cita a primária antiga
+  `#208AEF` (hex em comentário derruba a guarda).
 - [ ] `palette.guard.test.ts` -- (a) varredura de cor fora do módulo: hex `#RGB/#RRGGBB`
   **e `rgba()`/hex 8-dígitos**, com allowlist comentada (QR quiet zone, chrome de
   câmera de `qr-scanner.tsx` e `scan.tsx`, faixa branca 92% do `offline-banner.tsx` —
@@ -272,6 +280,8 @@ verificados na review (triage log rows 1, 6, 10, 17, 18):*
   (D3 renegociado)**, pares anotados; (c) **locks de binding**: `STATUS_PRESENTATION`,
   `TONE_COLOR`, `PENDING_COLOR`/`FAILED_COLOR` presos aos papéis da paleta (a migração
   manual não pode trocar tokens silenciosamente — demonstrado por mutação na review).
+  Como as consts são privadas de módulo, o lock preferencial é **render-probe**
+  (renderizar o componente e afirmar a cor efetiva, padrão da demonstração da review).
 - [ ] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
   student-list, routes) → aluno (home, QR) → banners (offline/stale) nos DOIS temas;
   mudanças visuais intencionais registradas na story. *(Já executada uma vez na review
@@ -320,10 +330,14 @@ verificados na review (triage log rows 1, 6, 10, 17, 18):*
 **Commands:**
 - `cd mobile && npm test` -- expected: verdes, incluindo as duas suítes novas
   (guarda + contraste).
-- `cd mobile && npx tsc --noEmit` -- expected: 0 erros.
+- `cd mobile && npx tsc --noEmit` -- expected: **exatamente os 3 erros pré-existentes
+  no baseline `b58b38e`** (`scan.tsx` TS18047, `use-trip-gps-capture.test.tsx` TS2554,
+  `tracking-stream.service.test.ts` TS2339); nenhum erro novo.
 - `cd mobile && npm run lint` -- expected: limpo.
 - `grep -rEn "#[0-9A-Fa-f]{6}" mobile/src --include="*.tsx" --include="*.ts" |
-  grep -v palette` -- expected: só allowlist (QR/scanner) e o módulo de paleta.
+  grep -v palette` -- expected: só as entradas da allowlist do teste de guarda
+  (`student-qr-code.tsx`, `qr-scanner.tsx`, os `#000000` de `scan.tsx`) e o módulo de
+  paleta.
 - Roteiro visual no alvo web (`npm run web`), dois temas -- expected: fluxos íntegros,
   mudanças intencionais conferidas, console sem erros.
 - `git diff --stat main` -- expected: só `mobile/` + `_bmad-output/`; nenhum `api/`.
