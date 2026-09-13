@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import React, { createElement } from 'react'
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper'
@@ -44,7 +44,9 @@ function walkSourceFiles(dir: string): string[] {
     const full = join(dir, entry.name)
     if (entry.isDirectory()) out.push(...walkSourceFiles(full))
     else if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
-      const rel = relative(SRC_ROOT, full)
+      // Normaliza para `/`: a ALLOWLIST é POSIX e `relative()` devolve o
+      // separador do SO (quebra a lookup no Windows).
+      const rel = relative(SRC_ROOT, full).split(sep).join('/')
       if (rel !== PALETTE_MODULE && rel !== GUARD_TEST) out.push(rel)
     }
   }
@@ -226,6 +228,7 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'erro × tinte de erro', fg: lightPalette.error, bg: statusTints.error, min: 4.5 },
   { desc: 'body × tinte neutro (chip Não embarcou)', fg: lightPalette.textBody, bg: statusTints.neutral, min: 4.5 },
   { desc: 'aviso × tinte de aviso (chip Não vai voltar)', fg: lightPalette.warning, bg: statusTints.warning, min: 3, note: AMBER_NOTE },
+  { desc: 'aviso × superfície clara (texto âmbar sobre botão branco do overlay)', fg: lightPalette.warning, bg: lightPalette.onPrimary, min: 3, note: AMBER_NOTE },
   { desc: 'onPrimary × overlay de sucesso', fg: lightPalette.onPrimary, bg: lightPalette.success, min: 4.5 },
   { desc: 'onPrimary × overlay de aviso', fg: lightPalette.onPrimary, bg: lightPalette.warning, min: 3, note: AMBER_NOTE },
   { desc: 'onPrimary × overlay de erro', fg: lightPalette.onPrimary, bg: lightPalette.error, min: 4.5 },
@@ -386,6 +389,7 @@ describe('lock de binding dos temas Paper', () => {
     expect(lightTheme.colors.onSecondaryContainer).toBe(lightPalette.text)
     expect(lightTheme.colors.surface).toBe(lightPalette.surface)
     expect(lightTheme.colors.onSurface).toBe(lightPalette.text)
+    expect(lightTheme.colors.onBackground).toBe(lightPalette.text)
     expect(lightTheme.colors.surfaceVariant).toBe(lightPalette.surfaceStrong)
     expect(lightTheme.colors.onSurfaceVariant).toBe(lightPalette.textMuted)
     expect(lightTheme.colors.error).toBe(lightPalette.error)
@@ -401,6 +405,8 @@ describe('lock de binding dos temas Paper', () => {
     expect(darkTheme.colors.onSecondaryContainer).toBe(darkPalette.text)
     expect(darkTheme.colors.surface).toBe(darkPalette.canvas)
     expect(darkTheme.colors.onSurface).toBe(darkPalette.text)
+    expect(darkTheme.colors.background).toBe(darkPalette.canvas)
+    expect(darkTheme.colors.onBackground).toBe(darkPalette.text)
     expect(darkTheme.colors.surfaceVariant).toBe(darkPalette.surface)
     expect(darkTheme.colors.onSurfaceVariant).toBe(darkPalette.textBody)
     expect(darkTheme.colors.error).toBe(darkPalette.error)

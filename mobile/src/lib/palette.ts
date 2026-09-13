@@ -51,6 +51,8 @@ export const designTokens = {
   info: '#254fad',
   infoBorder: '#458fff',
   success: '#006400',
+  // ~2.4:1 no branco: abaixo do gate não-texto (3:1, WCAG 1.4.11) da própria
+  // story — como borda de componente em superfície clara, exige decisão registrada.
   successBorder: '#39bf45',
   pricingInk: '#1d1f25',
   // Signature card surfaces (D7: registrados, não adotados em tela — full-bleed
