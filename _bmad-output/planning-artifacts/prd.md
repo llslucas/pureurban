@@ -389,3 +389,38 @@ revertido nos Épicos 4 e 5 em consequência disso.
 - **NFR18:** Interface do motorista otimizada para operação com uma mão e em movimento (botões grandes, contraste alto)
 - **NFR19:** Fluxos críticos (check-in, "não vou voltar") exigem no máximo 2 toques
 - **NFR20:** App utilizável em dispositivos com tela de 5" e resolução mínima de 720p
+
+## Production Readiness (Trabalhos Futuros)
+
+> Reemitido no wrap-3 (13/09/2026) — compromisso da retro do Épico 2, reaberto pela retro
+> do Épico 3 (AI8). Esta seção é a visão de produto; o detalhamento técnico com evidência
+> de pouso está em `architecture.md` §11 e o estado **vivo** dos débitos em
+> `_bmad-output/implementation-artifacts/deferred-work.md`.
+
+**O que está provado ao fim da Fase 1 (Épicos 1–5):** os 35 FRs do MVP implementados e os
+NFRs de performance medidos contra a API real pela UI (check-in 13ms vs budget 2s;
+localização 25ms vs 5s; ausência 101ms vs 3s; lista com 55 alunos 33ms vs 1s), com gate
+automatizado (`npm run gate`: unit + supertest + Playwright API/E2E + drift check do
+contrato) verde na baseline. Check-in offline com fila, ausência em tempo real e
+acompanhamento do ônibus via SSE + Redis Pub/Sub demonstrados ponta a ponta, incluindo
+comportamento degradado.
+
+**Débitos sistêmicos declarados** (aceitos conscientemente como escopo de TCC; cada um
+com categoria, severidade e mitigação proposta na tabela da Architecture §11):
+
+- **Segurança** — JWT sem revalidação contra `isActive`/`role` até expirar; QR estático
+  do aluno é UUID opaco (NFR8 assume isso para o protótipo); segundo 401 pós-refresh não
+  encerra a sessão.
+- **Multi-tenancy e DoS** — sem guard de empresa ativa; paginação sem teto; bcrypt sem
+  rate limiting.
+- **Confiabilidade** — sem outbox transacional (dispatch best-effort pós-commit); races
+  check-then-create em vínculos e início de viagem.
+- **Fila offline** — desfecho dos itens enfileirados (identidade, expiração, limpeza no
+  logout, invalidação pós-dreno) é decisão de produto pendente, roteada ao wrap-5.
+- **Processo** — sem CI: o gate roda manualmente; lint da API vermelho na baseline.
+
+**O que fica para device — Story 1.7 (development build Android):** NFR5 (boot < 3s),
+NFR18–NFR20 (usabilidade em campo), o timeout do `getCurrentPositionAsync` (risco
+silencioso da transmissão GPS), a leitura offline após reload ("F5 offline") e o
+realtime nativo (SSE, câmera, QR) fora do browser. Não bloqueia o desenvolvimento;
+bloqueia apenas a defesa com device.
