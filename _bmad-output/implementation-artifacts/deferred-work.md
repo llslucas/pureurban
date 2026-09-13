@@ -420,3 +420,9 @@ comparativa em vez de afirmação de viabilidade sem controle.
     tela do aluno é sensível a skew de relógio (limitada a 1 deslocamento por resync após o
     anti-flap do wrap-1, mas não eliminada). Exige DTO/cache change (rota wrap-3, item 18) ou
     a extração do broadcaster (wrap-4). Detectado na review do wrap-1 (achado F3).
+
+## Deferred from: build of spec-wrap-3-reconciliacao-de-contrato-e-documentos.md (2026-09-13)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-wrap-3-reconciliacao-de-contrato-e-documentos.md`
+  summary: `npx tsc --noEmit` do mobile vermelho na baseline em 2 arquivos de teste do wrap-1 — `use-trip-gps-capture.test.tsx:92` (TS2554) e `tracking-stream.service.test.ts:172` (TS2339 `pollingInterval`).
+  evidence: Verificado pré-existente via stash contra a árvore limpa da main (13/09/2026); `npm test` passa (252/252) e o gate não roda o tsc do mobile, então só checagem manual expõe. Fix de ~2 linhas (tipar o argumento no teste do classify; ler a config exportada no teste do cliente), sem comportamento.
