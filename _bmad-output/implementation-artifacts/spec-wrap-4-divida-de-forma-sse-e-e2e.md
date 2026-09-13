@@ -2,8 +2,9 @@
 title: 'Wrap 4: Dívida de forma — broadcaster SSE e specs e2e gigantes'
 type: 'refactor'
 created: '2026-09-12'
-status: 'ready-for-dev'
+status: 'in-progress'
 route: 'dispatch'
+baseline_commit: 'f05c93ac247625b9446f4569df5d617a6b3921ab'
 review_loop_iteration: 0
 context:
   - _bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md
@@ -119,3 +120,99 @@ DEPOIS do wrap-1 (guard já pousado nas cópias — a extração só o herda) e 
 depois do wrap-3 (sem diff de contrato concorrente). Pode rodar em paralelo ao wrap-5.
 Route `dispatch`: se a janela única não der conta, entregar Task A+B e Task C como PRs
 separados, nesta ordem.
+
+## Implementation Notes (13/09/2026)
+
+Branch `refactor/wrap-4-sse-broadcaster-e-e2e-slice` a partir de `main` (`f05c93a`,
+o `baseline_commit` do frontmatter). Commits atômicos, Conventional Commits, sem push
+nem PR (instrução da janela). Status segue `in-progress` aguardando o loop de review.
+
+**Task A — broadcaster API (AC1–AC3).** A maquinaria vive em UMA classe nova,
+`api/src/domains/shared/shell/sse/sse-broadcaster.service.ts` (canal ref-counted +
+heartbeat 30s + sentinela `__trip_ended__` + `handleMessage` com o guard de tipo do
+wrap-1 e o catch de parse). Não é `@Injectable` singleton de propósito: cada service
+de domínio instancia o seu (`new SseBroadcaster(redis, <Context>)`), preservando a
+conexão subscriber dedicada e o mapa de canais POR domínio — o desenho exato das
+cópias extraídas. Os services mantêm só o que é deles: `boardingChannel` + whitelist
+dos 3 eventos + `publish` no boarding; `trackingChannel` (que segue no
+`redis-location-bus.adapter`) + o `@OnEvent('trip.ended')` no tracking. O lock de
+"0 cópias novas" (AC3) está no comentário de cabeçalho da classe.
+
+**Task B — cliente mobile (AC4–AC5).** Cliente único `mobile/src/services/sse-client.ts`
+(`connectSseStream({ url, events, onOpen, onTripEnded, onUnrecoverable })`): escada
+1s..30s, 409 como fechamento contratado, 401 → refresh single-flight com 3 falhas ⇒
+`onUnrecoverable`, `parsePayload` defensivo, e `pollingInterval: SSE_REPOLL_INTERVAL_MS`
+(5000) explícito para AMBOS os domínios — o boarding dependia do default 5000 da lib
+(R6); pinar o mesmo valor não muda timing algum, só tira o default de terceiro do
+caminho. `boarding-events.service.ts` e `tracking-stream.service.ts` viram facades de
+config (URL + eventos nomeados + callbacks); API pública preservada (tipos de handler,
+`BoardingEventsConnection`/`TrackingEventsConnection`, re-export de
+`SSE_REPOLL_INTERVAL_MS`), então os consumidores (`student-list.tsx`, `track-bus.tsx`)
+não mudam uma linha.
+
+**Task C — fatiamento (AC6–AC7).** `api/test/boarding.e2e-spec.ts` (1.753 linhas) →
+`api/test/boarding/`: `check-in` (3.3a/3.4b, 22 casos), `roles-matrix` (4.0, 7),
+`events-stream` (4.2, 4), `not-returning` + roster (4.1, 13), `cancel-absence` (4.3,
+13), `checkin-reminder` (4.4, 11). `api/test/tracking.e2e-spec.ts` (995 linhas) →
+`api/test/tracking/`: `roles-matrix` (5.0, 4), `ingestion-last-known` (5.1, 16),
+`stream-discovery` (5.2, 17). Setup compartilhado em `api/test/support/` (padrão
+`tests/support/`): `supertest-app.ts` (boot/teardown + bind explícito do server,
+antes só comentado nos god-specs), `sse-stream.ts` (parser `openStream` — a versão
+tolerante a frame vazio de heartbeat do tracking, agora servindo o boarding também),
+`company-scenario.ts` (seed de empresa/rota/motorista/alunos/viagens, com prefixo por
+arquivo para não colidir email). Nenhum "misc.spec": cada arquivo é um bloco de story.
+
+**Task D — monitoria (AC8).** Medições de 13/09/2026 registradas no comentário do
+item `epic-4-retro-item-13` do sprint-status: `home.tsx` 419 linhas, `scan.tsx` 745 —
+sem ação (mesmos valores da retro 5).
+
+**Fronteiras respeitadas.** Zero diff em DTOs, guards, semântica de erro ou timing;
+`openapi.json` intocado (sem regeneração — contrato não muda). O guard do wrap-1 já
+existia nas 2 cópias e foi herdado pela implementação única (nada foi absorvido —
+nota desnecessária no sprint-status). Ítem 13 da retro 4 fica com o mesmo desenho de
+fechamento do item 19: comentário de execução agora, `done` só quando o PR mergear
+(convenção registrada na triage #3 do wrap-3).
+
+## Verificação (13/09/2026)
+
+- **Evidência central da extração mecânica: ZERO asserção editada.** Os 23 casos unit
+  dos 2 services SSE da API (`boarding-events.service.spec.ts`,
+  `tracking-events.service.spec.ts`) e os 20 casos mobile dos 2 clientes
+  (`boarding-events.service.test.ts`, `tracking-stream.service.test.ts`) passam
+  contra as implementações únicas SEM UM CARACTERE de mudança nos arquivos de teste —
+  a prova de AC2/AC5 mais forte disponível.
+- Contagem de casos por bloco preservada exatamente (AC7): boarding 70→70
+  (22+7+4+13+13+11), tracking 36→36 (4+16+17 totalizando os mesmos blocos), suíte
+  e2e completa 200→200 em 14 arquivos (antes 7).
+- API unit: **335/335** (59 arquivos); supertest e2e: **200/200** (14 arquivos).
+- Mobile: jest **253/253** (23 suítes, contagem idêntica à `main` via stash);
+  `tsc --noEmit` do mobile com a MESMA baseline de 4 linhas de antes (2 erros
+  pré-existentes do wrap-1 em arquivos de teste — defer registrado no
+  `deferred-work.md` pelo wrap-3); `npm run lint` limpo.
+- API: `tsc --noEmit` com a mesma baseline da `main` (42 erros, todos pré-existentes
+  em specs alheios; 0 nos arquivos tocados); ESLint limpo nos arquivos novos/tocados
+  (os 3 erros restantes em `test/` são os pré-existentes de `app.e2e-spec.ts`).
+- **Gate completo (`npm run gate` sob `E2E_API_URL=http://localhost:3001` — a `PORT`
+  do `api/.env` local é 3001): VERDE, exit 0** no HEAD da branch — 335 unit /
+  200 supertest / 2 pw:api (NFR4 41ms, budget 1s) / 10 pw:e2e (NFR1 11ms,
+  NFR2 8ms, NFR3 103ms) / `openapi:check` limpo contra o contrato commitado.
+
+## Riscos e ressalvas abertas
+
+1. **Logs da sentinela mudam de contexto**: o "Failed to publish terminal signal"
+   agora loga no contexto do broadcaster com o CANAL (`boarding:trip:{id}`) em vez do
+   `tripId` cru. Nenhuma asserção nem contrato depende disso; registrado por
+  transparência da "extração mecânica".
+2. **14 arquivos e2e em paralelo** (antes 7) bootam mais AppModule contra o mesmo
+   Postgres/Redis. Verde em 3 execuções seguidas nesta branch; os asserts do bloco
+   4.4 já eram desenhados para sweep system-wide com arquivos paralelos.
+3. **`tsc --noEmit` do mobile continua vermelho na baseline** (2 erros do wrap-1 em
+   arquivos de teste, incluindo o TS2339 de `pollingInterval` em
+   `tracking-stream.service.test.ts:172`) — pré-existente, deferido pelo wrap-3;
+   NÃO foi "aproveitado" para corrigir aqui porque AC5 exigia as suítes migradas
+   zero-edited (a correção do tipo do mock é 1 linha, fica para a story que pegar
+   o defer).
+4. **Rota wrap-4 ainda aberta no deferred-work**: o carimbo do servidor no last-known
+   (`receivedAt`) citava "extração do broadcaster (wrap-4)" como caminho barato — a
+   extração NÃO implementou o carimbo (fora do escopo congelado deste wrap); o item
+   segue aberto para decisão de produto.
