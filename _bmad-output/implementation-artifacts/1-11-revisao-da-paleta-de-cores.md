@@ -1,0 +1,201 @@
+---
+title: 'Story 1.11: Revisão da Paleta de Cores — Unificação sobre o DESIGN.md (Airtable)'
+type: 'feature'
+created: '2026-09-13'
+status: 'ready-for-dev'
+review_loop_iteration: 0
+baseline_commit: 'b58b38ea3b9d023676a1e512d278d67a52298945'
+context:
+  - '{project-root}/_bmad-output/project-context.md'
+  - '{project-root}/DESIGN.md'
+---
+
+<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+
+## Intent
+
+**Problem:** O app tem **quatro famílias de cores convivendo sem fonte única** — ~25 hexes
+distintos hardcoded em 10 arquivos de `mobile/src/`:
+
+1. **Azul da marca** (`#208AEF` em `lib/theme.ts`, comentado como "da splash screen") —
+   mas só 3 usos diretos; o resto do app ignora o tema Paper.
+2. **Neutros do template Expo** (`constants/theme.ts`: `#F0F0F3`, `#60646C`, `#212225`…).
+3. **Cores de status escolhidas story a story** — incluindo **dois vermelhos de erro
+   diferentes** (`#B3261E` e `#D32F2F`) e o slate `#37474F`/`#263238` para offline.
+4. **Azul-marinho avulso** (`#1A1A2E`) como cor de texto em 6 pontos das telas do
+   motorista — cor que nenhuma decisão de design pediu.
+
+O comentário em `student-card.tsx` ("sem introduzir uma quarta paleta") documenta a
+consciência do problema. Cada tela nova escolhe cor no olho; não há como responder
+"qual é o vermelho de erro?" sem inspecionar componentes.
+
+**Approach:** Adotar o `DESIGN.md` (análise do sistema Airtable) como fonte da paleta:
+registrar seus tokens de cor como a **única fonte de verdade** do app, mapear os papéis
+semânticos (primário, superfície, texto, status) sobre eles nos dois temas (claro e
+escuro), eliminar os hexes hardcoded dos componentes e travar a regressão com um teste
+de guarda que proíbe hex fora do módulo de paleta. Mudança de cor apenas — tipografia,
+espaçamento, raios e a forma dos componentes MD3 não mudam.
+
+**GATE: a matriz de decisões D1–D7 abaixo precisa ser aprovada na íntegra (ou com
+desvios anotados pelo Lucas) ANTES de executar qualquer tarefa** (precedente wrap-5).
+
+## Matriz de Decisões (GATE — aprovada antes de executar)
+
+| # | Decisão | Default (derivado do DESIGN.md) | Alternativa considerada | Justificativa |
+|---|---------|--------------------------------|------------------------|---------------|
+| D1 | Cor primária da marca | **Adotar tinta `#181d26`** ("black IS the primary") emplace do azul `#208AEF` | Manter azul | O DESIGN.md é inequívoco: primário é a tinta quase-preta; o azul-`link` (`#1b61c9`) é explicitamente "não é a cor do botão primário" |
+| D2 | Erro | **`#B3261E`** (default MD3, já dominante no app; eliminar o `#D32F2F` duplicado) | Coral `#aa2d00` | A fonte NÃO documenta erro ("Known Gaps"); coral é superfície-assinatura full-bleed ("nunca acento pequeno") — usá-lo como cor de texto violaria a própria fonte. `#B3261E` já está no código, 6.4:1 no branco |
+| D3 | Aviso | **Manter par âmbar `#B26A00`/`#FFF4E5`** como extensão app-only documentada | Mostarda `#d9a441`/`#f4d35e` | Mostarda como texto falha contraste (~2.2:1); as pastéis da fonte são superfícies de demo-grid, não semântica de status. Âmbar foi escolhido deliberadamente na 3.5b |
+| D4 | Sucesso | **Adotar `#006400`** (texto) + `#39bf45` (borda/acentos) emplace de `#1B7F3B` | — | Token documentado na fonte; elimina um verde avulso |
+| D5 | Link / informativo | **Adotar `link #1b61c9`** (ativo `#1a3866`) e `info #254fad`/`#458fff` | — | Tokens documentados; substituem os azuis avulsos restantes |
+| D6 | Tema escuro | **Mapeamento derivado**: canvas→`#181d26`, elemento→`#1d1f25`, texto→`#ffffff`, secundário→`#dddddd`, hairline→`#41454d`, borda-forte→`#9297a0`; **botão primário em dark = branco com texto tinta** (espelha o `button-secondary-on-dark` documentado — "o botão branco fica branco sobre superfícies escuras") | Desligar dark mode | A fonte documenta as superfícies escuras mas não o texto corrido sobre elas; o primário-tinta sobre fundo-tinta não funciona, e o padrão branco-sobre-dark É o padrão documentado da fonte |
+| D7 | Superfícies-assinatura (coral, forest, cream, peach, mint, yellow, mustard) | **Registrar os tokens sem adotar em tela** nesta story; guardrail da fonte: full-bleed apenas, nunca acento pequeno | Adotar em tela (ex.: card do QR) | Adoção em tela é decisão de composição por tela — outra story, com composição avaliada |
+
+Tintes de fundo de status (hoje `#E8F5E9`, `#E3F2FD`, `#FFF4E5`, `#ECEFF1`): derivados
+por **alpha (~12%) da cor semântica base** em vez de pastéis avulsos — zero cores novas,
+escala com qualquer tema.
+
+## Boundaries & Constraints
+
+**Always:**
+- Um único módulo de paleta como fonte das cores; `lib/theme.ts` (Paper) e
+  `constants/theme.ts` consomem dele — nada de segunda fonte.
+- Ambos os temas (claro/escuro) derivam do mesmo módulo.
+- QR preserva branco puro/preto puro (quiet zone de leitura) — allowlist explícita no
+  teste de guarda, com comentário do porquê.
+- Texto×fundo dos pares do tema ≥ 4.5:1 (WCAG AA), verificado por teste determinístico.
+- Roteiro de verificação visual executado no alvo web (sem device — validação nativa é
+  da Story 1.7).
+
+**Ask First:**
+- Tocar em assets nativos (splash screen, adaptive icon — hoje azuis; ficam
+  provisoriamente destoantes do primário-tinta; rebrand de asset é escopo próprio).
+- Introduzir qualquer cor fora do DESIGN.md além das extensões documentadas (D2/D3).
+- Adotar superfície-assinatura em alguma tela (D7).
+- Dependência nova de qualquer natureza.
+
+**Never:**
+- Tipografia, espaçamento, raios ou forma/estrutura de componentes (mudança de COR
+  apenas; Haas é licenciada — `system-ui` permanece).
+- Redesign de navegação ou de layout; dark mode toggle novo.
+- Tocar em `api/` (paleta é 100% mobile).
+- Permitir hex de cor fora do módulo de paleta sem allowlist documentada.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| Hex fora do módulo de paleta | `mobile/src/**` com `#RRGGBB` fora do módulo/allowlist | teste de guarda FALHA apontando arquivo:linha | allowlist só para QR (quiet zone) e scanner (chrome de câmera), cada uma comentada |
+| Tema claro | paleta → tema Paper light | primário `#181d26`, canvas `#ffffff`, texto `#181d26`/`#333840`, hairline `#dddddd` | — |
+| Tema escuro | paleta → tema Paper dark | conforme D6; nenhum token ilegível (ex.: `#41454d` sobre `#181d26`) | — |
+| Contraste AA | par texto×fundo de cada papel do tema | ≥ 4.5:1 (≥ 3:1 para texto ≥ 18px), calculado no teste | teste lista os pares reprovados |
+| Status do embarque | embarcado / pendente / ausente / offline / erro | verde `#006400`, âmbar `#B26A00`, slate→família ink/body, erro `#B3261E` — **um único vermelho no app** | — |
+| Student card / banners | superfícies pastéis atuais | tintes por alpha da cor base; nenhum pastel avulso restante | — |
+
+</frozen-after-approval>
+
+## Code Map
+
+- `mobile/src/lib/theme.ts` -- hoje: temas Paper light/dark com `primary: '#208AEF'`.
+  Alvo: derivar `colors` do módulo de paleta (D1/D6).
+- `mobile/src/constants/theme.ts` -- hoje: `Colors` do template Expo (neutros avulsos) +
+  Fonts/Spacing. Alvo: `Colors` sai (ou passa a reexportar a paleta); Fonts/Spacing
+  intocados (fora de escopo).
+- `mobile/src/lib/palette.ts` -- **novo (nome sugerido)**: os tokens do DESIGN.md
+  (semânticos + assinaturas + extensões D2/D3) e a derivação dos dois temas. Fonte única.
+- `mobile/src/app/(driver)/trip.tsx` -- `#1A1A2E` (texto), `#D32F2F` (botão destrutivo),
+  `#B3261E`, `#FFFFFF`.
+- `mobile/src/app/(driver)/routes.tsx` -- `#1A1A2E` ×3, `#F5F5F5`.
+- `mobile/src/app/(driver)/student-list.tsx` -- `#1A1A2E`, `#208AEF`, `#FFFFFF`.
+- `mobile/src/app/(driver)/scan.tsx` -- mapa de feedback (`warn #B26A00`, `error #B3261E`,
+  `offline #37474F`), overlay `#263238`, `#FFFFFF`.
+- `mobile/src/components/student-card.tsx` -- status `#37474F`/`#ECEFF1` (neutro),
+  `#B26A00`/`#FFF4E5` (atenção), `#1A1A2E`.
+- `mobile/src/components/offline-banner.tsx` -- `PENDING_COLOR #37474F`,
+  `FAILED_COLOR #B3261E`.
+- `mobile/src/components/qr-scanner.tsx` -- chrome de câmera (`#000000`,
+  `rgba(0,0,0,0.6)`, borda `#FFFFFF`) -- allowlist funcional.
+- `mobile/src/components/student-qr-code.tsx` -- quiet zone do QR (`#FFFFFF`/`#000000`)
+  -- allowlist funcional, com comentário.
+- `mobile/src/hooks/use-theme.ts` (+ `use-color-scheme`) -- consumo dos temas; deve
+  continuar funcionando sem mudança de API.
+- Teste de guarda + teste de contraste -- novos (sugestão:
+  `mobile/src/lib/palette.guard.test.ts`), no padrão dos travas-regressão do repo
+  (precedente `query-never-pauses.test.ts`).
+
+## Tasks & Acceptance
+
+**Execution:**
+- [ ] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
+  aprovadas (D2/D3) + derivação dos temas claro/escuro (D6). JSDoc mínimo apontando o
+  DESIGN.md como fonte viva.
+- [ ] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
+  `Colors` derivando da paleta; eliminação dos neutros avulsos.
+- [ ] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
+  (famílias: marinho `#1A1A2E`→tinta; vermelhos→`#B3261E`; slate offline→família
+  ink/body; verdes→`#006400`; pastéis→tintes alpha).
+- [ ] `palette.guard.test.ts` -- (a) varredura de hex fora do módulo com allowlist
+  comentada (QR + scanner); (b) contraste AA dos pares do tema.
+- [ ] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
+  student-list, routes) → aluno (home, QR) → banners (offline/stale) nos DOIS temas;
+  mudanças visuais intencionais registradas na story.
+- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
+  atualizada ao concluir.
+- [ ] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
+
+**Acceptance Criteria:**
+- Given o app em qualquer tela, when os componentes resolarem cor, then a cor vem do
+  módulo de paleta — zero hex semântico fora dele, provado pelo teste de guarda.
+- Given os dois temas, when alternados, then todos os pares texto×fundo passam AA no
+  teste de contraste e nenhum texto fica ilegível (verificação visual registra os dois).
+- Given a paleta antiga, when comparada, then: um só vermelho, um só verde, zero
+  `#1A1A2E`/`#208AEF`/`#F5F5F5` em componentes.
+- Given `cd mobile && npm test && npx tsc --noEmit && npm run lint`, then tudo verde;
+  `git diff` sem arquivo de `api/`.
+- Given a matriz D1–D7, then cada default aprovado (ou desvio anotado) ANTES da
+  primeira task de código — registrado nesta story.
+
+## Design Notes
+
+- **Tensão assumida em D2:** a fonte não documenta erro e seu coral é proibido como
+  acento pequeno. `#B3261E` é a escolha de menor invenção (MD3 default, já no código,
+  contraste ok) e fica marcada como extensão app-only até a fonte extrair estados de
+  erro de formulário.
+- **D3 (âmbar) segue o precedente 3.5b:** o par âmbar foi decisão consciente da review
+  da 3.5b; a mostarda da fonte é superfície de demo-grid, não semântica de status.
+- **Assinaturas registradas mas não adotadas (D7):** o vocabulário de "voltage" da
+  fonte (coral/forest/cream full-bleed) é convidente para o card do QR ou banners —
+  mas adoção muda composição, não só cor. Story própria, se o Lucas quiser.
+- **Splash/ícone azuis ficam destoantes** até o rebrand de assets (Ask First). A
+  incoerência temporária é consciente e documentada.
+- O comentário "sem introduzir uma quarta paleta" em `student-card.tsx` vira lei:
+  depois desta story, nova cor = nova entrada na paleta com decisão registrada.
+
+## Verification
+
+**Commands:**
+- `cd mobile && npm test` -- expected: verdes, incluindo as duas suítes novas
+  (guarda + contraste).
+- `cd mobile && npx tsc --noEmit` -- expected: 0 erros.
+- `cd mobile && npm run lint` -- expected: limpo.
+- `grep -rEn "#[0-9A-Fa-f]{6}" mobile/src --include="*.tsx" --include="*.ts" |
+  grep -v palette` -- expected: só allowlist (QR/scanner) e o módulo de paleta.
+- Roteiro visual no alvo web (`npm run web`), dois temas -- expected: fluxos íntegros,
+  mudanças intencionais conferidas, console sem erros.
+- `git diff --stat main` -- expected: só `mobile/` + `_bmad-output/`; nenhum `api/`.
+
+## Suggested Review Order
+
+**O que muda a marca (comece aqui)**
+1. Matriz D1–D7 (acima) -- as decisões de produto, especialmente D1 (azul→tinta) e
+   D6 (dark mode derivado).
+2. `palette.ts` -- a fonte única proposta; confira os tokens contra o DESIGN.md.
+3. `lib/theme.ts` / `constants/theme.ts` -- derivação dos temas.
+
+**Migração e trava**
+4. Os 8 arquivos de tela/componente -- migração mecânica; olhar `scan.tsx` (mapa de
+   feedback) com mais atenção.
+5. `palette.guard.test.ts` -- allowlist do QR comentada; fórmula de contraste.
+
+**Evidência**
+6. Roteiro visual (dois temas) e registros na story.

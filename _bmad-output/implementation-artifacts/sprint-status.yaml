@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "13-09-2026 12:47"
+last_updated: "13-09-2026 19:10"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -106,6 +106,13 @@ development_status:
   # o harness com uma suíte inicial sobre lógica pura (role-routes, qr-payload) mais
   # um render RN. DESBLOQUEIA a 3.4b (fila offline), que é inviável de validar à mão.
   1-10-setup-test-runner-mobile: done
+  # Adição pós-wrap (13/09/2026, decisão do Lucas). Revisão da paleta de cores: o app
+  # tem 4 famílias de cores convivendo (~25 hexes hardcoded em 10 arquivos, 2 vermelhos
+  # de erro, marinho #1A1A2E avulso) e passa a adotar o DESIGN.md (raiz do repo,
+  # extração do sistema Airtable) como fonte única da paleta. GATED: matriz de
+  # decisões D1–D7 (D1 azul #208AEF → tinta #181d26; D6 dark mode derivado) exige
+  # aprovação do Lucas ANTES de executar. Não bloqueia nem desbloqueia outras stories.
+  1-11-revisao-da-paleta-de-cores: ready-for-dev
   epic-1-retrospective: done # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
