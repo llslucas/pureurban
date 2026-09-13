@@ -277,6 +277,49 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
     expect(screen.getByText('Ana')).toBeTruthy()
   })
 
+  it('2 alunos ausentes na MESMA viagem: contagem ajusta 2x e 2 badges (RV2 — pluralidade)', async () => {
+    // Até aqui a pluralidade só era exercitada na API; o ajuste otimista da
+    // tela num tick com 2 ausências nunca tinha 2 elegíveis ao mesmo tempo.
+    const ANA_E_BRUNO_PENDENTES = rosterWith(
+      STUDENT_A,
+      { ...STUDENT_B, status: 'NOT_CHECKED_IN' as const, checkedInAt: null },
+    )
+    const SO_ANA_PENDENTE = rosterWith(
+      { ...STUDENT_A, status: 'NOT_RETURNING' },
+      { ...STUDENT_B, status: 'NOT_CHECKED_IN' as const, checkedInAt: null },
+    )
+    const NENHUM = rosterWith(
+      { ...STUDENT_A, status: 'NOT_RETURNING' },
+      { ...STUDENT_B, status: 'NOT_RETURNING' },
+    )
+    mockTrip.getTripStudents
+      .mockResolvedValueOnce(ANA_E_BRUNO_PENDENTES)
+      .mockResolvedValueOnce(SO_ANA_PENDENTE)
+      .mockResolvedValue(NENHUM)
+
+    renderScreen()
+    expect(await screen.findByText('0/2 embarcados')).toBeTruthy()
+
+    const handlers = registeredHandlers()
+    act(() => handlers.onNotReturning(NOT_RETURNING_EVENT))
+    expect(await screen.findByText('0/1 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('! Não vai voltar')).toHaveLength(1)
+    // Snackbar único: o toast do 1º evento só é observável aqui — o 2º o substitui.
+    expect(screen.getByText('Ana não vai voltar no ônibus')).toBeTruthy()
+
+    // Segundo evento, ANTES do refetch do primeiro reconciliar: o cache
+    // acumula os dois ajustes e a refetch final confirma 0/0.
+    act(() =>
+      handlers.onNotReturning({
+        ...NOT_RETURNING_EVENT,
+        studentId: STUDENT_B.studentId,
+      }),
+    )
+    expect(await screen.findByText('0/0 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('! Não vai voltar')).toHaveLength(2)
+    expect(screen.getByText('Bruno não vai voltar no ônibus')).toBeTruthy()
+  })
+
   it('studentId desconhecido (fora do cache): sem toast, só refetch de reconciliação', async () => {
     const soBruno = rosterWith(STUDENT_B)
     mockTrip.getTripStudents
