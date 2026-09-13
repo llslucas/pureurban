@@ -404,14 +404,15 @@ comparativa em vez de afirmação de viabilidade sem controle.
     da lib quanto a emissão pós-close e instrumentar o cliente com duas dispatches
     encadeadas num teste.
 - source_spec: `_bmad-output/implementation-artifacts/spec-wrap-1-correcoes-de-comportamento.md`
-  summary: Atualizar a descrição do 403 de PATCH /trips/:id/end no Swagger (e regenerar
+  summary: **✅ ENDEREÇADO pelo wrap-3 (PR #43, 13/09/2026).** Atualizar a descrição do 403 de PATCH /trips/:id/end no Swagger (e regenerar
     openapi.json) para nomear DRIVER_NOT_ASSIGNED — roteado ao wrap-3.
   evidence: O AC12 do wrap-1 mudou o comportamento para 403 DRIVER_NOT_ASSIGNED (mesmo
     disclosure do get-trip-students, DS6), dentro do status 403 já declarado no contrato —
     nenhuma regeneração foi permitida pelas Boundaries do wrap-1. A descrição do 403 ficou
     "FORBIDDEN — somente motoristas", sem nomear o código de negócio que o endpoint agora
     também devolve. Regenerar openapi.json + tipos (se houver drift) pertence ao wrap-3
-    (item 18 do sprint-status, mesma mecânica).
+    (item 18 do sprint-status, mesma mecânica). **O PR #43 nomeou o código com a MESMA
+    redação do get-trip-students e regenerou openapi.json + tipos no mesmo PR.**
 - source_spec: `_bmad-output/implementation-artifacts/spec-wrap-1-correcoes-de-comportamento.md`
   summary: Domínio de relógio do resync do aluno — servidor carimbar o last-known com o
     instante de recebimento (receivedAt) para a guarda monotônica comparar maçãs com maçãs.
@@ -420,6 +421,10 @@ comparativa em vez de afirmação de viabilidade sem controle.
     tela do aluno é sensível a skew de relógio (limitada a 1 deslocamento por resync após o
     anti-flap do wrap-1, mas não eliminada). Exige DTO/cache change (rota wrap-3, item 18) ou
     a extração do broadcaster (wrap-4). Detectado na review do wrap-1 (achado F3).
+    **Atualização (13/09/2026): o wrap-3 resolveu o lado CONTRATO (staleness declarado
+    por chegada de dado, nunca pela idade do capturedAt — decisões congeladas do spec);
+    o carimbo do servidor no last-known segue ABERTO, rota wrap-4 (broadcaster) ou
+    decisão de produto.**
 
 ## Deferred from: build of spec-wrap-3-reconciliacao-de-contrato-e-documentos.md (2026-09-13)
 
