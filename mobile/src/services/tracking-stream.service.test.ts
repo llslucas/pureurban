@@ -18,6 +18,7 @@ interface MockSource {
   url: string
   options: { headers?: Record<string, string> }
   closed: boolean
+  listeners: Map<string, ((event?: unknown) => void)[]>
   dispatch: (type: string, event?: unknown) => void
 }
 
@@ -196,6 +197,30 @@ describe('TrackingEventsClient — conexão e reconexão (spec-5-2)', () => {
       data: '{not json',
     })
     expect(handlers.onLocationUpdated).toHaveBeenCalledTimes(1)
+  })
+
+  it('pin determinístico do ping: NENHUM listener registrado e nenhum handler disparado (R17/AC4)', () => {
+    // O dispatch do teste anterior prova o caminho de hoje; o R17 pede o pin
+    // ESTRUTURAL: sem listener para 'ping' não existe caminho nenhum do
+    // heartbeat até o estado da tela — inclusive o timer de 15s do indicador
+    // "Sem sinal GPS", que só o onLocationUpdated alimenta. O e2e que tentava
+    // provar isso era probabilístico (ping depende do timing da lib).
+    const handlers = makeHandlers()
+    connectTrackingEvents(TRIP_ID, handlers)
+    const source = lastInstance()
+
+    expect(source.listeners.has('ping')).toBe(false)
+    expect([...source.listeners.keys()].sort()).toEqual([
+      'error',
+      'location.updated',
+      'open',
+    ])
+
+    source.dispatch('ping')
+    expect(handlers.onLocationUpdated).not.toHaveBeenCalled()
+    expect(handlers.onOpen).not.toHaveBeenCalled()
+    expect(handlers.onTripEnded).not.toHaveBeenCalled()
+    expect(handlers.onUnrecoverable).not.toHaveBeenCalled()
   })
 
   it("an 'open' fires onOpen and resets the backoff ladder", async () => {
