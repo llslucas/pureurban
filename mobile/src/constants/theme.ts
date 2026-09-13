@@ -1,26 +1,26 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
+import { darkPalette, lightPalette } from '@/lib/palette';
+
+// Cores do template Expo migradas para papéis da paleta (Story 1.11) — fonte
+// única em `@/lib/palette`. Sem consumidores hoje (o tema correto é via
+// `useTheme`/temas Paper), mantido por compatibilidade de API.
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: lightPalette.text,
+    background: lightPalette.canvas,
+    backgroundElement: lightPalette.surfaceSoft,
+    backgroundSelected: lightPalette.surfaceStrong,
+    textSecondary: lightPalette.textMuted,
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: darkPalette.text,
+    background: darkPalette.canvas,
+    backgroundElement: darkPalette.surface,
+    backgroundSelected: darkPalette.surfaceStrong,
+    textSecondary: darkPalette.textBody,
   },
 } as const;
 
