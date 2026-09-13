@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "12-09-2026 17:33"
+last_updated: "12-09-2026 21:19"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -239,7 +239,11 @@ action_items:
   #   spec-wrap-1 (correções de comportamento): itens 4, 7, 14, 15, 16, 20 —
   #     FECHADO em 12/09/2026 (PR #39); spec status: done, review triage 12
   #     achados (7 patches, 1 false, 1 low rejeitado, 2 defers → wrap-3).
-  #   spec-wrap-2 (bateria de testes das fronteiras): itens 6, 11, 17
+  #   spec-wrap-2 (bateria de testes das fronteiras): itens 6, 11, 17 —
+  #     FECHADO em 12/09/2026 (PR #41); spec status: done, review triage 14
+  #     achados (9 patches, 3 false, 2 low rejeitados). Gate verde: 335 unit /
+  #     199 supertest / 2 pw:api / 10 pw:e2e / openapi limpo. Único devDep
+  #     novo: better-sqlite3 (+@types) no mobile, SÓ de teste.
   #   spec-wrap-3 (reconciliação de contrato e documentos): itens 8, 18
   #   spec-wrap-4 (dívida de forma — broadcaster SSE + specs e2e): itens 13, 19
   #   spec-wrap-5 (desfecho da fila offline — GATED na matriz de decisão): item 3
@@ -320,7 +324,18 @@ action_items:
     action: "Testes de regressão: retry do scan reenvia a mesma X-Idempotency-Key,
       bateria do QueueStorage contra SQLite real, invalidação do roster pós-dreno"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-2, PR #41): bateria da 3.4b extraída para
+    # `describeQueueStorage(makeStorage)` com asserções só pela interface e
+    # rodada contra o fake E contra o SQL de produção (better-sqlite3 :memory:
+    # atrás do getDatabase mockado; migrações reais) — remover o guard
+    # `status = 'pending'` do WHERE do listPending agora quebra. Casos de SQL
+    # cru: payload ilegível na cabeça do FIFO vira failed com last_error,
+    # linhas de outra operação não drenam, settled grava attempts = 0. AC9:
+    # retry após 5xx reenvia a MESMA chave (= id da linha) e o mesmo
+    # occurredAt. Invalidação pós-dreno: pinada como BASELINE DS1 — hoje o
+    # dreno NÃO invalida (use-offline-sync.test.tsx nomeia o wrap-5); o flip
+    # acontece junto do fix, no item 3/AI3d.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-3-retro-item-7-cors-fail-fast"
     epic: 3
@@ -375,7 +390,15 @@ action_items:
       2x), scan com 2+ elegiveis na mesma viagem, ADMIN nos 4 endpoints novos, semantica
       skip-vs-die no meio do scan"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-2, PR #41): (a) 2 ausências na MESMA viagem —
+    # roster com 2 NOT_RETURNING e summary excluindo ambos (e2e, segundo aluno
+    # semeado no teste) + tela do motorista com ajuste otimista 2x (0/2 → 0/1
+    # → 0/0) e 2 badges; (b) varredura de lembretes com 2+ elegíveis no mesmo
+    # tick: 1 create e 1 evento POR aluno; (c) ADMIN ⇒ 403 FORBIDDEN nos 4
+    # endpoints novos (not-returning, cancel-absence, reminder, events); (d)
+    # die-vs-skip pinado: create que morre derruba a fibra (seguintes ficam
+    # sem lembrete no tick) e o tick seguinte se auto-cura sem duplicar.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-4-retro-item-12-tornar-reminder_scan_enabled-observavel"
     epic: 4
@@ -447,7 +470,16 @@ action_items:
       do hook de captura com permissão negada => 0 POSTs (NFR10); (c) clause accuracy
       -5 => 400; (d) pin determinístico de que ping não alimenta o markSignal"
     owner: "Dev"
-    status: open
+    # DONE em 12/09/2026 (wrap-2, PR #41): (a) descoberta com OUTBOUND e
+    # RETURN ativas na mesma rota — startedAt explícitos via prisma (exceção
+    # consciente ao seed via API: nenhum endpoint expõe startedAt; precedente
+    # prisma-time da 4.5) pinam startedAt desc, e empate exato resolve no
+    # maior id com vencedor CALCULADO; (b) corpo do hook: negada ⇒ nem o
+    # primeiro POST parte, concedida arma a cadência, revogada no meio da
+    # viagem PARA; (c) accuracy -5 ⇒ 400 E o lado inclusivo 0 ⇒ 200 (gte não
+    # deriva para gt); (d) pin ESTRUTURAL: nenhum listener 'ping' registrado
+    # no cliente SSE — sem caminho do heartbeat até o timer de 15s.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-18-reconciliação-de-contrato-documento-rege"
     epic: 5
