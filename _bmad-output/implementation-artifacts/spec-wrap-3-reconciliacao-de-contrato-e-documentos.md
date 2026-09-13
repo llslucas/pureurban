@@ -180,8 +180,9 @@ de contrato).
 - Mobile: jest **253/253** (novo caso de 9 casas em `track-bus-screen.test.tsx`); lint
   limpo.
 - Gate completo (`npm run gate` sob `E2E_API_URL=http://localhost:3001` — a `PORT` do
-  `api/.env` local é 3001, e o default do script é 3000): receipt registrado no commit
-  de fechamento deste spec.
+  `api/.env` local é 3001, e o default do script é 3000): **VERDE, exit 0** no HEAD da
+  branch — 335 unit / 200 supertest / 2 pw:api (NFR4 31ms, budget 1s) / 10 pw:e2e
+  (NFR1 10ms, NFR2 17ms, NFR3 90ms) / `openapi:check` limpo contra o contrato commitado.
 
 ## Review Triage Log
 
