@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { MessageEvent } from '@nestjs/common';
 import type { Observable } from 'rxjs';
