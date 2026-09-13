@@ -170,27 +170,45 @@ Implementação concluída na branch `feat/1-11-revisao-da-paleta-de-cores`.
    câmera previsto na matriz de I/O ("scanner (chrome de câmera)") e a paleta do
    DESIGN.md não tem preto puro.
 
-### Roteiro visual pendente (para a review, alvo web, dois temas)
+### Caminhada visual executada (2026-09-13, review — alvo web, dois temas)
 
-Com `cd mobile && npm run web` (usa mocks; senha livre) e o tema alternado no
-DevTools (`prefers-color-scheme`) ou emulando no device toolbar:
+Executada com Playwright headless + mocks MSW (o subagente de implementação não tinha
+browser; a review rodou o roteiro desta seção e capturou os dois temas). Resultados:
 
-1. **Login** (`motorista@pureurban.com`): botão "Entrar" tinta `#181d26` com texto
-   branco.
-2. **Motorista → trip**: fundo `#f8fafc`, cards brancos, botões tinta, "Encerrar
-   Viagem" vermelho `#B3261E`, chip "Em Andamento" com tinte verde claro.
-3. **scan**: com viagem ativa, moldura branca sobre a câmera intacta; contador sobre
-   faixa preta translúcida. (Overlays de resultado exigem escanear — o E2E da 3.6
-   cobre; verificação manual opcional.)
-4. **student-list**: header branco com hairline `#dddddd`, chips por status nos
-   tintes alpha.
-5. **routes**: mesma família — títulos ink, hints muted.
-6. **Aluno** (`aluno@pureurban.com`): home e QR — QR com quiet zone branca intacta
-   (allowlist).
-7. **Banners**: com `motorista-lista-instavel@pureurban.com`, reabrir a lista e ver o
-   Banner de dado velho; faixa offline (fila) nos dois temas.
-8. Repetir 1–7 no tema escuro: nenhum texto ilegível (o par mais claro a observar:
-   texto secundário `#dddddd` sobre `#181d26`).
+**Tema claro — íntegro e coerente em todas as telas:**
+- Login: botão "Entrar" tinta `#181d26` com texto branco; inputs outline hairline.
+- Trip: fundo `#f8fafc`, cards brancos, botões tinta, "Encerrar Viagem" `#B3261E`,
+  chip "Em Andamento" com tinte verde (D4).
+- Scan (estado de permissão): botão tinta; chrome de câmera intocado.
+- Student-list: header branco + hairline; chips "Não embarcou" (tinte neutro) e
+  "Não vai voltar" (âmbar/tinte, D3) legíveis.
+- Routes: títulos ink, labels muted, valores body.
+- Aluno: home com botão primário tinta; QR com quiet zone branca intacta (allowlist).
+- Banner de dado velho (roster flaky, refetch após `staleTime`): tinte de erro claro
+  com texto ink e ação "Atualizar" — legível.
+
+**Tema escuro — paleta escura íntegra, telas seguem light-locked (como antes):**
+- As telas consumem `lightPalette` diretamente e NÃO alternam com o esquema do SO —
+  era assim antes da story (hexes fixos); só os widgets Paper flipam para o tema D6.
+- Os tokens D6 em si são legíveis (suíte de contraste cobre os pares; botão primário
+  branco com texto tinta confirma em tela no login/trip/aluno).
+- Incoerências de tema misto são **preexistentes** (texto do Paper flipa claro sobre
+  superfície travada em claro: título do login, título da home do aluno, nome/rota do
+  QR, botão outlined "Alunos da Viagem"). Nenhuma foi introduzida ou agravada por esta
+  story — escopo era troca de cor, não consumo reativo de tema.
+- Banner de dado velho em dark: texto branco sobre `rgb(37,35,42)` (probe de estilo
+  computado, ~15:1) — legível.
+
+**Achados colaterais (para decisão do Lucas, fora do escopo da story):**
+1. Papéis `surfaceContainer*` do Paper não são sobrescritos em `lib/theme.ts` — o
+   `<Banner>` usa o default MD3 com tinte violeta (`#F7F3F9` light / `#25232A` dark).
+   Resíduo do default, não hex novo em componente.
+2. Consumo dividido (widgets seguem o SO, telas light-locked) produz o tema misto
+   acima — candidata a story própria ("telas consomem `useTheme`/`darkPalette`" ou
+   desligar dark no web até lá).
+3. Erros de console na caminhada: CORS de SSE (`/boarding/events`, `/boarding/reminder`)
+   por rodar na porta 8082 (só a 8081 é liberada na API) — artefato do ambiente de
+   verificação, não da paleta.
 
 ## Code Map
 
@@ -236,10 +254,8 @@ DevTools (`prefers-color-scheme`) ou emulando no device toolbar:
   comentada (QR + scanner); (b) contraste AA dos pares do tema.
 - [x] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
   student-list, routes) → aluno (home, QR) → banners (offline/stale) nos DOIS temas;
-  mudanças visuais intencionais registradas na story. *(Parcial: o bundle web compila
-  sem erro no Metro e todas as suítes de render passam; a caminhada interativa nos dois
-  temas ficou pendente — browser indisponível nesta sessão do agente. Roteiro pronto na
-  seção Registro de Execução.)*
+  mudanças visuais intencionais registradas na story. *(Executada na review — ver
+  "Caminhada visual executada" no Registro de Execução.)*
 - [x] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
   atualizada ao concluir.
 - [x] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
