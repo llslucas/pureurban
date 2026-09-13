@@ -13,7 +13,26 @@ export const MAX_ATTEMPTS = 5
 const BASE_BACKOFF_MS = 1_000
 export const MAX_BACKOFF_MS = 30_000
 
+/**
+ * Janela do contrato (3.3a/3.0): o servidor rejeita check-in com `occurredAt`
+ * mais velho que 24h. O dreno usa o MESMO limite para não gastar um POST com
+ * rejeição garantida (D1/AC4).
+ */
+export const OCCURRENCE_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * D6/AC8: linhas `sent` são histórico de entrega, não estado — purgadas do
+ * banco local depois de 7 dias, no boot.
+ */
+export const SENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+
 export type QueueStatus = 'pending' | 'sent' | 'failed'
+
+/** Dono do item — a identidade que vai assinar o POST do dreno (D4). */
+export interface QueueOwner {
+  userId: string
+  companyId: string
+}
 
 export interface CheckInQueuePayload {
   studentId: string
@@ -38,16 +57,33 @@ export interface QueuedCheckIn {
   createdAt: string
   attempts: number
   lastError: string | null
+  /**
+   * D4: quem escaneou. O dreno só vê (e só envia) itens do usuário logado —
+   * num aparelho compartilhado, drenar item de outro motorista sairia com o
+   * token errado e viraria DRIVER_NOT_ASSIGNED. Itens sem dono (migração v1)
+   * ficam invisíveis para todos.
+   */
+  userId: string
+  companyId: string
 }
 
 export interface QueueStorage {
   insert(item: QueuedCheckIn): Promise<void>
-  /** FIFO estrito: ordenado por `createdAt` ascendente. */
-  listPending(): Promise<QueuedCheckIn[]>
+  /** FIFO estrito: ordenado por `createdAt` ascendente, só do usuário. */
+  listPending(userId: string): Promise<QueuedCheckIn[]>
   markSent(id: string): Promise<void>
   markFailed(id: string, error: string): Promise<void>
   bumpAttempt(id: string, error: string): Promise<void>
-  count(status: QueueStatus): Promise<number>
+  count(status: QueueStatus, userId: string): Promise<number>
+  /** D6/AC8: remove `sent` entregues antes do corte (ISO 8601). */
+  purgeSentBefore(cutoffIso: string): Promise<void>
+  /**
+   * D5/AC7: esvazia a fila do usuário no logout. Remove também linhas sem dono
+   * (órfãs da migração v1), que ninguém pode drenar com segurança.
+   */
+  purgeUser(userId: string): Promise<void>
+  /** D1/AC6: reconhecimento do motorista — remove os `failed` dele. */
+  deleteFailed(userId: string): Promise<void>
 }
 
 /**
@@ -156,9 +192,15 @@ export type EnqueueResult =
 
 export async function enqueueCheckIn(
   storage: QueueStorage,
-  input: { id: string; studentId: string; tripId: string; scannedAt: string },
+  input: {
+    id: string
+    studentId: string
+    tripId: string
+    scannedAt: string
+    owner: QueueOwner
+  },
 ): Promise<EnqueueResult> {
-  if ((await storage.count('pending')) >= MAX_QUEUE_SIZE) {
+  if ((await storage.count('pending', input.owner.userId)) >= MAX_QUEUE_SIZE) {
     return { kind: 'full' }
   }
 
@@ -170,6 +212,8 @@ export async function enqueueCheckIn(
     createdAt: input.scannedAt,
     attempts: 0,
     lastError: null,
+    userId: input.owner.userId,
+    companyId: input.owner.companyId,
   }
   await storage.insert(item)
   return { kind: 'queued', item }
@@ -243,8 +287,9 @@ export function buildCheckInSender(api: CheckInApi): CheckInSender {
 
 export type DrainStep =
   | { kind: 'idle' }
-  | { kind: 'sent'; id: string }
-  | { kind: 'settled'; id: string; reason: string }
+  /** `tripId` vai junto: é o que o hook invalida no roster pós-dreno (D7/AC9). */
+  | { kind: 'sent'; id: string; tripId: string }
+  | { kind: 'settled'; id: string; tripId: string; reason: string }
   | { kind: 'failed'; id: string; reason: string }
   | {
       kind: 'retry'
@@ -258,10 +303,24 @@ export type DrainStep =
   /** Sessão morta: encerra este item e ABORTA o lote — o resto segue `pending`. */
   | { kind: 'signed-out'; id: string; reason: string }
 
-/** Drena EXATAMENTE um item — o mais antigo pendente. */
-export async function drainNext(storage: QueueStorage, send: CheckInSender): Promise<DrainStep> {
-  const [item] = await storage.listPending()
+/** Drena EXATAMENTE um item — o mais antigo pendente DO USUÁRIO. */
+export async function drainNext(
+  storage: QueueStorage,
+  send: CheckInSender,
+  userId: string,
+): Promise<DrainStep> {
+  const [item] = await storage.listPending(userId)
   if (!item) return { kind: 'idle' }
+
+  // D1/AC4: fora da janela de 24h é rejeição garantida pelo contrato — o item
+  // vira `failed`/EXPIRED sem gastar o POST. Um `createdAt` ilegível dá idade
+  // NaN, que não passa no limite e segue para o servidor decidir.
+  const ageMs = Date.now() - Date.parse(item.createdAt)
+  if (ageMs >= OCCURRENCE_WINDOW_MS) {
+    const reason = `EXPIRED: occurredAt fora da janela de 24h do escaneamento`
+    await storage.markFailed(item.id, reason)
+    return { kind: 'failed', id: item.id, reason }
+  }
 
   let outcome: SendOutcome
   try {
@@ -274,10 +333,10 @@ export async function drainNext(storage: QueueStorage, send: CheckInSender): Pro
   switch (outcome.kind) {
     case 'accepted':
       await storage.markSent(item.id)
-      return { kind: 'sent', id: item.id }
+      return { kind: 'sent', id: item.id, tripId: item.payload.tripId }
     case 'settled':
       await storage.markSent(item.id)
-      return { kind: 'settled', id: item.id, reason: outcome.reason }
+      return { kind: 'settled', id: item.id, tripId: item.payload.tripId, reason: outcome.reason }
     case 'rejected':
       await storage.markFailed(item.id, outcome.reason)
       return { kind: 'failed', id: item.id, reason: outcome.reason }
@@ -335,7 +394,7 @@ export interface DrainSummary {
 export async function drainQueue(
   storage: QueueStorage,
   send: CheckInSender,
-  options: { transportFailures?: number } = {},
+  options: { userId: string; transportFailures?: number },
 ): Promise<DrainSummary> {
   const summary: DrainSummary = {
     sent: 0,
@@ -345,11 +404,11 @@ export async function drainQueue(
     steps: [],
   }
 
-  // Teto de iterações: `listPending()` é relido a cada passo, então uma
+  // Teto de iterações: `listPending()` é relida a cada passo, então uma
   // implementação de storage que não removesse o item de `pending` giraria para
   // sempre. Barato o bastante para não valer a pena confiar.
   for (let i = 0; i < MAX_QUEUE_SIZE; i += 1) {
-    const step = await drainNext(storage, send)
+    const step = await drainNext(storage, send, options.userId)
     if (step.kind === 'idle') break
     summary.steps.push(step)
     if (step.kind !== 'offline') summary.transportFailures = 0

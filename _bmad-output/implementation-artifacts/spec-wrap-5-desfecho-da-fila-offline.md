@@ -2,10 +2,11 @@
 title: 'Wrap 5: Desfecho da fila offline (decisão de produto + implementação)'
 type: 'bugfix'
 created: '2026-09-12'
-status: 'ready-for-dev'
+status: 'done'
 route: 'oneshot'
-review_loop_iteration: 0
-gated: 'exige aprovação do Lucas na matriz de decisão antes de executar'
+review_loop_iteration: 1
+gated: 'Matriz D1–D7 APROVADA na íntegra (defaults) pelo Lucas em 13/09/2026'
+approval: 'Matriz D1–D7 aprovada na íntegra com os defaults sugeridos pelo Lucas em 13/09/2026'
 context:
   - _bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md
   - _bmad-output/implementation-artifacts/3-4b-check-in-offline-com-fila-de-sincronizacao.md
@@ -39,7 +40,7 @@ sobre o que o motorista vê quando um embarque falha definitivamente).
 
 </frozen-after-approval>
 
-## Matriz de decisão (defaults sugeridos — aprovar/editar antes de executar)
+## Matriz de decisão (defaults sugeridos — APROVADA na íntegra, defaults, 13/09/2026)
 
 | # | Pergunta | Default sugerido | Alternativa |
 |---|---|---|---|
@@ -120,3 +121,125 @@ cd api && npm run gate         # completo no fim
 DEPOIS do wrap-1 (invalidação pós-dreno é vizinha do AC11 do dreno) e de preferência
 depois do wrap-2 (bateria de QueueStorage contra SQLite real ajuda a validar a migração).
 GATED: executar só com a matriz D1–D7 aprovada (inteira ou com overrides anotados aqui).
+
+## Implementation Notes
+
+**Branch:** `fix/wrap-5-desfecho-da-fila-offline` (a partir da `main` 730af81).
+
+**Decisões de implementação (matriz aprovada em defaults):**
+
+- **Migração versionada (D4/AC1):** mecanismo mínimo via `PRAGMA user_version`
+  (`database-migrations.ts`). Instalação nova nasce na v2 (tabela completa); instalação
+  da 3.4b (v1, sem versão) migra por `ALTER TABLE` coluna a coluna (idempotente contra
+  crash no meio da migração) + backfill `updated_at = created_at` FORA do guard da
+  coluna (crash entre ALTER e UPDATE completaria o backfill na reabertura — achado de
+  review). Teste de crash-state incluído.
+- **Linhas v1 órfãs (`user_id` NULL):** preservadas (AC1), mas INVISÍVEIS para todos —
+  o dono é irrecuperável e atribuí-las à sessão atual recriaria o dreno cruzado do D4.
+  Saem de cena na `purgeUser` (`OR user_id IS NULL`) no logout.
+- **`companyId`:** não existe no `AuthUser` (e a API não muda — boundary do spec); o
+  dono é estampado no scan com `user.id` + `activeTrip.companyId`. A coluna é anotação
+  de tenant conforme a matriz D4 ("userId (+ companyId)"); nenhuma query filtra por ela
+  hoje.
+- **Teto de 500 virou POR USUÁRIO:** consequência coerente do escopo D4 (a fila cheia
+  de A não pode bloquear B). Pinned por teste na bateria; AC8's "comportamento
+  preservado" segue valendo no sentido do teto contar só `pending`.
+- **Aviso do D5/AC7 na TELA DE LOGIN (desvio consciente do congelado):** o congelado
+  diz "aviso no logout — serão descartados" (confirmação prévia), mas NÃO EXISTE botão
+  de logout no happy path do motorista (defer registrado no deferred-work da 1.6/3.5b):
+  o logout real é programático (401 do api-client, guardas de role). Implementado:
+  `auth.store.logout()` notifica listeners (novo `registerLogoutListener`); o
+  `offline-queue-lifecycle` (registrado no root layout) conta os pendentes, purga e
+  publica o aviso como PROMISE antes do primeiro await (regressão de race com o mount
+  do login — achado de review); o login consome e exibe "N embarques não sincronizados
+  foram descartados ao sair da conta." (passado, pós-fato).
+- **Purga de `sent` (D6/AC8) no BOOT DE VERDADE:** vive no registro do lifecycle (root
+  layout, qualquer sessão), não no hook do motorista (achado de review: o mount do
+  driver group não é boot). `markSent`/`markFailed`/`bumpAttempt` estampam `updated_at`;
+  o corte é `Date.now() - 7 dias`.
+- **EXPIRED local (D1/AC4):** `drainNext` compara `Date.now()` com a janela de 24h
+  (`OCCURRENCE_WINDOW_MS`) e marca `failed`/`EXPIRED` SEM POST; `createdAt` ilegível dá
+  NaN → não expira localmente (o servidor decide). As suítes congelam o relógio
+  (`jest.setSystemTime`) — os itens de data fixa da bateria "envelheceriam" com o
+  calendário real.
+- **Invalidação (D7/AC9):** `DrainStep` `sent`/`settled` agora carrega `tripId`; o hook
+  invalida `tripStudentsKey(tripId)` de cada viagem entregue + `activeTripKey`. O pin de
+  baseline DS1 do wrap-1 (use-offline-sync.test) foi revertido COM esta mudança, como o
+  próprio teste anunciava.
+- **A11y do banner (achado de review):** o container NÃO tem mais `accessible` — ele
+  achataria a subárvore e esconderia o botão "Dispensar" do VoiceOver. O papel `alert`
+  migrou para os textos (auto-acessíveis) e o `accessibilityLiveRegion` ficou no
+  container.
+- **Isolamento de listeners de logout (achado de review):** um listener que lança não
+  aborta os demais nem o logout.
+
+**Arquivos:** produção — `utils/offline-queue.ts` (owner, escopo, expiração, tripId nos
+passos, `SENT_RETENTION_MS`/`OCCURRENCE_WINDOW_MS`), `lib/database-migrations.ts` (v2),
+`lib/offline-queue-storage.ts` (SQL com escopo + purgas + updated_at),
+`hooks/use-offline-sync.ts` (escopo por sessão, invalidação, dismissFailed),
+`stores/auth.store.ts` (registerLogoutListener), `lib/offline-discard-notice.ts` (novo),
+`lib/offline-queue-lifecycle.ts` (novo), `components/offline-banner.tsx` (Dispensar),
+`app/(driver)/_layout.tsx`, `app/(driver)/scan.tsx` (owner no attempt), `app/_layout.tsx`
+(registro global), `app/(auth)/login.tsx` (aviso). Testes — baterias atualizadas e
+novos: `utils/describe-queue-storage.ts`, `utils/offline-queue.test.ts`,
+`lib/offline-queue-storage.test.ts` (migração v1→v2 + crash + órfãs),
+`lib/offline-queue-lifecycle.test.ts` (novo), `hooks/use-offline-sync.test.tsx` (DS1
+revertido + ciclo AC6), `components/offline-banner.test.tsx` (ciclo AC6 + a11y),
+`app/(auth)/login.test.tsx` (novo).
+
+**Contexto adicional usado:** o gate roda nesta máquina com
+`E2E_API_URL=http://localhost:3001` (o `api/.env` usa `PORT=3001`; default do script é
+3000) — sem isso o passo 3/5 finge timeout de API.
+
+## Review Triage Log
+
+Blind Hunter (context-free), 14 achados em 2026-09-13. 7 patches aplicados, 3
+rejeitados com evidência, 1 defer, 1 false, 2 absorvidos como docs/testes.
+
+1. **Race do aviso de descarte** (promise publicada só após a purga; login monta
+   antes e consome null) — REAL, high. PATCH: promise publicada antes do primeiro
+   `await`; regressão pinada em `offline-queue-lifecycle.test.ts` ("o aviso é
+   publicado como PROMISE no despacho do logout").
+2. **Backfill da migração dentro do guard da coluna** (crash entre ALTER e UPDATE
+   deixaria `updated_at` NULL para sempre; purga de `sent` nunca casaria) — REAL,
+   medium. PATCH: UPDATE fora do guard, idempotente por `WHERE IS NULL`.
+3. **Sem teste do estado de crash da migração** — REAL, medium. PATCH: caso
+   "crash no meio da migração" em `offline-queue-storage.test.ts`.
+4. **Purga de `sent` no mount do driver layout, não no boot** — REAL, low. PATCH:
+   movida para o registro do `offline-queue-lifecycle` (root layout, qualquer
+   sessão); assertion movida do teste do hook para o do lifecycle.
+5. **Teto de 500 virou por-usuário** — REAL, low, aceito como consequência
+   coerente do D4 (a fila cheia de A não bloqueia B). PINNADO: caso na bateria
+   ("o teto de 500 é POR USUÁRIO") + anotado nas Implementation Notes.
+6. **Copy "Registre manualmente" é impossível para EXPIRED; dispensar sem undo** —
+   real, low, REJEITADO como patch: a copy é a NFR13 literal e a bateria global é
+   a interface aprovada; discriminar motivo por item é o corte consciente da
+   Fase 2. DEFERIDO para o trabalho de badge (deferred-work.md).
+7. **Botão "Dispensar" inalcançável no VoiceOver** (`accessible` no container
+   achata a subárvore em iOS) — REAL, medium. PATCH: `accessible` removido do
+   container, papel `alert` migrado para os textos, teste de
+   `getByRole('button', { name: /dispensar/i })`.
+8. **Login sem teste do aviso (metade UI do AC7)** — REAL, low. PATCH:
+   `src/login-screen.test.tsx` (3 casos). Lição do próprio patch: o arquivo
+   NASCEU em `src/app/(auth)/` e o Expo Router tentou bundlar o
+   `@testing-library/react-native` como rota, derrubando o app no browser e o
+   pw:e2e — movido para `src/` (convenção dos testes de tela).
+9. **Fake do hook filtrava `purgeSentBefore` por `createdAt`** (produção usa
+   `updated_at`) — REAL, low. PATCH: o fake do hook parou de filtrar (a asserção
+   do hook é de CHAMADA; a fidelidade da filtragem é da bateria e do teste SQLite
+   por SQL cru).
+10. **Spec stale (gated+approval; desvio do D5)** — válido. PATCH: frontmatter
+    atualizado + desvio do aviso documentado nas Implementation Notes.
+11. **Órfãs v1 sem saída exceto logout** — real, low, REJEITADO: ≤500 linhas,
+    invisíveis por desenho (D4); apagá-las na migração violaria o AC1
+    ("preservadas").
+12. **`companyId` gravado mas nunca lido** — FALSE: a matriz D4 aprovada pede a
+    coluna explicitamente ("coluna userId (+ companyId)"); é anotação de tenant
+    para o Tier 2, não filtro.
+13. **Listeners de logout sem isolamento de erro** — REAL, low. PATCH: try/catch
+    no loop de `logout()` (um listener que lança não aborta os demais nem o
+    logout).
+14. **Logout no meio do dreno superconta o aviso** — real, low, REJEITADO: corrida
+    rara (logout exatamente entre o `listPending` e o `markSent`); o servidor
+    RECEBE o embarque (nenhuma perda real — só o número do aviso pode errar);
+    abortar dreno no logout seria mecanismo novo sem AC que o peça.

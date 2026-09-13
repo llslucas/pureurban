@@ -1,6 +1,6 @@
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
-import { Text } from 'react-native-paper'
+import { Button, Text } from 'react-native-paper'
 
 import type { OfflineSyncState } from '@/hooks/use-offline-sync'
 
@@ -26,9 +26,19 @@ function failedLabel(count: number): string {
 interface OfflineBannerProps extends OfflineSyncState {
   /** Inset inferior da safe area; o banner é a última coisa na tela. */
   insetBottom?: number
+  /**
+   * D1/AC6: reconhecimento explícito — sem ele o vermelho fica preso para
+   * sempre, porque `failedCount` de item definitivo nunca volta a zero sozinho.
+   */
+  onDismissFailed?: () => void
 }
 
-export function OfflineBanner({ pendingCount, failedCount, insetBottom = 0 }: OfflineBannerProps) {
+export function OfflineBanner({
+  pendingCount,
+  failedCount,
+  insetBottom = 0,
+  onDismissFailed,
+}: OfflineBannerProps) {
   // Nada pendente e nada falhado: o banner some por inteiro, inclusive o
   // preenchimento da safe area — senão deixaria uma faixa vazia no rodapé.
   if (pendingCount === 0 && failedCount === 0) return null
@@ -36,26 +46,38 @@ export function OfflineBanner({ pendingCount, failedCount, insetBottom = 0 }: Of
   return (
     <View
       style={[styles.container, { paddingBottom: insetBottom }]}
-      // O banner aparece e some sozinho: sem isto o leitor de tela nunca anuncia
-      // nem a fila crescendo nem o embarque que exige registro manual (NFR18).
-      // `accessible` agrupa as faixas num anúncio só, em vez de duas paradas de
-      // foco no rodapé de todas as telas do motorista.
-      accessible
-      accessibilityRole="alert"
+      // O banner aparece e some sozinho: o liveRegion anuncia as faixas no
+      // Android; o papel `alert` vive nos TEXTS (auto-acessíveis) e não no
+      // container porque `accessible` aqui achataria a subárvore num único
+      // elemento e tornaria o botão "Dispensar" inalcançável no VoiceOver.
       accessibilityLiveRegion="polite"
     >
       {failedCount > 0 ? (
         // Falha definitiva vem primeiro: é a única das duas que exige ação do
         // motorista, e as tentativas já se esgotaram.
         <View style={[styles.strip, { backgroundColor: FAILED_COLOR }]}>
-          <Text variant="titleMedium" style={styles.text}>
+          <Text variant="titleMedium" style={styles.text} accessibilityRole="alert">
             {failedLabel(failedCount)}
           </Text>
+          {onDismissFailed ? (
+            // "Dispensar" reconhece a falha (as linhas failed são apagadas) — é
+            // o desfecho do D1: o vermelho não é prisão perpétua.
+            <Button
+              mode="contained-tonal"
+              compact
+              onPress={onDismissFailed}
+              style={styles.dismissButton}
+              labelStyle={styles.dismissLabel}
+              testID="offline-banner-dismiss"
+            >
+              Dispensar
+            </Button>
+          ) : null}
         </View>
       ) : null}
       {pendingCount > 0 ? (
         <View style={[styles.strip, { backgroundColor: PENDING_COLOR }]}>
-          <Text variant="titleMedium" style={styles.text}>
+          <Text variant="titleMedium" style={styles.text} accessibilityRole="alert">
             {pendingLabel(pendingCount)}
           </Text>
         </View>
@@ -73,6 +95,8 @@ const styles = StyleSheet.create({
   strip: {
     paddingVertical: 10,
     paddingHorizontal: 16,
+    // room para o botão de dispensar sem esconder o texto.
+    gap: 4,
   },
   // NFR18: alto contraste e >= 16sp, legível em movimento e sob sol direto.
   text: {
@@ -81,5 +105,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  dismissButton: {
+    alignSelf: 'center',
+    // Sobre o vermelho do strip: tonal herda a cor do tema; forçar contraste.
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+  },
+  dismissLabel: {
+    color: FAILED_COLOR,
+    fontWeight: '700',
   },
 })

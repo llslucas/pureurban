@@ -437,3 +437,9 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/spec-wrap-4-divida-de-forma-sse-e-e2e.md`
   summary: Add a unit case asserting the SSE terminal-signal failure log fires — the log is the ONLY diagnostic when the sentinel publish to Redis fails.
   evidence: Verification-gap layer (pré-verificado): os 23 casos unit dos services SSE nunca tocam o caminho de falha do publish (deletar o `.catch`/`logger.error` deixa o gate inteiro verde); nenhum e2e força falha de publish. O wrap-4 mudou o shape do log (canal em vez de tripId) — mudança divulgada no risco #1 do spec. Follow-up barato: 1 caso unit com spy no logger e `redis.publish` rejeitando.
+
+## Deferred from: review of spec-wrap-5-desfecho-da-fila-offline.md (2026-09-13)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-wrap-5-desfecho-da-fila-offline.md`
+  summary: Copy do banner vermelho discriminada por motivo — para itens EXPIRED (D1), "Registre manualmente" é instrução impossível (a janela de 24h fechou também para o registro manual); o texto certo seria "dispense este embarque".
+  evidence: Rejeitado como patch no wrap-5 (triagem: low — a copy atual é a NFR13 literal e a bateria é a interface aprovada "banner global", sem badge por item); o fix depende de expor o motivo por item, que é o corte consciente da Fase 2 (sprint-change-proposal-2026-08-28). Registrado para quando o badge ✗/⏳/✗ existir.
