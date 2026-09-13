@@ -49,9 +49,10 @@ import { TrackingStreamGuard } from './tracking-stream.guard.js';
 // Story 5.1 wired POST /location and GET /trips/:id/location to the real core
 // (Effect use cases + Redis behind LocationBus); 5.2 flipped the stream to a
 // real @Sse and added GET /trips/active (the ONLY contract addition of this
-// story). Swagger decorators are the frozen 5.0 contract — openapi.json must
-// not drift (the 501 doc of the stream stays as historical contract, precedent
-// 5.1 where handlers arrived after their docs).
+// story). Wrap-3 removed the inherited 501 NOT_IMPLEMENTED Swagger entries:
+// every handler here is real, so documenting the stub era drifted the
+// published contract. Any contract text edit here still requires regenerating
+// openapi.json + the mobile types in the same PR (Architecture §12).
 @ApiTags('tracking')
 @ApiBearerAuth()
 @Controller('api/v1/tracking')
@@ -101,12 +102,6 @@ export class TrackingController {
     status: 409,
     description:
       'TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa (posição só é aceita em viagem ativa).',
-    type: ErrorResponseDto,
-  })
-  @ApiResponse({
-    status: 501,
-    description:
-      'NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1.',
     type: ErrorResponseDto,
   })
   async ingestLocation(
@@ -224,12 +219,6 @@ export class TrackingController {
       'TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa.',
     type: ErrorResponseDto,
   })
-  @ApiResponse({
-    status: 501,
-    description:
-      'NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1.',
-    type: ErrorResponseDto,
-  })
   lastKnownLocation(
     @TenantId() companyId: string,
     @Req() req: Request & { user: { userId: string } },
@@ -298,12 +287,6 @@ export class TrackingController {
     status: 409,
     description:
       'TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa.',
-    type: ErrorResponseDto,
-  })
-  @ApiResponse({
-    status: 501,
-    description:
-      'NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.2.',
     type: ErrorResponseDto,
   })
   tripLocationStream(

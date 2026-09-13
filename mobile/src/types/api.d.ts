@@ -868,7 +868,7 @@ export interface components {
              */
             accuracy?: number;
             /**
-             * @description Instante da captura da posição pelo device (ISO 8601 UTC). Não volta em nenhuma resposta do servidor: o ack carrega o receivedAt e o evento do stream carrega o timestamp de publicação.
+             * @description Instante da captura da posição pelo device (ISO 8601 UTC, com qualquer precisão fracionária — 0 a N casas). Não volta em nenhuma resposta do servidor: o ack carrega o receivedAt e o evento do stream carrega o timestamp de publicação.
              * @example 2026-09-11T12:00:00.000Z
              */
             capturedAt: string;
@@ -910,7 +910,7 @@ export interface components {
              */
             accuracy?: number;
             /**
-             * @description Instante da captura da posição pelo device (ISO 8601 UTC) — a idade deste ponto é o que a tela usa para o estado degradado "Sem sinal GPS". Se a posição foi expirada, o endpoint responde 404 NO_LOCATION_AVAILABLE, nunca um ponto stale.
+             * @description Instante da captura da posição pelo device (ISO 8601 UTC, precisão fracionária ilimitada), ecoado sem alteração — o servidor nunca o compara com relógio algum. O estado degradado "Sem sinal GPS" da tela é avaliado pela RECEPÇÃO de dados no cliente (timer de 15s sem chegar posição nova: evento location.updated ou resposta deste endpoint), não pela idade deste campo — capturado há pouco não significa sinal vivo. Se a posição foi expirada (TTL do cache), o endpoint responde 404 NO_LOCATION_AVAILABLE, nunca um ponto stale.
              * @example 2026-09-11T12:00:00.000Z
              */
             capturedAt: string;
@@ -1648,7 +1648,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description FORBIDDEN — somente motoristas */
+            /** @description FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não é o responsável pela viagem) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2682,15 +2682,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
         };
     };
     TrackingController_activeTrackingTrip: {
@@ -2809,15 +2800,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponseDto"];
                 };
             };
-            /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.1. */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
         };
     };
     TrackingController_tripLocationStream: {
@@ -2870,15 +2852,6 @@ export interface operations {
             };
             /** @description TRIP_NOT_ACTIVE — viagem inexistente, de outra empresa ou não ativa. */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponseDto"];
-                };
-            };
-            /** @description NOT_IMPLEMENTED — contrato declarado na Story 5.0; implementação na Story 5.2. */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
