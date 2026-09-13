@@ -81,7 +81,8 @@ export class TripController {
   })
   @ApiResponse({
     status: 403,
-    description: 'FORBIDDEN — somente motoristas',
+    description:
+      'FORBIDDEN (role diferente de DRIVER) ou DRIVER_NOT_ASSIGNED (motorista não é o responsável pela viagem)',
     type: ErrorResponseDto,
   })
   async end(

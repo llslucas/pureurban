@@ -827,10 +827,10 @@ material mais defensável, porque tem termo de comparação.
 **Status:** PRONTO PARA IMPLEMENTAÇÃO — Nível de confiança alto.
 
 **Gaps conhecidos:**
-- ⚠️ Schema Prisma (entidades/campos): definir na primeira história
+- ✅ Schema Prisma (entidades/campos): definido na Story 1.2
 - ⚠️ Deploy específico (Railway vs Render): decidir no momento do deploy
-- ⚠️ Shell de navegação do mobile ausente (Story 1.8) — bloqueia toda verificação de story mobile
-- ⚠️ Seed do banco quebrado sob Prisma 7 (Story 1.9) — bloqueia stories que dependem de dados semeados
+- ✅ Shell de navegação do mobile ausente (Story 1.8) — **RESOLVIDO em 28/08/2026**: `<Stack>` + guards por papel; telas do produto alcançáveis
+- ✅ Seed do banco quebrado sob Prisma 7 (Story 1.9) — **RESOLVIDO em 07/09/2026**: `prisma.config.ts` + adapter `PrismaPg`; `npm run seed` verificado
 - Nenhum gap crítico identificado
 
 **Compatibilidade verificada:**
@@ -838,6 +838,68 @@ material mais defensável, porque tem termo de comparação.
 - SSE nativo NestJS + Redis Pub/Sub: padrão documentado
 - Prisma v7 `moduleFormat = "cjs"`: resolve compatibilidade ESM/CJS
 - `ManagedRuntime` + `useFactory`: funciona sem dependências externas
+
+### Trabalhos Futuros — Production Readiness (reemitido no wrap-3, 13/09/2026)
+
+> Compromisso da retro do Épico 2, reemitido pela retro do Épico 3 (AI8, sem evidência
+> de pouso) e cumprido pelo spec-wrap-3. A fonte **viva** dos débitos é
+> `_bmad-output/implementation-artifacts/deferred-work.md`; esta seção é a fotografia
+> com evidência, insumo direto da defesa do TCC.
+
+**Evidência de pouso (Fase 1 completa — Épicos 1–5).** Gate completo da retro do Épico 5
+(12/09/2026, stack real: Postgres/Redis via docker compose, API `:3001`, Expo Web
+`:8081` sem MSW): **320 unit + 193 supertest + 2 pw:api + 10 pw:e2e verdes** e NFRs de
+performance **medidos pela UI contra a API real** — NFR1 13ms (budget 2s), NFR2 25ms
+(budget 5s), NFR3 101ms (budget 3s), NFR4 33ms com 55 alunos (budget 1s). O gate é o
+script `npm run gate` (api/), que sobe a infra, roda as quatro suítes + drift check do
+contrato e desliga o que iniciou; a bateria de fronteiras do wrap-2 (PR #41) elevou para
+335 unit / 199 supertest. O canal SSE + Redis Pub/Sub do Épico 5 foi provado ponta a
+ponta pela UI, incluindo comportamento degradado e fim limpo da transmissão.
+
+**Débitos sistêmicos fechados desde a retro 2 (evidência verificada contra o HEAD):**
+
+| Débito | Fechado por |
+|---|---|
+| Nenhuma tela do produto alcançável (shell ausente) | Story 1.8 (28/08/2026) |
+| Seed quebrado sob Prisma 7 | Story 1.9 (PR #24) |
+| Sem gate de testes automatizado | `npm run gate` — PR #31 |
+| Suíte e2e vermelha na baseline (login 201×200) + P2002 do login | PR #31 |
+| Queries offline pausando (`onlineManager` inerte): `networkMode: 'always'` global + factory de query options | PR #31 (decisão: SEM NetInfo — conectividade derivada do desfecho de transporte) |
+| CORS × SSE bloqueado no browser (cache-control fora da allowlist, shim de teste) | PR #31 |
+| CORS sem fail-fast em produção; preflight sem teste | wrap-1 (PR #39) |
+| `toInfraError` em 11 cópias; harness de TestClock duplicado | PR #31 (extração; boarding/tracking adaptadores já nascem no helper) |
+| Resync do last-known prometido pelo contrato e nunca executado; comentários descrevendo comportamento inexistente | wrap-1 (PR #39) — guarda monotônica por `capturedAt` |
+| Mensagem não-objeto no Redis derrubando o processo (`handleMessage` sem guard, 2 cópias) | wrap-1 (PR #39) |
+| Captura GPS engolindo 409/403 determinísticos (tempestade de POSTs pós-fim de viagem) | wrap-1 (PR #39) |
+| Baratas: NaN no `formatClock`, `pollingInterval` do SSE, `isActive` na descoberta | wrap-1 (PR #39) |
+| `QueueStorage` (SQL de produção) sem teste — bateria contra SQLite real | wrap-2 (PR #41) |
+| Fronteiras dos Épicos 4/5 sem bateria (2 ausências, 2+ elegíveis, ADMIN, tie-break da descoberta, NFR10, accuracy −5, ping×timer) | wrap-2 (PR #41) |
+| Contrato publicado divergente do código (staleness por idade; `capturedAt` rejeitando ISO válido; 501 de handlers reais; 403 do end-trip sem código de negócio) | **wrap-3 (este PR)** |
+
+**Débitos sistêmicos abertos (aceitos como escopo de TCC; principais itens — a lista
+viva completa é o `deferred-work.md`; mitigação é decisão de produto/arquitetura, não
+patch):**
+
+| Categoria | Débito | Origem | Mitigação proposta |
+|---|---|---|---|
+| Segurança | JWT nunca revalidado contra `isActive`/`role` — token vale até expirar; SSE autoriza só no connect | 3-5a; retro 5 (R8) | Revalidação em janela (ex.: no heartbeat do SSE) |
+| Segurança | QR do aluno é UUID opaco em texto claro (`sessionId` nunca validado no backend) | 3.2b | Assinar o payload ou registrar/validar `sessionId` no check-in |
+| Segurança | Segundo 401 após refresh bem-sucedido não encerra a sessão no app | 3.3b | Tratar 401 pós-refresh como logout |
+| Multi-tenancy | Sem guard de empresa ativa — JWT válido de empresa desativada opera | 2.3 | Checar status no `TenantGuard` |
+| DoS / Performance | Paginação sem teto; bcrypt sem rate limiting; N+1 em `updateDriver` | 2.4 / 2.3 | Limites de página, throttling, query única |
+| Confiabilidade de eventos | Sem outbox transacional; dispatch best-effort pós-commit; `ManagedRuntime` sem `dispose()`; `Effect.orDie` converte falha de infra em 500 | 2.6 / 3.3a | Outbox + hook de dispose + mapeamento de erros |
+| Confiabilidade | Resync do aluno compara relógios de domínios distintos — `capturedAt` (device do motorista) × timestamp do servidor no evento; o last-known não carrega carimbo do servidor | wrap-1 (review F3) | Servidor carimbar o `receivedAt` no last-known |
+| Concorrência | Races check-then-create: vínculos (P2002 vira 500 no routing), duas viagens ativas por motorista (sem índice único parcial), TOCTOU check-in × fim de viagem | 2.6 / 3.3a / 3.1 | Índice único parcial (SQL cru), transação `FOR SHARE`, discriminação de P2002 no Prisma 7 |
+| Fila offline | Desfecho pendente de decisão de produto (identidade no item, logout limpando, expiração 24h, invalidação pós-dreno, purga de linhas `sent`, `failedCount` preso) | 3.4b; retro 3 (AI3) | **wrap-5**, gated na matriz de decisão |
+| Dívida de forma | Broadcaster SSE em 4 cópias; specs e2e gigantes (boarding 1.753, tracking 995 linhas) | retro 5 (AI6) | **wrap-4** |
+| Processo | Sem CI — o gate é manual; lint da API vermelho na baseline (~147 erros) | 3.6 | Pipeline GitHub Actions; story de higiene de lint |
+| Compliance | Sem audit trail (`actorId` ausente dos eventos) | 2.4 | Propagar ator nos domain events |
+
+**O que fica para device — Story 1.7 (development build Android), não bloqueia o
+desenvolvimento:** NFR5 (boot < 3s em Android 8+), NFR18–NFR20 (usabilidade em tela 5",
+uma mão), o timeout de `Location.getCurrentPositionAsync` (EH-8 — risco silencioso da
+transmissão GPS, talvez falso), a linha "F5 offline" do cache persistido (limitação do
+dev server do Metro) e o realtime nativo (SSE, câmera e QR fora do browser).
 
 ---
 

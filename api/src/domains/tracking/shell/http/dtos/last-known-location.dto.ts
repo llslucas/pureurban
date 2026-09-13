@@ -38,7 +38,8 @@ export class LastKnownLocationDto {
   @ApiProperty({
     type: 'string',
     description:
-      'Instante da captura da posição pelo device (ISO 8601 UTC) — a idade deste ponto é o que a tela usa para o estado degradado "Sem sinal GPS". Se a posição foi expirada, o endpoint responde 404 NO_LOCATION_AVAILABLE, nunca um ponto stale.',
+      'Instante da captura da posição pelo device (ISO 8601 UTC, precisão fracionária ilimitada), ecoado sem alteração — o servidor nunca o compara com relógio algum. O estado degradado "Sem sinal GPS" da tela é avaliado pela RECEPÇÃO de dados no cliente (timer de 15s sem chegar posição nova: evento location.updated ou resposta deste endpoint), não pela idade deste campo — capturado há pouco não significa sinal vivo. Se a posição foi expirada (TTL do cache), o endpoint responde 404 NO_LOCATION_AVAILABLE, nunca um ponto stale.',
+    pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$',
     example: '2026-09-11T12:00:00.000Z',
   })
   capturedAt!: string;

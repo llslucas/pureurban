@@ -134,8 +134,10 @@ export default function TrackBusScreen() {
   // com o relógio do motorista adiantado (capturedAt é eco do device; o
   // timestamp do evento é hora do SERVIDOR), desfaria o ponto fresco em um
   // vai-e-vem. A comparação de capturedAt entre fontes tem esse limite de
-  // domínio de relógio — o fix de contrato (servidor carimbar o last-known)
-  // pertence ao wrap-3.
+  // domínio de relógio — o carimbo do servidor no last-known segue registrado
+  // no deferred-work (entry do wrap-1, "servidor carimbar o last-known"); o
+  // wrap-3 resolveu o lado do contrato (staleness declarado pela CHEGADA do
+  // dado, nunca pela idade do capturedAt).
   const appliedResyncRef = React.useRef(0)
   React.useEffect(() => {
     if (!lastKnownPoint) return

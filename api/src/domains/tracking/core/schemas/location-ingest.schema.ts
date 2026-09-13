@@ -28,9 +28,11 @@ const Accuracy = Schema.Number.pipe(
 
 // Formato do fio: ISO 8601 UTC (o device envia `toISOString()`). Um regex
 // explícito e não Date.parse: o parse aceitaria "March 5, 2020" e a mensagem
-// do contrato promete ISO 8601.
+// do contrato promete ISO 8601. Precisão fracionária ilimitada (wrap-3/R11):
+// o ISO permite 0..N casas e o GPS nativo comum manda mais de 3 — rejeitar
+// quem segue o contrato documentado era o pior dos mundos.
 const IsoUtcString = Schema.String.pipe(
-  Schema.pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/, {
+  Schema.pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/, {
     message: () => 'capturedAt deve ser uma data ISO 8601 UTC',
   }),
 );

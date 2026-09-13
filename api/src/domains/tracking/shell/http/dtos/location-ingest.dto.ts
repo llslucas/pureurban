@@ -38,7 +38,8 @@ export class LocationIngestRequestDto {
   @ApiProperty({
     type: 'string',
     description:
-      'Instante da captura da posição pelo device (ISO 8601 UTC). Não volta em nenhuma resposta do servidor: o ack carrega o receivedAt e o evento do stream carrega o timestamp de publicação.',
+      'Instante da captura da posição pelo device (ISO 8601 UTC, com qualquer precisão fracionária — 0 a N casas). Não volta em nenhuma resposta do servidor: o ack carrega o receivedAt e o evento do stream carrega o timestamp de publicação.',
+    pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$',
     example: '2026-09-11T12:00:00.000Z',
   })
   capturedAt!: string;

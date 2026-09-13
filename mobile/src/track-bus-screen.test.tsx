@@ -230,6 +230,24 @@ describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
     expect(screen.getByText('Sem sinal GPS')).toBeTruthy()
     expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
   })
+
+  it('last-known com capturedAt de 9 casas fracionárias (wrap-3/R11): semeia e o relógio renderiza hora válida', async () => {
+    mockTracking.getLastKnownLocation.mockResolvedValue({
+      tripId: TRIP.tripId,
+      latitude: BUS_POINT.latitude,
+      longitude: BUS_POINT.longitude,
+      accuracy: 12.5,
+      capturedAt: '2026-09-12T11:59:55.123456789Z',
+    })
+
+    renderScreen()
+
+    // O eco do device com precisão ilimitada tem de atravessar a tela: semeia
+    // o ponto e renderiza relógio — nunca "--:--:--".
+    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.getByText(/Posição de \d{2}:\d{2}:\d{2}/)).toBeTruthy()
+    expect(screen.queryByText(/Posição de --:--:--/)).toBeNull()
+  })
 })
 
 describe('TrackBusScreen — sinal GPS e stream (spec-5-2)', () => {
