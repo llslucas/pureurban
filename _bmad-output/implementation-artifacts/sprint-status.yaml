@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "13-09-2026 10:58"
+last_updated: "13-09-2026 12:47"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -250,7 +250,13 @@ action_items:
   #     2 pw:api (NFR4 31ms) / 10 pw:e2e (NFR1 10ms, NFR2 17ms, NFR3 90ms) /
   #     openapi limpo. Server-stamp do last-known segue aberto (defer F3 do
   #     wrap-1, rota wrap-4/decisão).
-  #   spec-wrap-4 (dívida de forma — broadcaster SSE + specs e2e): itens 13, 19
+  #   spec-wrap-4 (dívida de forma — broadcaster SSE + specs e2e): itens 13, 19 —
+  #     FECHADO em 13/09/2026 (PR #45); spec status: done, review triage 26
+  #     achados (2 patches, 1 defer, demais false/rejeitados com evidência).
+  #     Gate verde: 335 unit / 200 supertest / 2 pw:api (NFR4 41ms) / 10 pw:e2e
+  #     (NFR1 11ms, NFR2 8ms, NFR3 103ms) / openapi limpo (refatoração pura,
+  #     contrato não muda). Follow-up do log de falha da sentinela deferido
+  #     (ver deferred-work.md).
   #   spec-wrap-5 (desfecho da fila offline — GATED na matriz de decisão): item 3
   # Um item só vira `done` quando o PR do spec correspondente mergear e a evidência
   # estiver verificada (padrão das retro: evidência contra o HEAD, não contra o
@@ -435,16 +441,17 @@ action_items:
     # acompanhar home.tsx (413 linhas) — a fatiar durante o Épico 5 se o
     # spec de tracking crescer junto.
     #
-    # Fatiamento EXECUTADO em 13/09/2026 (wrap-4, branch
-    # refactor/wrap-4-sse-broadcaster-e-e2e-slice, pendente de merge):
+    # Fatiamento EXECUTADO em 13/09/2026 (wrap-4, PR #45):
     # boarding.e2e-spec.ts (1753 linhas) dividido por bloco de story em
     # test/boarding/ — casos 70→70 preservados, asserções intocadas. Detalhe
-    # no comentário do epic-5-retro-item-19 (mesma branch).
+    # no comentário do epic-5-retro-item-19 (mesmo PR).
     #
     # MONITORIA (AC8 do wrap-4, medição de 13/09/2026): home.tsx = 419 linhas,
     # scan.tsx = 745 linhas — SEM AÇÃO, mesmos valores da retro 5 (precedente
     # scan.tsx). Reavaliar extração só se crescerem além do padrão atual.
-    status: open
+    # DONE em 13/09/2026 (wrap-4, PR #45): restante do item (fatiamento +
+    # monitoria) pousado e mergeado; spec status: done.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-5-retro-item-14-implementar-o-resync-que-o-contrato-prom"
     epic: 5
@@ -535,8 +542,7 @@ action_items:
       (995 linhas) junto do boarding.e2e-spec.ts (1753, restante do item 13 da retro
       4)"
     owner: "Dev"
-    # EXECUTADO em 13/09/2026 (branch refactor/wrap-4-sse-broadcaster-e-e2e-slice,
-    # pendente de merge — só vira done quando o PR mergear, convenção do item 8/18):
+    # DONE em 13/09/2026 (wrap-4, PR #45):
     # (A) API: a maquinaria (canal ref-counted + heartbeat 30s + sentinela +
     # handleMessage com o guard wrap-1) vive em UMA classe,
     # shared/shell/sse/sse-broadcaster.service.ts; cada service de domínio a
@@ -552,10 +558,11 @@ action_items:
     # sse-stream, company-scenario). ZERO mudança de asserção: os 23 cases unit
     # dos services SSE e os 20 cases mobile dos clientes passam SEM edição;
     # contagem por bloco preservada (boarding 70→70, tracking 36→36, total e2e
-    # 200→200). Gate verde no HEAD da branch: 335 unit / 200 supertest / 2 pw:api
+    # 200→200). Gate verde no HEAD: 335 unit / 200 supertest / 2 pw:api
     # (NFR4 41ms) / 10 pw:e2e (NFR1 11ms, NFR2 8ms, NFR3 103ms) / openapi:check
-    # limpo (contrato não muda, sem regeneração).
-    status: open
+    # limpo (contrato não muda, sem regeneração). Review triage: 2 patches, 1
+    # defer (cobertura do log de falha da sentinela — deferred-work.md).
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-20-baratas-de-1-linha-nan-guard-no-formatcl"
     epic: 5
