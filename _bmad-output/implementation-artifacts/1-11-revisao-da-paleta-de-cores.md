@@ -2,7 +2,7 @@
 title: 'Story 1.11: Revisão da Paleta de Cores — Unificação sobre o DESIGN.md (Airtable)'
 type: 'feature'
 created: '2026-09-13'
-status: 'in-review'
+status: 'ready-for-dev'
 review_loop_iteration: 1
 baseline_commit: 'b58b38ea3b9d023676a1e512d278d67a52298945'
 context:
