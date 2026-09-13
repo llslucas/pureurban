@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "12-09-2026 21:19"
+last_updated: "13-09-2026 10:58"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -244,7 +244,12 @@ action_items:
   #     achados (9 patches, 3 false, 2 low rejeitados). Gate verde: 335 unit /
   #     199 supertest / 2 pw:api / 10 pw:e2e / openapi limpo. Único devDep
   #     novo: better-sqlite3 (+@types) no mobile, SÓ de teste.
-  #   spec-wrap-3 (reconciliação de contrato e documentos): itens 8, 18
+  #   spec-wrap-3 (reconciliação de contrato e documentos): itens 8, 18 —
+  #     FECHADO em 13/09/2026 (PR #43); spec status: done, review triage 12
+  #     achados (2 false, 10 patches). Gate verde: 335 unit / 200 supertest /
+  #     2 pw:api (NFR4 31ms) / 10 pw:e2e (NFR1 10ms, NFR2 17ms, NFR3 90ms) /
+  #     openapi limpo. Server-stamp do last-known segue aberto (defer F3 do
+  #     wrap-1, rota wrap-4/decisão).
   #   spec-wrap-4 (dívida de forma — broadcaster SSE + specs e2e): itens 13, 19
   #   spec-wrap-5 (desfecho da fila offline — GATED na matriz de decisão): item 3
   # Um item só vira `done` quando o PR do spec correspondente mergear e a evidência
@@ -355,7 +360,17 @@ action_items:
     action: "Reconciliar AC #4 da 3.5b (online vs pós-dreno) e reemitir seção Production
       Readiness no PRD/Architecture (item da retro 2 sem evidência de pouso)"
     owner: "Lucas"
-    status: open
+    # DONE em 13/09/2026 (wrap-3, PR #43): AC #4 da 3.5b anotado in place com o
+    # desfecho real — reflexo sem recarregar cobre o caminho ONLINE (invalidação
+    # da roster no sucesso do submit); item DRENADO só aparece no próximo
+    # staleTime/pull-to-refresh (pinado como baseline no wrap-2, rota wrap-5),
+    # com referência ao fix do PR #19 e à linha "F5 offline" diferida para
+    # device (1.7). Production Readiness reemitida em dois níveis:
+    # architecture.md §11 (evidência de pouso do gate da retro 5 com NFRs
+    # medidos, débitos fechados desde a retro 2, tabela curada de débitos
+    # abertos com categoria/origem/mitigação) + prd.md (resumo de produto);
+    # deferred-work.md permanece a fonte viva.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-07.md"
   - id: "epic-4-retro-item-9-promover-o-defer-cors-x-sse-a-story-curt"
     epic: 4
@@ -488,7 +503,20 @@ action_items:
       idade do capturedAt) e capturedAt com até 3 casas fracionárias (ou ampliar o
       pattern)"
     owner: "Dev"
-    status: open
+    # DONE em 13/09/2026 (wrap-3, PR #43): DECISÕES — R4: staleness declarado por
+    # CHEGADA de dado no cliente (texto do LastKnownLocationDto reescrito; a tela
+    # nunca comparou capturedAt com relógio; acoplar relógios device×device era o
+    # pior lado). R11: pattern do schema ampliado para 0..N casas fracionárias E
+    # declarado como `pattern` nos 2 DTOs (a regra que o código impõe agora é
+    # machine-readable no contrato). Extras no mesmo PR: 3 entradas 501
+    # NOT_IMPLEMENTED da era stub removidas do TrackingController (open question
+    # 4 da retro 5) e 403 do end-trip nomeando DRIVER_NOT_ASSIGNED (defer do
+    # wrap-1). openapi.json + api.d.ts regenerados no MESMO PR; e2e de travessia
+    # com 9 casas (ingest 200 → SSE → last-known verbatim) + 0 casas + sem-Z ⇒
+    # 400; teste mobile da perna tela. Gate verde no HEAD: 335 unit / 200
+    # supertest / 2 pw:api / 10 pw:e2e / openapi:check limpo. Server-stamp do
+    # last-known (F3) segue deferido — ver deferred-work.md.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
   - id: "epic-5-retro-item-19-dívida-de-forma-extrair-broadcaster-sse"
     epic: 5
