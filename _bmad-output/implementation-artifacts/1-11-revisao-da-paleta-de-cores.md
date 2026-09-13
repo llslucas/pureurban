@@ -2,8 +2,8 @@
 title: 'Story 1.11: Revisão da Paleta de Cores — Unificação sobre o DESIGN.md (Airtable)'
 type: 'feature'
 created: '2026-09-13'
-status: 'ready-for-dev'
-review_loop_iteration: 1
+status: 'in-progress'
+review_loop_iteration: 2
 baseline_commit: 'b58b38ea3b9d023676a1e512d278d67a52298945'
 context:
   - '{project-root}/_bmad-output/project-context.md'
@@ -216,6 +216,188 @@ browser; a review rodou o roteiro desta seção e capturou os dois temas). Resul
    por rodar na porta 8082 (só a 8081 é liberada na API) — artefato do ambiente de
    verificação, não da paleta.
 
+## Registro de Re-derivação (2026-09-13, iteração 1)
+
+Re-execução das tasks sobre o baseline `b58b38e`, incorporando os patches da triage
+(rows 1, 6, 10, 17, 18). Os arquivos e o mapeamento visual são os do registro de
+execução acima; abaixo só o que MUDOU nesta re-derivação:
+
+- **`palette.guard.test.ts` (row 1 + row 18):** a guarda agora casa `#RGB/#RRGGBB`
+  **e `#RRGGBBAA` e chamadas `rgba()/rgb()`** (comparação normalizada por espaço);
+  allowlist expandida e comentada: quiet zone do QR (`student-qr-code.tsx`), chrome
+  de câmera (`qr-scanner.tsx` e `scan.tsx` — inclui o scrim `rgba(0,0,0,0.55)` e o
+  botão translúcido `rgba(255,255,255,0.16)`), faixa branca 92% do "Dispensar"
+  (`offline-banner.tsx`). Novos **locks de binding**: `STATUS_PRESENTATION` preso
+  aos papéis da paleta + render-probe do `StudentCard` (cor efetiva por status);
+  render-probe das faixas `PENDING_COLOR`/`FAILED_COLOR` do `OfflineBanner`;
+  `TONE_COLOR` de `scan.tsx` travado no fonte (render-probe exigiria montar o stack
+  da câmera). **Mutação verificada em 5 cenários** (hex fora, rgba fora,
+  PENDING→muted, TONE offline→muted, STATUS warning→muted): a guarda falha apontando
+  arquivo:linha em todos.
+- **`lib/theme.ts` (row 10):** comentário ESCOPADO aos papéis sobrescritos; afirma
+  explicitamente que `elevation`/`surfaceContainer*` permanecem default MD3
+  (resíduo do `<Banner>`, defer registrado).
+- **`palette.ts` (row 17):** comentário do erro alinhado ao registro frozen —
+  `6.4:1 (valor frozen; cômputo fino ~6.5)`. Comentário do âmbar atualiza D3 à
+  renegociação (piso 3:1, loopback 13/09/2026).
+- **`sprint-status.yaml` (row 6):** comentário da 1.11 reflete o estado real
+  (re-derivação concluída, gates verdes, PR pendente — sem "pendente" obsoleto).
+- **`lib/theme.ts` (correção da chave `secondary` no dark, na verificação de tasks):**
+  as duas iterações do código mapearam `secondary: darkMapping.textSecondary`
+  (`#dddddd`) — exatamente a colisão de nomes que a task alerta — enquanto a tabela
+  "Mudanças visuais intencionais" e o texto da task pedem a superfície `muted`
+  (`#41454d`) em dark; a tabela nunca tinha sido conferida contra o código pela
+  review. Corrigido para `secondary: darkMapping.hairline` (=`muted`) com
+  `onSecondary: darkMapping.text`, espelhando o par já usado em
+  `secondaryContainer`/`onSecondaryContainer` (elimina o par tinta-sobre-`muted`
+  que ficaria no objeto do tema). Gates re-executados após o patch: 334/334 testes,
+  tsc com só os 3 erros pré-existentes, lint limpo, grep = allowlist. (A 1ª tentativa
+  do patch escreveu hexes no comentário e a guarda a derrubou — a trava funcionou
+  contra o próprio mantenedor, como projetado.)
+
+### Verificação da re-derivação
+
+- `cd mobile && npm test` — **334 testes** (296 do baseline + 38 da suíte de
+  guarda/contraste/locks), 26 suítes, 0 falhas. O aviso "worker process has failed
+  to exit" é preexistente (timers de `trip-screen.test.tsx`).
+- `npx tsc --noEmit` — exatamente os 3 erros pré-existentes no baseline
+  (`scan.tsx` TS18047, `use-trip-gps-capture.test.tsx` TS2554,
+  `tracking-stream.service.test.ts` TS2339); nenhum erro novo.
+- `npm run lint` — limpo (exit 0).
+- `grep -rEn "#[0-9A-Fa-f]{6}" mobile/src --include="*.tsx" --include="*.ts" |
+  grep -v palette` — só as allowlists (`student-qr-code.tsx`, `qr-scanner.tsx`,
+  `scan.tsx`); as 4 entradas `rgba()` restantes batem com a allowlist da guarda.
+- `git diff --stat main` — só `mobile/` + `_bmad-output/`; nenhum arquivo de `api/`.
+- Bundle web no Metro (`entry.bundle`, platform=web) — HTTP 200, sem erro de
+  resolução/transform.
+
+### Caminhada visual da re-derivação (alvo web, dois temas)
+
+Executada com Playwright headless contra o Metro local, com sessão injetada via
+localStorage (prefixo MMKV `mmkv.default\`) e respostas de API interceptadas —
+**34/34 asserções de estilo computado passando** (17 por tema), 10 screenshots nos
+dois temas:
+
+- **Claro:** login "Entrar" tinta `#181d26`; trip com fundo `#f8fafc`, cards
+  brancos, botões tinta, "Encerrar Viagem" `#B3261E`, chip "Em Andamento" tinte
+  verde `rgba(0,100,0,0.12)`; routes com títulos ink, labels muted `#41454d`, card
+  canvas; student-list com os três chips nos tintes (verde/neutro/âmbar) e contagem
+  ink; scan (estado de permissão) botão tinta; QR do aluno com quiet zone branca
+  pura (allowlist).
+- **Escuro:** telas seguem light-locked (consumem `lightPalette` — como antes da
+  story); widgets Paper flipam para o D6 (botões primários BRANCOS com texto tinta
+  confirmados em login/trip/scan); "Encerrar Viagem" permanece `#B3261E` (cor
+  explícita de tela, não é widget temático) — comportamento intencional.
+  Incoerências de tema misto (ex.: botão outlined com texto claro sobre superfície
+  clara) são pré-existentes e já registradas no defer de consumo de tema.
+- Ambiente de verificação: sem API real — 401 x interceptado viraria logout; erros
+  de OPFS/SQLite no browser headless aparecem como toast em sessões concorrentes e
+  são artefato do harness, não do app.
+
+## Registro de Re-derivação (2026-09-13, iteração 2)
+
+Re-execução das tasks sobre o baseline `b58b38e`, incorporando a emenda da review da
+iteração 2 (rows 25, 41–44). Arquivos e mapeamento visual idênticos ao registro da
+iteração 1; abaixo só o que MUDOU nesta rodada:
+
+- **`lib/theme.ts` (row 25):** `outline`/`outlineVariant` NÃO são sobrescritos —
+  permanecem no default MD3 (`rgba(121,116,126,1)` em light). O comentário do módulo
+  fica escopado aos papéis sobrescritos e declara explicitamente essa preservação e
+  a da paleta `elevation` (resíduo violeta do `<Banner>`, defer registrado).
+- **`palette.guard.test.ts` (rows 41–44):** novas camadas — **(d)** lock de binding
+  dos temas Paper (todos os papéis sobrescritos afirmados contra a paleta, com
+  `secondary` travado como SUPERFÍCIE — não texto; papéis NÃO sobrescritos fixados ao
+  default MD3, incluindo `elevation`), **(e)** token-pin de `designTokens` (28
+  entradas), `appExtensions` (D2/D3) e `darkMapping` (D6) contra os hexes
+  documentados — tabela `Record<keyof typeof ...>` com checagem bidirecional de
+  chaves, **(f)** locks estendidos de call-site (botão destrutivo e chips da trip,
+  `TONE_COLOR` e overlay do scan, papéis de texto de routes/student-list, nome e
+  divisória do student-card). Suíte fechou em **46 testes**.
+- **`qr-scanner.tsx`:** comentário do issue 9619 reescrito sem `#` (hex-like em
+  comentário derruba a guarda — a trava pegou o próprio mantenedor de novo).
+- Descobertas de execução registradas: defaults do Paper chegam como strings
+  `rgba()` (o cômputo de contraste do teste aceita hex e rgb()/rgba()); o
+  render-probe do StudentCard sobe na árvore até o ancestral com backgroundColor
+  (o pai direto do Text não é o chip no renderer de teste); o arquivo é `.ts` (nome
+  registrado na story) e usa `createElement` — JSX exigiria `.tsx`.
+
+### Mutação verificada (5 cenários — todos derrubam a guarda)
+
+1. Drift de token (`error` → `#D32F2F`, contrast-safe) → token-pin falha.
+2. Colisão `secondary` (superfície → texto) → lock de binding do tema falha.
+3. Hex avulso em componente (`#FAFAFA` em routes) → varredura falha apontando
+   arquivo:linha.
+4. Troca de papel em `STATUS_PRESENTATION` (warning → muted) → lock de valor falha.
+5. Troca de papel em `TONE_COLOR` (offline → muted) → source-lock de call-site falha.
+
+### Verificação da re-derivação (iteração 2)
+
+- `cd mobile && npm test` — **342 testes** (296 do baseline + 46 da suíte de
+  guarda/contraste/locks), 26 suítes, 0 falhas. O aviso "worker process has failed
+  to exit" é preexistente (timers de `trip-screen.test.tsx`).
+- `npx tsc --noEmit` — exatamente os 3 erros pré-existentes no baseline (`scan.tsx`
+  TS18047, `use-trip-gps-capture.test.tsx` TS2554, `tracking-stream.service.test.ts`
+  TS2339); nenhum erro novo.
+- `npm run lint` — limpo (0 erros, 0 avisos).
+- `grep -rEn "#[0-9A-Fa-f]{6}" mobile/src --include="*.tsx" --include="*.ts" |
+  grep -v palette` — só as allowlists (`student-qr-code.tsx`, `qr-scanner.tsx`,
+  `scan.tsx` fundos de câmera); as 4 entradas `rgba()` batem com a allowlist da
+  guarda (`qr-scanner.tsx`, `scan.tsx`, faixa 92% do `offline-banner.tsx`).
+- `git diff --stat main` — só `mobile/` + `_bmad-output/`; nenhum arquivo de `api/`.
+- Metro web: `entry.bundle` + os 11 módulos alterados — HTTP 200, sem erro de
+  resolução/transform; tokens da paleta presentes nos bundles dos módulos.
+
+### Caminhada visual da re-derivação (alvo web, dois temas)
+
+Playwright headless contra o Metro local (porta 8081), sessão criada por login
+interceptado no formato do ResponseWrapper (`{ data }`) e APIs do embarque mockadas
+— **34/34 asserções de estilo computado passando** (17 por tema), screenshots em
+`/tmp/palette-walkthrough/` (efêmeros; o registro durável é esta prosa):
+
+- **Claro:** login "Entrar" tinta `rgb(24,29,38)`; **bordas outlined dos inputs =
+  default MD3 `rgb(121,116,126)` e nenhuma borda hairline — SEM regressão vs
+  baseline (o foco da emenda row 25)**; trip com fundo `#f8fafc`, "Encerrar Viagem"
+  `rgb(179,38,30)`, chip "Em Andamento" `rgba(0,100,0,0.12)`; student-list com os
+  três chips nos papéis/tintes (verde `#006400`, body `#333840` neutro, âmbar
+  `#B26A00`) e contagem ink; scan (estado de permissão) com botão tinta; routes com
+  título ink, label muted `#41454d`, valor body; QR do aluno com quiet zone branca
+  pura (allowlist).
+- **Escuro:** botão primário dos widgets Paper BRANCO com texto tinta (login, trip,
+  scan) — D6; bordas outlined = default MD3 dark `rgb(147,143,153)`; telas seguem
+  light-locked (bg `#f8fafc`, "Encerrar Viagem" permanece `#B3261E` — cor explícita
+  de tela, não widget temático); incoerências de tema misto pré-existentes
+  inalteradas (defer de consumo de tema).
+- Sem erros de página. Artefatos do harness (SSE abortado → banner de dado velho;
+  headless sem câmera → estado de permissão do scan) são do ambiente de
+  verificação, não do app.
+
+## Spec Change Log
+
+- **2026-09-13 — loopback da review, iteração 2 (bad_spec, row 25):** a review
+  verificou que `outline`/`outlineVariant` do Paper foram mapeados para hairline
+  (`#dddddd`, 1.36:1 no branco), rebaixando as bordas de inputs/botões outlined de
+  ~4.5:1 (default MD3 `#79747E`) para 1.36:1 — regressão WCAG 1.4.11 (não-texto, 3:1)
+  em superfícies de uso diário (login.tsx:110,123; botões outlined do aluno/admin).
+  **Gatilho:** row 25 (medium). **Emendado (seções não-frozen):** task de
+  `lib/theme.ts` passa a FIXAR `outline`/`outlineVariant` no default MD3 (resíduo
+  documentado, como `surfaceContainer*`); task da guarda ganha (d) lock de binding
+  dos temas, (e) token-pin dos valores e (f) locks estendidos de call-site (rows
+  41–44); ACs ganham o gate não-texto ≥3:1 e a prova-por-mutação dos locks.
+  **Estado known-bad evitado:** borda de componente interativo abaixo de 3:1; mapeamento
+  de papel MD3 sem teste (a colisão do `secondary` shipou 2× antes de humano pegar);
+  tokens deriváveis silenciosamente (erro → `#D32F2F` passa em todos os gates).
+  **KEEP instructions (devem sobreviver à re-derivação):** a forma do módulo
+  `palette.ts` (`designTokens`/`appExtensions`/`darkMapping`/`STATUS_TINT_ALPHA`/
+  `withAlpha`/`SemanticColors`/paletas claro+escuro); a guarda com cobertura
+  hex+rgba()+8-dígitos, allowlist comentada e checagem de entrada morta; os locks
+  existentes (`STATUS_PRESENTATION` com render-probes, faixas do banner, `TONE_COLOR`
+  source-lock); o comentário do `theme.ts` escopado aos papéis sobrescritos; o fix do
+  `secondary` (superfície `muted` em dark, `onSecondary` texto); os comentários do
+  âmbar renegociado e do erro (`6.4:1 frozen`); a metodologia de mutação e a caminhada
+  visual nos dois temas. **Restrição herdada:** o Always (frozen) continua travando
+  apenas pares de TEXTO — o gate não-texto entra como requisito de task/AC, não como
+  emenda do bloco frozen.
+
 ## Code Map
 
 - `mobile/src/lib/theme.ts` -- hoje: temas Paper light/dark com `primary: '#208AEF'`.
@@ -250,30 +432,35 @@ browser; a review rodou o roteiro desta seção e capturou os dois temas). Resul
 
 **Execution:**
 
-*Re-derivação pós-loopback (iteração 1) — tasks abaixo recomeçam abertas; o código foi
-revertido ao baseline `b58b38e`. Além do escopo original, incorporam os patches
-verificados na review (triage log rows 1, 6, 10, 17, 18):*
+*Re-derivação pós-loopback (iteração 2) — tasks abaixo executadas em 13/09/2026 sobre
+o baseline `b58b38e`. Incorporam os patches verificados na review da iteração
+1 (rows 1, 6, 10, 17, 18), a correção do `secondary` aplicada na verificação de tasks e
+os patches + emenda da review da iteração 2 (rows 25, 41–44 — ver Spec Change Log):*
 
-- [ ] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
+- [x] `mobile/src/lib/palette.ts` -- módulo único: tokens do DESIGN.md + extensões
   aprovadas (D2/D3, com o piso 3:1 do âmbar renegociado) + derivação dos temas
   claro/escuro (D6). JSDoc mínimo apontando o DESIGN.md como fonte viva; comentário de
   contraste do erro alinhado ao registro frozen (`6.4:1 (valor frozen; cômputo fino
   ~6.5)`). Atenção à colisão de nomes: o "secundário" do D6 é **texto secundário**
   (`#dddddd`); a chave `secondary` do tema Paper mapeia para superfície (`#e0e2e6`
-  light / `#41454d` dark) — usar a tabela "Mudanças visuais intencionais" do Registro
+  light / `muted` dark) — usar a tabela "Mudanças visuais intencionais" do Registro
   como referência do mapeamento Paper.
-- [ ] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
+- [x] `mobile/src/lib/theme.ts` + `mobile/src/constants/theme.ts` -- temas Paper e
   `Colors` derivando da paleta; eliminação dos neutros avulsos. O comentário do
   `theme.ts` fica ESCOPADO aos papéis sobrescritos (não afirmar "nenhum lavender do
   MD3" — `elevation`/`surfaceContainer*` permanecem default, resíduo pré-existente
-  registrado no defer).
-- [ ] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
+  registrado no defer). **`outline`/`outlineVariant` NÃO são sobrescritos** —
+  permanecem no default MD3 (`#79747E`, ~4.5:1), mesmíssimo resíduo documentado:
+  hairline (`#dddddd`, 1.36:1 no branco) NÃO atinge o 3:1 de borda de componente
+  interativo (WCAG 1.4.11) e as bordas de inputs/botões outlined não têm mudança
+  registrada na tabela aprovada (regressão da iteração 2, row 25).
+- [x] 8 arquivos de tela/componente -- substituição dos ~25 hexes por tokens semânticos
   (famílias: marinho `#1A1A2E`→tinta; vermelhos→`#B3261E`; slate offline→família
   ink/body; verdes→`#006400`; pastéis→tintes alpha). *2 deles (`qr-scanner.tsx`,
   `student-qr-code.tsx`) recebem só o comentário de allowlist — hexes funcionais
   intocados.* Atualizar o comentário de `scan.tsx` que cita a primária antiga
   `#208AEF` (hex em comentário derruba a guarda).
-- [ ] `palette.guard.test.ts` -- (a) varredura de cor fora do módulo: hex `#RGB/#RRGGBB`
+- [x] `palette.guard.test.ts` -- (a) varredura de cor fora do módulo: hex `#RGB/#RRGGBB`
   **e `rgba()`/hex 8-dígitos**, com allowlist comentada (QR quiet zone, chrome de
   câmera de `qr-scanner.tsx` e `scan.tsx`, faixa branca 92% do `offline-banner.tsx` —
   cada uma com o porquê); (b) contraste AA dos pares do tema com o **âmbar no piso 3:1
@@ -281,19 +468,34 @@ verificados na review (triage log rows 1, 6, 10, 17, 18):*
   `TONE_COLOR`, `PENDING_COLOR`/`FAILED_COLOR` presos aos papéis da paleta (a migração
   manual não pode trocar tokens silenciosamente — demonstrado por mutação na review).
   Como as consts são privadas de módulo, o lock preferencial é **render-probe**
-  (renderizar o componente e afirmar a cor efetiva, padrão da demonstração da review).
-- [ ] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
+  (renderizar o componente e afirmar a cor efetiva, padrão da demonstração da review);
+  **(d) lock de binding dos TEMAS** (row 41): cada papel sobrescrito de
+  `lightTheme`/`darkTheme` afirmado contra o valor/tom esperado da paleta — nenhum
+  teste lia os temas e a colisão do `secondary` shipou 2×; **(e) token-pin** (row 42):
+  cada entrada de `designTokens`/`appExtensions` afirmada igual ao hex documentado no
+  DESIGN.md/matriz D1–D7 — drift contrast-safe (ex.: erro → `#D32F2F`) hoje passa em
+  todos os gates; **(f) locks estendidos de call-site** (row 43): botão destrutivo e
+  chips da `trip`, bg/botões do overlay do `scan`, papéis de texto de
+  `routes`/`student-list` — source-lock onde render-probe exigiria stack de câmera.
+- [x] Roteiro de verificação visual no alvo web: login → motorista (trip, scan,
   student-list, routes) → aluno (home, QR) → banners (offline/stale) nos DOIS temas;
-  mudanças visuais intencionais registradas na story. *(Já executada uma vez na review
-  anterior — repetir na re-derivação.)*
-- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
+  mudanças visuais intencionais registradas na story. *(Executada nas iterações
+  anteriores — repetir na re-derivação; bordas de inputs/botões outlined devem
+  conferir SEM mudança vs baseline.)*
+- [x] `_bmad-output/implementation-artifacts/sprint-status.yaml` -- entrada da 1.11
   atualizada ao concluir, com comentário refletindo o estado REAL (sem "pendente"
   obsoleto).
-- [ ] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
+- [x] `DESIGN.md` -- intocado (fonte viva; desvios documentados AQUI, não nele).
 
 **Acceptance Criteria:**
 - Given o app em qualquer tela, when os componentes resolarem cor, then a cor vem do
   módulo de paleta — zero hex semântico fora dele, provado pelo teste de guarda.
+- Given componentes outlined (inputs do login, botões outlined), when renderizados com
+  o tema Paper, then a borda mantém ≥3:1 sobre o fundo (WCAG 1.4.11) — idêntica ao
+  baseline, sem regressão não-texto (row 25).
+- Given qualquer papel sobrescrito dos temas Paper ou valor de `designTokens`/
+  `appExtensions`, when mutado para outra cor, then a suíte de guarda FALHA (rows
+  41–42: locks de tema + token-pin, provados por mutação).
 - Given os dois temas, when alternados, then todos os pares texto×fundo passam AA no
   teste de contraste (âmbar no piso 3:1, D3 renegociado) e nenhum texto fica ilegível
   (verificação visual registra os dois).
@@ -389,3 +591,44 @@ Veredito por finding, com evidência verificada por mim sobre o diff/código:
 → loopback; rows 1, 6, 10, 17, 18 (patch) e 4, 9, 10-resíduo, 11–15 (defer) ficam
 registradas e serão rederivadas no ciclo seguinte; rows 2, 5, 7, 8, 16, 19 rejeitadas
 com a refutação acima.
+
+### Review de 2026-09-13 (iteração 2, re-derivação pós-loopback)
+
+Blind-hunter (17 findings) + edge-case-hunter (5) + verification-gap (3 + 2 observações)
+sobre o diff da re-derivação. Veredito por finding, com evidência verificada por mim:
+
+| # | Camadas | Finding | Veredito | Evidência / rota |
+|---|---------|---------|----------|------------------|
+| 20 | BH1 | Comentários de código em pt-BR violariam a regra "comentários em inglês" do AGENTS.md | low | Real no papel, mas 100% dos comentários pré-existentes de `mobile/src` são em pt-BR (scan.tsx, student-card.tsx, offline-banner.tsx) — traduzir ~60 comentários divergiria de todo o codebase vizinho sem ganho algum → reject |
+| 21 | BH2 | Piso 3:1 do âmbar rotulado "AA texto grande/UI" não conformsa formalmente (chip 16px/700 < 18,66px bold) | low | O tradeoff substancial é a row 3, renegociada e aprovada pelo Lucas no loopback; a imprecisão do rótulo vive no texto frozen de D3 — só o humano pode reescrevê-lo → reject (fix = editar bloco frozen) |
+| 22 | BH3 | DESIGN.md: `button-pricing-pill` usa `typography: {typography.button}` (Haas) que o Do/Don't (linha ~498) proíbe misturar | low | Verificado no doc (linhas 174-178 vs 498); contradição pré-existente em doc frozen-intocável → defer |
+| 23 | BH4 | DESIGN.md: `description:` do front-matter diz "pill CTA" mas o corpo (linha 300/414) manda `rounded.lg` para CTA primário e pill só no pricing | low | Verificado (linha 4 vs 300/414); idem → defer |
+| 24 | BH5 | DESIGN.md: tabela de elevation documenta "blue-tinted glow" (linha 394) e 4 linhas depois nega existir glow (linha 398) | low | Verificado (394 vs 398); idem → defer |
+| 25 | BH6 | `outline`/`outlineVariant` → hairline `#dddddd`: bordas de componentes caem de ~4.5:1 (default MD3 `#79747E`) para **1.36:1** — regressão WCAG 1.4.11 (não-texto, 3:1) | medium | **Real e causado pela mudança**: login.tsx:110,123 (`TextInput mode="outlined"`), student home (Card/Button outlined) e admin home (Button outlined) consomem o papel; a tabela de mudanças visuais aprovada NÃO registra mudança em bordas de input; o Always só trava pares de TEXTO. Único consertador coerente com o conteúdo já aprovado: manter o default MD3 nesses papéis (resíduo documentado, como `surfaceContainer*`) + gate não-texto no Always → **bad_spec → loopback** |
+| 26 | BH7 | `darkPalette.link/info/success/error` como texto sobre canvas escuro ~2.3–2.9:1, sem comentário de alerta nem teste que prenda os valores | low | Inalcançável hoje (row 2); a story de consumo de tema já está em defer e negociará os tons de texto em dark; paleta comenta a estratégia → reject |
+| 27 | BH8 | Contrato frozen da allowlist ("só QR e scanner") vs allowlist real (4 arquivos, incl. faixa 92% do banner) | low | Cada entrada é comentada no teste e documentada nos desvios #4 + registro de re-derivação; nenhum escape não-documentado existe; completar o contrato exigiria editar o bloco frozen → reject (fix = editar frozen) |
+| 28 | BH9 | Drift de contagem: "326 incl. 20 novas" (iteração 1) vs "334 = 296 + 38" (re-derivação), mesmo baseline | low | Aritmética fecha: a suíte de guarda da iteração 1 tinha 30 casos (2+18+10) → 296+30=326; o "20" é que estava errado. Fix = editar registro histórico da spec → reject |
+| 29 | BH10 | Guarda deixa passar cores nomeadas, `hsl()`, `.json`, `global.css` | low | Grep confirma: zero literais nomeados/hsl em `src`; global.css é web-only; contrato frozen é hex/rgba (row 1 já fixou o escopo) → reject |
+| 30 | BH11+ECH4 | `centeredNote` do scan: erro `#B3261E` sobre `#000000` ≈3.2:1 (texto normal bold), sem par no teste | low | Par PRÉ-existente: baseline `b58b38e` já tinha exatamente essas cores; o token swap não mudou o par. Fix exigiria variante on-dark de erro (Ask First: cor nova) → defer |
+| 31 | BH12 | AC "um só verde" vs `successBorder #39bf45` citado no teste dark = dois verdes vivos | false | D4 em si define DOIS papéis de uma única decisão (`#006400` texto + `#39bf45` borda/acentos); `successBorder` não tem consumidor em tela (só comentário de teste); o AC conta verdes semânticos substituídos, satisfeito → reject |
+| 32 | BH13 | Spec `in-review` vs sprint-status "in-progress/PR pendente" — estados divergentes | false | Transitório por design: sprint-status é atualizado "ao concluir" (task 6); durante a review os registros legítimamente divergem → reject |
+| 33 | BH14 | Screenshots da caminhada em `/tmp` — evidência efêmera | low | O registro durável é a prosa dos resultados na story; a menção a `/tmp` é honesta quanto à efemeridade → reject |
+| 34 | BH15 | `textBody` e `textMuted` colapsam no mesmo tom em dark (hierarquia some) | low | Colapso FORÇADO pelo vocabulário de D6 (só dois tons de texto) e inalcançável hoje; comentário na paleta documenta; decisão de tom novo é humana e pertence à story de consumo de tema (já em defer) → reject |
+| 35 | BH16 | DESIGN.md: `pricing-ink` usado por 3 componentes mas ausente da prosa de Text | low | Verificado (token na linha 34; prosa não cita); dívida editorial do doc frozen → defer |
+| 36 | BH17 | DESIGN.md: footer com `padding: 64px` fora da escala de spacing (48→96) | low | Verificado (linha 284); idem → defer |
+| 37 | ECH1 | `withAlpha` sem validação (rgba(NaN) silencioso) | false | **carried** (row 19): sem caminho alcançável, call sites só passam constantes de módulo |
+| 38 | ECH2 | Guarda não casa `hsla()`, cores nomeadas, rgba() multilinha | low | idem row 29 (grep confirma zero ocorrências) → reject |
+| 39 | ECH3 | `darkPalette.link/info` como texto em dark ~2.9:1/2.3:1 sem par no teste | false | **carried** (row 2): inalcançável, nenhuma tela consome os papéis |
+| 40 | ECH5 | Matriz frozen promete "cada papel do tema ≥4.5 testado"; dark link/info não têm par (e falhariam) | false | Refutação prática = row 2 (inalcançável); consertar a PROMESSA exigiria editar a matriz frozen → reject (fix = editar frozen) |
+| 41 | VG1 | Mapeamento Paper (`lightTheme`/`darkTheme`) sem NENHUM teste; a colisão do `secondary` shipou 2× e só um humano pegou; mutação demonstrada: trocar `secondary` passa 334/334 | medium | Pré-verificado (gap layer): zero teste lê os temas; render tests dispensam PaperProvider. A classe de regressão já ocorreu 2× na própria story → **patch** (lock de binding dos temas no padrão STATUS_PRESENTATION) |
+| 42 | VG2 | Valores dos tokens sem pin no DESIGN.md/D1–D7: `error→#D32F2F` ou `primary→link-blue` passam em TODOS os gates (contrast-safe) | medium | Pré-verificado (grep: nenhum hex esperado em teste); drift do deliverable central é invisível às travas → **patch** (tabela token-pin) |
+| 43 | VG3 | Locks cobrem 3/6 arquivos migrados: botão destrutivo da trip, chips, overlay do scan, estilos de routes/student-list sem lock | medium | Pré-verificado (mutação: `buttonColor→textMuted` passa 334/334); inclui as superfícies de maior risco (destrutiva + feedback do scan) → **patch** (estender locks, source-lock onde render-probe exige stack de câmera) |
+| 44 | VG-out | Suíte dark testa combinações inalcançáveis enquanto o caminho dark renderizável (widgets Paper) não tem cobertura | low | Fato real; a cobertura que falta É o lock de temas da row 41 → **patch** (mesmo grupo) |
+| 45 | VG-out | `Colors` de constants/theme.ts deriva da paleta mas é código morto (único importer sem importers) | low | **carried** (row 4): dívida de consumo de tema, já em defer |
+
+**Processamento em cascata (iteração 2):** row 25 = bad_spec (raiz fora do frozen: o
+Always só trava texto; a tabela aprovada não registra mudança em bordas de input) →
+**loopback com emenda de spec** (gate não-texto no Always + `outline`/`outlineVariant`
+permanecem default MD3) e re-derivação incorporando os patches verificados (rows 41–44:
+locks de tema, token-pin, locks estendidos). Rows 30 e 22–24+35–36 (defer) registradas
+em deferred-work.md. Rows 20–21, 26–29, 31–34, 37–40, 45 rejeitadas com a refutação acima.
