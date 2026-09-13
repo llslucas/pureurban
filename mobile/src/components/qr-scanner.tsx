@@ -50,7 +50,7 @@ export function QrScanner({ onScan, isPaused, onMountError }: QrScannerProps) {
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         // GATE: `onBarcodeScanned` é chamado repetidamente enquanto o código
         // estiver no enquadramento — dezenas de vezes por segundo, com
-        // frequência variando por device (expo/expo#9619). Passar `undefined` é
+        // frequência variando por device (issue 9619 do expo/expo). Passar `undefined` é
         // o mecanismo suportado pela lib para desligar a leitura.
         //
         // Um `if (isPaused) return` DENTRO do callback não substitui isto: o
@@ -89,6 +89,8 @@ export function QrScanner({ onScan, isPaused, onMountError }: QrScannerProps) {
 }
 
 const styles = StyleSheet.create({
+  // Allowlist da guarda de paleta: o que segue é chrome da câmera (fundo do
+  // viewfinder, máscara escura e cantos de alto contraste), não cor de UI.
   container: {
     flex: 1,
     backgroundColor: '#000000',

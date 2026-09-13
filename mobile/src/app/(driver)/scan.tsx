@@ -10,6 +10,7 @@ import { useCameraPermissions } from 'expo-camera'
 import { QrScanner } from '@/components/qr-scanner'
 import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
+import { lightPalette } from '@/lib/palette'
 import { boardingService } from '@/services/boarding.service'
 import { ApiClientError } from '@/services/api-client'
 import { activeTripOptions, tripStudentsKey } from '@/lib/trip-queries'
@@ -66,12 +67,13 @@ interface Attempt {
 }
 
 const TONE_COLOR: Record<Tone, string> = {
-  // Verde/âmbar/vermelho/cinza-escuro sobre o preto da câmera — contraste alto,
-  // legível em movimento e sob sol direto (NFR18).
-  success: '#1B7F3B',
-  warn: '#B26A00',
-  error: '#B3261E',
-  offline: '#37474F',
+  // Verde/âmbar/vermelho/tinta (família ink/body para offline) sobre o preto da
+  // câmera — contraste alto, legível em movimento e sob sol direto (NFR18).
+  // Papéis da paleta única (`@/lib/palette`); o branco dos overlays é `onPrimary`.
+  success: lightPalette.success,
+  warn: lightPalette.warning,
+  error: lightPalette.error,
+  offline: lightPalette.textBody,
 }
 
 export default function ScanScreen() {
@@ -480,7 +482,7 @@ export default function ScanScreen() {
           mode="contained"
           compact
           buttonColor="rgba(255, 255, 255, 0.16)"
-          textColor="#FFFFFF"
+          textColor={lightPalette.onPrimary}
           onPress={() => router.navigate('/(driver)/student-list')}
           style={styles.listButton}
           contentStyle={styles.listButtonContent}
@@ -491,9 +493,9 @@ export default function ScanScreen() {
       </View>
 
       {result.kind === 'checking' ? (
-        <View style={[styles.overlay, { backgroundColor: '#263238' }]}>
+        <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]}>
           <View style={styles.overlayMessage}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={lightPalette.onPrimary} />
             <Text variant="headlineSmall" style={styles.overlayTitle}>
               Verificando...
             </Text>
@@ -513,7 +515,7 @@ export default function ScanScreen() {
           <View style={styles.overlayActions}>
             <Button
               mode="contained"
-              buttonColor="#FFFFFF"
+              buttonColor={lightPalette.onPrimary}
               textColor={TONE_COLOR.success}
               onPress={resume}
               style={styles.action}
@@ -539,7 +541,7 @@ export default function ScanScreen() {
             {result.canRetry ? (
               <Button
                 mode="contained"
-                buttonColor="#FFFFFF"
+                buttonColor={lightPalette.onPrimary}
                 textColor={TONE_COLOR[result.tone]}
                 onPress={handleRetry}
                 style={styles.action}
@@ -555,7 +557,7 @@ export default function ScanScreen() {
             {result.code === 'TRIP_NOT_ACTIVE' ? (
               <Button
                 mode="contained"
-                buttonColor="#FFFFFF"
+                buttonColor={lightPalette.onPrimary}
                 textColor={TONE_COLOR[result.tone]}
                 onPress={() => router.navigate('/(driver)/trip')}
                 style={styles.action}
@@ -565,12 +567,12 @@ export default function ScanScreen() {
                 Ir para Viagem
               </Button>
             ) : null}
-            {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema
-                (primária #208AEF) e ficam ilegíveis sobre vermelho ou âmbar. */}
+            {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema e
+                ficam ilegíveis sobre vermelho ou âmbar. */}
             <Button
               mode={hasPrimaryAction ? 'text' : 'contained'}
-              buttonColor={hasPrimaryAction ? undefined : '#FFFFFF'}
-              textColor={hasPrimaryAction ? '#FFFFFF' : TONE_COLOR[result.tone]}
+              buttonColor={hasPrimaryAction ? undefined : lightPalette.onPrimary}
+              textColor={hasPrimaryAction ? lightPalette.onPrimary : TONE_COLOR[result.tone]}
               onPress={resume}
               style={styles.action}
               contentStyle={styles.actionContent}
@@ -637,6 +639,8 @@ function Blocked({
 }
 
 const styles = StyleSheet.create({
+  // Fundos pretos da câmera/offscreen: chrome de câmera (allowlist da guarda) —
+  // a paleta do DESIGN.md não tem preto puro.
   container: {
     flex: 1,
     backgroundColor: '#000000',
@@ -661,7 +665,7 @@ const styles = StyleSheet.create({
   },
   centeredNote: {
     textAlign: 'center',
-    color: '#B3261E',
+    color: lightPalette.error,
     fontWeight: 'bold',
   },
   counterBar: {
@@ -671,10 +675,11 @@ const styles = StyleSheet.create({
     right: 0,
     paddingVertical: 12,
     paddingHorizontal: 20,
+    // Scrim sobre a câmera: chrome de câmera (allowlist da guarda).
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   counterText: {
-    color: '#FFFFFF',
+    color: lightPalette.onPrimary,
     fontSize: 18,
     lineHeight: 24,
     textAlign: 'center',
@@ -717,11 +722,11 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 72,
     lineHeight: 80,
-    color: '#FFFFFF',
+    color: lightPalette.onPrimary,
     fontWeight: 'bold',
   },
   overlayTitle: {
-    color: '#FFFFFF',
+    color: lightPalette.onPrimary,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -729,7 +734,7 @@ const styles = StyleSheet.create({
   // 16sp com peso 500, e a opacidade reduzida piorava ainda mais a leitura em
   // movimento — é esta linha que carrega o "por quê" do resultado.
   overlayDetail: {
-    color: '#FFFFFF',
+    color: lightPalette.onPrimary,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: 'bold',

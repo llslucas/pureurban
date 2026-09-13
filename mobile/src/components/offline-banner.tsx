@@ -2,13 +2,15 @@ import React from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Button, Text } from 'react-native-paper'
 
+import { lightPalette } from '@/lib/palette'
 import type { OfflineSyncState } from '@/hooks/use-offline-sync'
 
 // Banner GLOBAL, um por app (Story 3.4b). Badge por item e contador de teto na
 // UI foram cortados para a Fase 2 em 28/08/2026 — o motorista dirigindo precisa
-// de um sinal, não de um inventário.
-const PENDING_COLOR = '#37474F'
-const FAILED_COLOR = '#B3261E'
+// de um sinal, não de um inventário. Cores = papéis da paleta (`@/lib/palette`):
+// pendente na família ink/body (era o slate do template), falha no vermelho único.
+const PENDING_COLOR = lightPalette.textBody
+const FAILED_COLOR = lightPalette.error
 
 function pendingLabel(count: number): string {
   // O texto da NFR13 é literal e não varia com a contagem; o número entra como
@@ -100,7 +102,7 @@ const styles = StyleSheet.create({
   },
   // NFR18: alto contraste e >= 16sp, legível em movimento e sob sol direto.
   text: {
-    color: '#FFFFFF',
+    color: lightPalette.onPrimary,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '700',
@@ -109,6 +111,8 @@ const styles = StyleSheet.create({
   dismissButton: {
     alignSelf: 'center',
     // Sobre o vermelho do strip: tonal herda a cor do tema; forçar contraste.
+    // Branco 92% (allowlist da guarda de paleta): overlay funcional sobre a
+    // faixa de falha, não papel do tema.
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
   dismissLabel: {

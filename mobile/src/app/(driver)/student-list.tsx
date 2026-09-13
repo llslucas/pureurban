@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { StudentCard } from '@/components/student-card'
 import { ApiClientError } from '@/services/api-client'
+import { lightPalette } from '@/lib/palette'
 import {
   connectBoardingEvents,
   type BoardingAbsenceCancelledEvent,
@@ -377,19 +378,19 @@ function Centered({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.surfaceSoft,
   },
   header: {
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: lightPalette.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: lightPalette.hairline,
   },
   count: {
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: lightPalette.text,
   },
   empty: {
     alignItems: 'center',
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyTitle: {
-    color: '#555',
+    color: lightPalette.textBody,
     textAlign: 'center',
   },
   emptyContent: {
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 24,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.surfaceSoft,
   },
   centeredTitle: {
     textAlign: 'center',
