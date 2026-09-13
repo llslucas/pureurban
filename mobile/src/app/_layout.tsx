@@ -5,6 +5,7 @@ import { useColorScheme, View } from 'react-native'
 import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
 import { initializeDatabase } from '@/lib/database'
+import { registerOfflineQueueLifecycle } from '@/lib/offline-queue-lifecycle'
 import { mmkvPersister } from '@/lib/mmkv-persister'
 import { queryClient } from '@/lib/query-client'
 import { darkTheme, lightTheme } from '@/lib/theme'
@@ -31,6 +32,12 @@ export default function RootLayout() {
       .finally(() => {
         setIsDbReady(true)
       })
+  }, [])
+
+  useEffect(() => {
+    // Purga da fila offline no logout (D5/AC7) — global de propósito: o logout
+    // parte de qualquer tela e o storage por baixo espera o banco abrir sozinho.
+    return registerOfflineQueueLifecycle()
   }, [])
 
   useEffect(() => {

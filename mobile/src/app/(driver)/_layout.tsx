@@ -8,7 +8,7 @@ import { useOfflineSync } from '@/hooks/use-offline-sync'
 export default function DriverLayout() {
   // Montado no LAYOUT, não na tela de scan: o dreno precisa continuar enquanto o
   // motorista navega para Viagem ou Rotas, e o banner precisa aparecer nas três.
-  const { pendingCount, failedCount } = useOfflineSync()
+  const { pendingCount, failedCount, dismissFailed } = useOfflineSync()
   const insets = useSafeAreaInsets()
 
   return (
@@ -26,6 +26,7 @@ export default function DriverLayout() {
         pendingCount={pendingCount}
         failedCount={failedCount}
         insetBottom={insets.bottom}
+        onDismissFailed={dismissFailed}
       />
     </View>
   )

@@ -4,18 +4,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { useOfflineSync } from '@/hooks/use-offline-sync'
 import { boardingService } from '@/services/boarding.service'
+import { ApiClientError } from '@/services/api-error'
 import type { QueuedCheckIn, QueueStatus, QueueStorage } from '@/utils/offline-queue'
 
 // O dreno em produção vive aqui (layout do grupo do motorista). Este spec
 // prende o wiring do hook contra um storage fake: contagens sobem para o
-// banner e, no desfecho de CADA item, o sender de produção
-// (`buildCheckInSender`) é quem posta.
+// banner, no desfecho de CADA item o sender de produção (`buildCheckInSender`)
+// é quem posta, o dreno bem-sucedido invalida roster/`activeTrip` (D7/AC9 —
+// antigo pin de baseline DS1 da retro 3, revertido pelo wrap-5) e o ciclo do
+// banner vermelho termina na ação "Dispensar" (D1/AC6).
 //
-// O caso da invalidação é um PIN DE BASELINE (DS1 da retro 3, AI6): HOJE o
-// dreno bem-sucedido NÃO invalida roster/`activeTrip` — a lista do motorista
-// envelhece até remount/staleTime. O gap é conhecido e roteado (AI3d,
-// spec-wrap-5); quando o fix pousar, este teste muda COM ele — é o delta
-// consciente que o wrap-5 executa.
+// O relógio é congelado: os itens são semeados com data fixa e o dreno compara
+// `createdAt` com a janela de 24h usando o relógio do processo (AC4).
 
 jest.mock('@/lib/connectivity', () => ({
   startConnectivityListeners: jest.fn(() => () => undefined),
@@ -31,10 +31,29 @@ jest.mock('@/services/boarding.service', () => ({
   boardingService: { checkIn: jest.fn() },
 }))
 
+// As keys de query vêm de `@/lib/trip-queries`, que arrasta o api-client (e o
+// MMKV nativo). O mock devolve as MESMAS keys — o que este spec afirma é que o
+// hook invalida essas chaves, não como elas são construídas.
+jest.mock('@/lib/trip-queries', () => ({
+  activeTripKey: ['activeTrip'] as const,
+  tripStudentsKey: (tripId: string | undefined) => ['trip', tripId, 'students'] as const,
+}))
+
+// O hook lê SÓ `user` do store, via selector. Um objeto `user` vivo enquanto
+// `mockAuthUserId` é não-nulo; `null` simula sessão encerrada (D4).
+let mockAuthUserId: string | null = 'driver-a-1111'
+
+jest.mock('@/stores/auth.store', () => ({
+  useAuthStore: (selector: (state: { user: { id: string } | null }) => unknown) =>
+    selector({ user: mockAuthUserId ? { id: mockAuthUserId } : null }),
+}))
+
 const mockCheckIn = jest.mocked(boardingService.checkIn)
 
 const TRIP_ID = '770e8400-e29b-41d4-a716-446655440100'
 const ANA = '660e8400-e29b-41d4-a716-446655440010'
+const DRIVER_A = 'driver-a-1111'
+const COMPANY = 'company-3333'
 
 const RECORD = {
   id: 'c1',
@@ -56,10 +75,10 @@ function createFakeStorage(
       rows.set(item.id, { ...item })
       return Promise.resolve()
     },
-    listPending: () =>
+    listPending: (userId: string) =>
       Promise.resolve(
         [...rows.values()]
-          .filter((item) => item.status === 'pending')
+          .filter((item) => item.status === 'pending' && item.userId === userId)
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
           .map((item) => ({ ...item })),
       ),
@@ -84,8 +103,24 @@ function createFakeStorage(
       }
       return Promise.resolve()
     },
-    count: (status: QueueStatus) =>
-      Promise.resolve([...rows.values()].filter((item) => item.status === status).length),
+    count: (status: QueueStatus, userId: string) =>
+      Promise.resolve(
+        [...rows.values()].filter((item) => item.status === status && item.userId === userId)
+          .length,
+      ),
+    purgeSentBefore: jest.fn(() => Promise.resolve()),
+    purgeUser: jest.fn((userId: string) => {
+      for (const [id, item] of rows) {
+        if (item.userId === userId) rows.delete(id)
+      }
+      return Promise.resolve()
+    }),
+    deleteFailed: jest.fn((userId: string) => {
+      for (const [id, item] of rows) {
+        if (item.status === 'failed' && item.userId === userId) rows.delete(id)
+      }
+      return Promise.resolve()
+    }),
   }
 }
 
@@ -96,6 +131,8 @@ const pendingItem = (overrides: Partial<QueuedCheckIn> & { id: string }): Queued
   createdAt: '2026-09-01T07:05:00.000Z',
   attempts: 0,
   lastError: null,
+  userId: DRIVER_A,
+  companyId: COMPANY,
   ...overrides,
 })
 
@@ -115,11 +152,21 @@ function renderSync(storage: QueueStorage) {
   return { ...view, invalidateSpy }
 }
 
+beforeAll(() => {
+  jest.useFakeTimers()
+  jest.setSystemTime(new Date('2026-09-01T08:00:00.000Z'))
+})
+
+afterAll(() => {
+  jest.useRealTimers()
+})
+
 describe('useOfflineSync — dreno no boot (AI6, retro 3)', () => {
   let warnSpy: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockAuthUserId = DRIVER_A
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
@@ -146,7 +193,7 @@ describe('useOfflineSync — dreno no boot (AI6, retro 3)', () => {
     expect(result.current.failedCount).toBe(0)
   })
 
-  it('PIN de baseline DS1: dreno bem-sucedido NÃO invalida roster/activeTrip (o fix é do wrap-5/AI3d)', async () => {
+  it('D7/AC9 (era o pin DS1): dreno bem-sucedido invalida o roster da viagem e a activeTrip', async () => {
     mockCheckIn.mockResolvedValue(RECORD)
     const storage = createFakeStorage([pendingItem({ id: 'item-1' })])
 
@@ -155,14 +202,77 @@ describe('useOfflineSync — dreno no boot (AI6, retro 3)', () => {
       await flush()
     })
 
-    // O dreno completou (contagens em 0), mas nenhuma query de roster ou
-    // descoberta é invalidada: a lista do motorista segue com o estado de
-    // antes do embarque sincronizado até remount/staleTime/refetch. Este é o
-    // gap DS1 documentado — se este teste passar a falhar sem mudança aqui,
-    // alguém implementou (ou quebrou) a invalidação sem passar pelo wrap-5.
+    // O embarque só passa a existir para o servidor no dreno: é AGORA que o
+    // roster fica velho. A lista do motorista reflete o embarque sem remount.
     expect(mockCheckIn).toHaveBeenCalledTimes(1)
     expect(result.current.pendingCount).toBe(0)
-    expect(result.current.failedCount).toBe(0)
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['trip', TRIP_ID, 'students'],
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['activeTrip'] })
+  })
+
+  it('dreno sem entrega NÃO invalida nada: só sent/settled envelhecem o roster', async () => {
+    mockCheckIn.mockRejectedValue(new TypeError('Network request failed'))
+    const storage = createFakeStorage([pendingItem({ id: 'item-1' })])
+
+    const { invalidateSpy } = renderSync(storage)
+    await act(async () => {
+      await flush()
+    })
+
+    // Falha de transporte não mudou nada no servidor — invalidar seria refetch
+    // à toa contra a rede que acabou de cair.
     expect(invalidateSpy).not.toHaveBeenCalled()
+  })
+
+  it('D4: sem usuário logado o hook nem consulta a fila', async () => {
+    mockAuthUserId = null
+    mockCheckIn.mockResolvedValue(RECORD)
+    const storage = createFakeStorage([pendingItem({ id: 'item-1' })])
+
+    const { result } = renderSync(storage)
+    await act(async () => {
+      await flush()
+    })
+
+    expect(mockCheckIn).not.toHaveBeenCalled()
+    expect(result.current.pendingCount).toBe(0)
+    expect(result.current.failedCount).toBe(0)
+  })
+
+  it('D6/AC8: a purga de `sent` no boot NÃO é do hook — vive no ciclo de vida global (root layout), que drena qualquer sessão', async () => {
+    const storage = createFakeStorage([pendingItem({ id: 'item-1' })])
+
+    renderSync(storage)
+    await act(async () => {
+      await flush()
+    })
+
+    expect(storage.purgeSentBefore).not.toHaveBeenCalled()
+  })
+
+  it('D1/AC6 — ciclo completo: falha pinta o banner, "Dispensar" zera a contagem', async () => {
+    // 400 determinístico = falha definitiva (D2): o item sai da fila como
+    // `failed` e o vermelho não vai embora sozinho.
+    mockCheckIn.mockRejectedValue(new ApiClientError('INVALID_QR_CODE', 'fora da janela', 400))
+    const storage = createFakeStorage([pendingItem({ id: 'item-1' })])
+
+    const { result } = renderSync(storage)
+    await act(async () => {
+      await flush()
+    })
+
+    expect(result.current.pendingCount).toBe(0)
+    expect(result.current.failedCount).toBe(1)
+
+    await act(async () => {
+      result.current.dismissFailed()
+      await flush()
+    })
+
+    expect(storage.deleteFailed).toHaveBeenCalledWith(DRIVER_A)
+    expect(result.current.failedCount).toBe(0)
+    expect(result.current.pendingCount).toBe(0)
   })
 })

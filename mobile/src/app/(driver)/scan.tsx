@@ -14,7 +14,7 @@ import { boardingService } from '@/services/boarding.service'
 import { ApiClientError } from '@/services/api-client'
 import { activeTripOptions, tripStudentsKey } from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
-import { enqueueCheckIn, isTransportFailure } from '@/utils/offline-queue'
+import { enqueueCheckIn, isTransportFailure, type QueueOwner } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
 import { registerE2eScanHook } from '@/utils/e2e-scan-hook'
 import {
@@ -61,6 +61,8 @@ interface Attempt {
    * voltou, e não a hora em que o aluno subiu no ônibus (NFR12).
    */
   scannedAt: string
+  /** D4: quem escaneou — o item só drena de volta para ESTA identidade. */
+  owner: QueueOwner
 }
 
 const TONE_COLOR: Record<Tone, string> = {
@@ -162,6 +164,7 @@ export default function ScanScreen() {
         studentId: attempt.studentId,
         tripId: attempt.tripId,
         scannedAt: attempt.scannedAt,
+        owner: attempt.owner,
       })
       if (outcome.kind === 'full') return QUEUE_FULL_FEEDBACK
       // Acorda o dreno, que vive no layout do grupo: sem isto o banner só
@@ -305,11 +308,14 @@ export default function ScanScreen() {
         idempotencyKey: Crypto.randomUUID(),
         // Carimbado agora, e não no momento da falha nem do dreno.
         scannedAt: new Date().toISOString(),
+        // O dono é a sessão que vai assinar o POST do dreno — o userId do
+        // token e a empresa da viagem ativa (D4).
+        owner: { userId: user.id, companyId: activeTrip.companyId },
       }
       lastAttempt.current = attempt
       void submit(attempt)
     },
-    [activeTrip, submit],
+    [activeTrip, submit, user],
   )
 
   // Ref para o `handleScan` corrente: o backdoor de scan do E2E (abaixo) lê

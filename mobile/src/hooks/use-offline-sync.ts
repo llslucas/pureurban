@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { startConnectivityListeners } from '@/lib/connectivity'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
+import { activeTripKey, tripStudentsKey } from '@/lib/trip-queries'
 import { boardingService } from '@/services/boarding.service'
+import { useAuthStore } from '@/stores/auth.store'
 import { useAppStore } from '@/stores/app.store'
 import {
   buildCheckInSender,
@@ -25,11 +28,21 @@ export interface OfflineSyncState {
   failedCount: number
 }
 
-export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): OfflineSyncState {
+export interface OfflineSync extends OfflineSyncState {
+  /** D1/AC6: reconhecimento do motorista — zera o vermelho do banner. */
+  dismissFailed: () => void
+}
+
+export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): OfflineSync {
   const [counts, setCounts] = useState<OfflineSyncState>({
     pendingCount: 0,
     failedCount: 0,
   })
+
+  // D4: o dreno é da sessão — sem usuário não há o que drenar nem contagem que
+  // faça sentido, então o hook nem consulta o banco.
+  const userId = useAuthStore((state) => state.user?.id ?? null)
+  const queryClient = useQueryClient()
 
   const isMounted = useRef(true)
   // Um dreno em voo por vez: sem isto o gatilho do `online` e o timer do backoff
@@ -51,6 +64,18 @@ export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): Offl
 
   const send = useMemo(() => buildCheckInSender(boardingService), [])
 
+  const refreshCounts = useCallback(
+    async (scopeUserId: string) => {
+      const [pendingCount, failedCount] = await Promise.all([
+        storage.count('pending', scopeUserId),
+        storage.count('failed', scopeUserId),
+      ])
+      if (!isMounted.current) return
+      setCounts({ pendingCount, failedCount })
+    },
+    [storage],
+  )
+
   const schedule = useCallback((delayMs: number | null) => {
     if (timer.current) {
       clearTimeout(timer.current)
@@ -64,6 +89,11 @@ export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): Offl
   }, [])
 
   const runDrain = useCallback(async () => {
+    if (!userId) {
+      // Logout: nada é drenado e o banner morre com o layout que está desmontando.
+      if (isMounted.current) setCounts({ pendingCount: 0, failedCount: 0 })
+      return
+    }
     if (isDraining.current) {
       wakeRequested.current = true
       return
@@ -71,15 +101,28 @@ export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): Offl
     isDraining.current = true
     try {
       const summary = await drainQueue(storage, send, {
+        userId,
         transportFailures: transportFailures.current,
       })
       transportFailures.current = summary.transportFailures
-      const [pendingCount, failedCount] = await Promise.all([
-        storage.count('pending'),
-        storage.count('failed'),
-      ])
-      if (!isMounted.current) return
-      setCounts({ pendingCount, failedCount })
+      await refreshCounts(userId)
+      // D7/AC9: o embarque só passa a existir para o servidor quando o dreno o
+      // entrega — é agora que o roster e a descoberta de viagem ficam velhos.
+      // Sem `activeTrip` invalidada, uma viagem encerrada por outro fluxo
+      // continuaria sendo servida do cache até o staleTime.
+      const deliveredTripIds = [
+        ...new Set(
+          summary.steps
+            .filter((step) => step.kind === 'sent' || step.kind === 'settled')
+            .map((step) => step.tripId),
+        ),
+      ]
+      for (const tripId of deliveredTripIds) {
+        void queryClient.invalidateQueries({ queryKey: tripStudentsKey(tripId) })
+      }
+      if (deliveredTripIds.length > 0) {
+        void queryClient.invalidateQueries({ queryKey: activeTripKey })
+      }
       schedule(summary.nextDelayMs)
     } catch (error: unknown) {
       // Só o storage chega aqui — `drainQueue` já absorve os erros de rede. Na
@@ -95,7 +138,7 @@ export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): Offl
         void runDrainRef.current()
       }
     }
-  }, [schedule, send, storage])
+  }, [queryClient, refreshCounts, schedule, send, storage, userId])
 
   // Em efeito, não no corpo do render: com o React Compiler ligado, escrever num
   // ref durante o render é justamente o padrão que ele reordena.
@@ -112,8 +155,9 @@ export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): Offl
     }
   }, [])
 
-  // Retoma sozinho no boot: os itens que sobreviveram ao fechamento do app
-  // continuam `pending` com `attempts` preservado (NFR11).
+  // Retoma sozinho no boot e a cada troca de sessão: os itens que sobreviveram
+  // ao fechamento do app continuam `pending` com `attempts` preservado (NFR11),
+  // e os do usuário que acabou de logar nunca foram drenados por outra sessão.
   useEffect(() => {
     void runDrain()
   }, [runDrain])
@@ -140,5 +184,13 @@ export function useOfflineSync(storage: QueueStorage = sqliteQueueStorage): Offl
     }
   }, [runDrain])
 
-  return counts
+  const dismissFailed = useCallback(() => {
+    if (!userId) return
+    void storage
+      .deleteFailed(userId)
+      .then(() => refreshCounts(userId))
+      .catch((error: unknown) => console.error('[offline-sync] falha ao dispensar falhas:', error))
+  }, [refreshCounts, storage, userId])
+
+  return { ...counts, dismissFailed }
 }

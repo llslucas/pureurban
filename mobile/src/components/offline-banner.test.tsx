@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native'
+import { fireEvent, render, screen } from '@testing-library/react-native'
 import React from 'react'
 
 import { OfflineBanner } from '@/components/offline-banner'
@@ -40,5 +40,32 @@ describe('OfflineBanner', () => {
   it('é anunciado por leitor de tela em vez de aparecer em silêncio', () => {
     render(<OfflineBanner pendingCount={1} failedCount={0} />)
     expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  it('o botão "Dispensar" é focável isoladamente pelo leitor de tela (sem achatamento do container)', () => {
+    render(<OfflineBanner pendingCount={0} failedCount={1} onDismissFailed={() => undefined} />)
+    expect(screen.getByRole('button', { name: /dispensar/i })).toBeTruthy()
+  })
+
+  it('D1/AC6 — ciclo completo: falha → banner com "Dispensar" → toques → banner some', () => {
+    const onDismissFailed = jest.fn()
+    const view = render(
+      <OfflineBanner pendingCount={0} failedCount={2} onDismissFailed={onDismissFailed} />,
+    )
+    expect(screen.getByText(/2 embarques não puderam ser enviados/)).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId('offline-banner-dismiss'))
+    expect(onDismissFailed).toHaveBeenCalledTimes(1)
+
+    // O hook responde à dispensa zerando `failedCount` — e o banner some sozinho.
+    view.rerender(<OfflineBanner pendingCount={0} failedCount={0} onDismissFailed={onDismissFailed} />)
+    expect(screen.queryByText(/Registre manualmente/)).toBeNull()
+    expect(screen.queryByTestId('offline-banner-dismiss')).toBeNull()
+  })
+
+  it('sem a ação de dispensa o vermelho aparece sem botão (banner de só-leitura)', () => {
+    render(<OfflineBanner pendingCount={0} failedCount={1} />)
+    expect(screen.getByText(/1 embarque não pôde ser enviado/)).toBeTruthy()
+    expect(screen.queryByTestId('offline-banner-dismiss')).toBeNull()
   })
 })

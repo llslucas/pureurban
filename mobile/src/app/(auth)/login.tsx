@@ -1,9 +1,10 @@
 import { router } from 'expo-router'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { Button, HelperText, Text, TextInput } from 'react-native-paper'
 
 import { tokenStorage } from '@/lib/storage'
+import { consumeDiscardNotice } from '@/lib/offline-discard-notice'
 import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { homeForRole } from '@/utils/role-routes'
@@ -14,6 +15,25 @@ export default function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // D5/AC7: o logout purga a fila do motorista; se havia embarques nunca
+  // enviados, ele é avisado aqui — a única superfície que toda saída de sessão
+  // atravessa (o 401 do api-client e os guards deslogam sem passar por botão).
+  const [discardNotice, setDiscardNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void consumeDiscardNotice().then((notice) => {
+      if (cancelled || !notice) return
+      setDiscardNotice(
+        notice.count === 1
+          ? '1 embarque não sincronizado foi descartado ao sair da conta.'
+          : `${notice.count} embarques não sincronizados foram descartados ao sair da conta.`,
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const { login } = useAuthStore()
 
@@ -75,6 +95,12 @@ export default function LoginScreen() {
           <Text variant="bodyMedium" style={styles.subtitle}>
             Faça login para continuar
           </Text>
+
+          {discardNotice ? (
+            <HelperText type="info" visible style={styles.discardNotice}>
+              {discardNotice}
+            </HelperText>
+          ) : null}
 
           <TextInput
             id="login-email"
@@ -152,6 +178,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     opacity: 0.7,
+  },
+  discardNotice: {
+    textAlign: 'center',
   },
   input: {
     marginBottom: 4,

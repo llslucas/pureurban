@@ -16,6 +16,24 @@ const TRIP_ID = '770e8400-e29b-41d4-a716-446655440100'
 const ANA = '660e8400-e29b-41d4-a716-446655440010'
 const BRUNO = '660e8400-e29b-41d4-a716-446655440011'
 
+const DRIVER_A = 'driver-a-1111'
+const COMPANY = 'company-3333'
+
+// O dreno compara `createdAt` com a janela de 24h usando o relógio do processo
+// (AC4): congelado para os itens de data fixa não virarem "expirados" conforme
+// o calendário anda. beforeEach, e não beforeAll: o afterAll da bateria
+// (describeQueueStorage) restaura timers reais no meio do arquivo.
+const BATTERY_NOW = '2026-09-01T08:00:00.000Z'
+
+beforeEach(() => {
+  jest.useFakeTimers()
+  jest.setSystemTime(new Date(BATTERY_NOW))
+})
+
+afterAll(() => {
+  jest.useRealTimers()
+})
+
 /**
  * Fake em memória do `QueueStorage`. É o motivo de a lógica estar atrás da
  * interface: `jest-expo` não tem SQLite nem OPFS, e `initPromise` em
@@ -31,6 +49,9 @@ const BRUNO = '660e8400-e29b-41d4-a716-446655440011'
 function createFakeStorage(seed: QueuedCheckIn[] = []) {
   const rows = new Map<string, QueuedCheckIn>()
   for (const item of seed) rows.set(item.id, { ...item })
+  // Espelho do `updated_at` do SQLite: o instante da ENTREGA, que o corte da
+  // purga de `sent` compara (o fake não tem coluna onde guardar isso).
+  const sentAtById = new Map<string, string>()
 
   const storage: QueueStorage & { rows: Map<string, QueuedCheckIn> } = {
     rows,
@@ -39,16 +60,19 @@ function createFakeStorage(seed: QueuedCheckIn[] = []) {
       rows.set(item.id, { ...item })
       return Promise.resolve()
     },
-    listPending: () =>
+    listPending: (userId: string) =>
       Promise.resolve(
         [...rows.values()]
-          .filter((item) => item.status === 'pending')
+          .filter((item) => item.status === 'pending' && item.userId === userId)
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
           .map((item) => ({ ...item })),
       ),
     markSent: (id) => {
       const row = rows.get(id)
-      if (row) row.status = 'sent'
+      if (row) {
+        row.status = 'sent'
+        sentAtById.set(id, new Date().toISOString())
+      }
       return Promise.resolve()
     },
     markFailed: (id, error) => {
@@ -67,8 +91,31 @@ function createFakeStorage(seed: QueuedCheckIn[] = []) {
       }
       return Promise.resolve()
     },
-    count: (status: QueueStatus) =>
-      Promise.resolve([...rows.values()].filter((item) => item.status === status).length),
+    count: (status: QueueStatus, userId: string) =>
+      Promise.resolve(
+        [...rows.values()].filter((item) => item.status === status && item.userId === userId)
+          .length,
+      ),
+    purgeSentBefore: (cutoffIso: string) => {
+      for (const [id, item] of rows) {
+        if (item.status === 'sent' && (sentAtById.get(id) ?? item.createdAt) < cutoffIso) {
+          rows.delete(id)
+        }
+      }
+      return Promise.resolve()
+    },
+    purgeUser: (userId: string) => {
+      for (const [id, item] of rows) {
+        if (item.userId === userId) rows.delete(id)
+      }
+      return Promise.resolve()
+    },
+    deleteFailed: (userId: string) => {
+      for (const [id, item] of rows) {
+        if (item.status === 'failed' && item.userId === userId) rows.delete(id)
+      }
+      return Promise.resolve()
+    },
   }
   return storage
 }
@@ -81,6 +128,8 @@ function pendingItem(overrides: Partial<QueuedCheckIn> & { id: string }): Queued
     createdAt: '2026-09-01T07:05:00.000Z',
     attempts: 0,
     lastError: null,
+    userId: DRIVER_A,
+    companyId: COMPANY,
     ...overrides,
   }
 }
@@ -247,8 +296,8 @@ describe('buildCheckInSender — o POST que o dreno realmente emite', () => {
       pendingItem({ id: 'b', payload: { studentId: BRUNO, tripId: TRIP_ID }, createdAt: '2026-09-01T07:06:00.000Z' }),
     ])
 
-    await drainQueue(storage, buildCheckInSender(api))
-    await drainQueue(storage, buildCheckInSender(api))
+    await drainQueue(storage, buildCheckInSender(api), { userId: DRIVER_A })
+    await drainQueue(storage, buildCheckInSender(api), { userId: DRIVER_A })
 
     expect(api.calls).toEqual([
       {
@@ -272,7 +321,7 @@ describe('buildCheckInSender — o POST que o dreno realmente emite', () => {
         pendingItem({ id: 'a', payload: { studentId: ANA, tripId: TRIP_ID } }),
       ])
 
-      const summary = await drainQueue(storage, buildCheckInSender(api))
+      const summary = await drainQueue(storage, buildCheckInSender(api), { userId: DRIVER_A })
 
       // O passo é 'offline' (falha de transporte), NÃO 'sent': o servidor nunca
       // confirmou o embarque.
@@ -292,7 +341,7 @@ describe('buildCheckInSender — o POST que o dreno realmente emite', () => {
       pendingItem({ id: 'a', payload: { studentId: ANA, tripId: TRIP_ID } }),
     ])
 
-    const summary = await drainQueue(storage, buildCheckInSender(api))
+    const summary = await drainQueue(storage, buildCheckInSender(api), { userId: DRIVER_A })
 
     expect(summary.sent).toBe(0)
     const [row] = [...storage.rows.values()]

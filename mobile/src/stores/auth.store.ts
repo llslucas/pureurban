@@ -35,7 +35,7 @@ function clearPersistedQueryCache(): void {
   void mmkvPersister.removeClient()
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: persistedUser,
   isAuthenticated: hasPersistedToken && Boolean(persistedUser),
   login: (user) => {
@@ -47,10 +47,37 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, isAuthenticated: true })
   },
   logout: () => {
+    const { user } = get()
     tokenStorage.clearTokens()
     userStorage.clearUser()
     qrSessionStorage.clearSessionId()
     clearPersistedQueryCache()
     set({ user: null, isAuthenticated: false })
+    // D5/AC7: notifica a limpeza de coisas por usuário que vivem fora do MMKV
+    // (a fila offline se purga no `offline-queue-lifecycle`). Síncrono no
+    // despacho: os listeners decidem o que é async. O usuário é entregue porque
+    // depois do `set` não há mais de quem limpar.
+    if (user) {
+      for (const listener of logoutListeners) {
+        try {
+          listener(user)
+        } catch (error) {
+          // Um listener que lança não pode abortar os demais nem o logout.
+          console.error('[auth] listener de logout falhou:', error)
+        }
+      }
+    }
   },
 }))
+
+type LogoutListener = (user: AuthUser) => void
+
+const logoutListeners = new Set<LogoutListener>()
+
+/** Registra reação ao logout de UM usuário (fila offline, caches por conta). */
+export function registerLogoutListener(listener: LogoutListener): () => void {
+  logoutListeners.add(listener)
+  return () => {
+    logoutListeners.delete(listener)
+  }
+}
