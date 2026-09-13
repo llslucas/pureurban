@@ -124,7 +124,7 @@ development_status:
   # pré-existentes, lint limpo, caminhada visual nos dois temas 34/34 com
   # bordas outlined SEM regressão vs baseline. Falta abrir o PR — status vira
   # `done` no merge.
-  1-11-revisao-da-paleta-de-cores: in-progress # re-derivação da iteração 2 concluída (gates verdes); PR ainda não aberto — aguarda confirmação do Lucas
+  1-11-revisao-da-paleta-de-cores: review # re-derivação concluída (iteração 2 + patches da review iteração 3), gates verdes; PR pendente da confirmação do Lucas — status vira `done` no merge
   epic-1-retrospective: done # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===

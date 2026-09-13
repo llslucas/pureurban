@@ -2,7 +2,7 @@
 title: 'Story 1.11: Revisão da Paleta de Cores — Unificação sobre o DESIGN.md (Airtable)'
 type: 'feature'
 created: '2026-09-13'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 2
 baseline_commit: 'b58b38ea3b9d023676a1e512d278d67a52298945'
 context:
@@ -632,3 +632,39 @@ Always só trava texto; a tabela aprovada não registra mudança em bordas de in
 permanecem default MD3) e re-derivação incorporando os patches verificados (rows 41–44:
 locks de tema, token-pin, locks estendidos). Rows 30 e 22–24+35–36 (defer) registradas
 em deferred-work.md. Rows 20–21, 26–29, 31–34, 37–40, 45 rejeitadas com a refutação acima.
+
+### Review de 2026-09-13 (iteração 3, pós-bad_spec)
+
+Blind-hunter (16) + edge-case-hunter (8) + verification-gap (0 gaps — todos os locks
+executam e pinam valores; 3 notas de acurácia de asserção) sobre o diff da re-derivação
+da iteração 2. Veredito por finding, com evidência verificada por mim:
+
+| # | Camadas | Finding | Veredito | Evidência / rota |
+|---|---------|---------|----------|------------------|
+| 46 | BH1 | DESIGN.md: exemplo "path to 10×" citado p/ surface-dark (L313), cream (L328) e hero-card-dark (L451) — superfície canônica ambígua | low | Verificado nas 3 linhas; dívida editorial do doc frozen-intocável → defer |
+| 47 | BH1 | DESIGN.md: "Navigation Variants" contém footer/cta-band-light; top-nav fora de subseção | low | idem → defer |
+| 48 | BH1 | DESIGN.md: front-matter hardcoda 96px/32px (tokens existem) e 64px (sem token) contra a própria política | low | idem (estende row 36) → defer |
+| 49 | BH1 | DESIGN.md: `npx @google/design.md lint DESIGN.md` (L544) — ferramenta inexistente no repo | low | Verificado; idem → defer |
+| 50 | BH1 | DESIGN.md: button-legal (~40px de altura) abaixo do piso de 44px da própria seção Touch Targets | low | Dimensões conferidas (L163/437); idem → defer |
+| 51 | BH1 | `primaryActive` registrado e pinado, sem consumidor | low | Registro 1:1 da fonte é o mandato (padrão D7: registrado, não adotado); adoção cabe à futura story de consumo/estados → reject |
+| 52 | BH1+ECH2 | Pin dos papéis não-sobrescritos cobre só outline/outlineVariant/elevation | false | O título do teste ESCOPA "(outline e elevation)"; pinar TODOS os defaults MD3 congelaria o resíduo violeta do Banner que o defer registrado planeja sobrescrever → reject |
+| 53 | BH1 | Par âmbar×branco do overlay do scan sem asserção (~4.24:1 @ 16px medium) | low | Real: a suíte da re-derivação derrubou o `warning × superfície clara` que a iteração 1 testava, e o botão branco com texto âmbar é alcançável; passa no piso 3:1 renegociado (contexto overlay, D3) mas não está travado → patch (par no piso D3, com a nota) |
+| 54 | BH1 | `secondary`/`onSecondary` sem par de razão (só lock de valor) | false | Os locks pinam os VALORES exatos nos dois temas — o par renderizado não muda sem quebrar o lock; par de razão seria redundante → reject |
+| 55 | BH1 | `successBorder` ~2.4:1 no branco, sem aviso — D4 diz "borda/acentos" e o gate não-texto próprio exige 3:1 | low | Cômputo confirma ~2.4:1; zero consumidores hoje; comentário de 1 linha previne o uso como borda em claro → patch |
+| 56 | BH1 | Regex `{3,8}\b` deixa escapar literais hex de 9+ dígitos | false | Cor de 9+ dígitos hex não existe (formatos são 3/6/8); a fronteira existe para não casar IDs; a cobertura anunciada está intacta → reject |
+| 57 | BH1 | Alpha ignorado no cálculo de razão (rgba 4º comp.; hex >6 dígitos) | low | Todos os pares assertados são opacos por construção; translúcidos vão por `contrastOverTint`; par translúcido novo seria decisão revisada → reject |
+| 58 | BH1+ECH2 | Allowlist com chaves POSIX vs `relative()` com separador do SO — guarda falso-falharia em Windows | low | Real: a iteração 1 normalizava separadores, a reescrita derrubou; falha FECHADA (visível, não erosão silenciosa), repo é WSL/Linux, mas correção é de 1 linha → patch |
+| 59 | BH1 | sprint-status "8 arquivos migrados" repetiria a superconta (2 só comentário) | low | Espelha o framing da PRÓPRIA task ("8 arquivos… *2 deles recebem só o comentário*"; precedente row 7) → reject (fix = editar docs que citam a task) |
+| 60 | BH1 | Caminhada não reconferiu admin/student outlined (AC cita os três) | false | O papel `outline` é único, pinado ao default MD3 e testado ≥3:1 nos DOIS temas — todo consumidor herda structuralmente; reconferir por tela testa o mesmo valor → reject |
+| 61 | BH1 | Linha em branco divide os registros de 1.11 em deferred-work.md | low | Cosmético; correção direta (apagar a linha) → patch |
+| 62 | ECH2 | Symlinks sob `src` escapam à varredura (`isFile`/`isDirectory`) | low | Não existem symlinks em `mobile/src`; estrutura hipotética, mudança futura seria revisada → reject |
+| 63 | ECH2 | Par dark `onSurfaceVariant×surfaceStrong` não é o binding do tema (`surfaceVariant`→`surface`) | false | O par assertado é MAIS estrito; o renderizado passa *a fortiori* (análise VG); valores pinados pelos locks de tema → reject |
+| 64 | ECH2 | `counterText` branco sobre scrim 55%: pior caso de cena clara ~3.5:1 < 4.5 | low | Pré-existente (mesmo scrim/texto no baseline); depende da luminância da câmera (não determinístico); padrão aceito na 3.3b (NFR18) → defer |
+| 65 | ECH2 | Label "Dispensar" (erro × composto 92% branco×vermelho) sem par assertado | low | Cômputo: composto ≈ #F9EEED → ~5.7:1, passa com folga; par pré-existente; valores pinados pelos render-probes → reject |
+| 66 | VG-out | Pares assertados ≠ pares renderizados (chip "Concluída" resolve label→ink; `errorTint` sem consumidor; dark surfaceVariant mais estrito) | low | Pré-verificado (gap layer): "assertion accuracy, not an unprotected path" — todos os valores envolvidos pinados; os pares renderizados também passam → reject |
+| 67 | Verificação de tasks (triage) | `darkTheme` sem `background`/`onBackground` (ficaram no default MD3 `#121212`/`#e6e0e9`) — a tabela D6 aprovada manda canvas `#181d26` | low | Real contra a tabela de referência da task (a iteração 1 mapeava); sem consumidor dark hoje; correção = mapear + estender locks → patch |
+
+**Processamento em cascata (iteração 3):** nenhum intent_gap/bad_spec — **patch** nas
+rows 53, 55, 58, 61, 67 via re-engajamento do subagente de implementação; **defer** nas
+rows 46–50 (dívida editorial DESIGN.md, lote 3) e 64 (legibilidade do scrim pré-existente);
+demais rejeitadas com a refutação acima.

@@ -456,10 +456,15 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `1-11-revisao-da-paleta-de-cores.md`
   summary: Dívida editorial do DESIGN.md — peso 575 órfão, aritmética do touch target 48px inconsistente, cross-ref "Step 6" errada, Known Gaps sem o gap de texto-sobre-escuro, token button-secondary-on-dark duplicado.
   evidence: Triagem da review da 1.11, iteração 1 (rows 11–15, verdict low cada): fatos reais verificados no documento; a story 1.11 não pode tocá-lo (frozen: DESIGN.md intocado).
-
 - source_spec: `1-11-revisao-da-paleta-de-cores.md`
   summary: Par pré-existente erro-sobre-preto no scan (~3.2:1) — a nota de permissão negada usa o vermelho único sobre o backdrop `#000000` do chrome de câmera, abaixo do AA 4.5:1 para texto normal.
   evidence: Triagem da review da 1.11, iteração 2 (rows 30/BH11+ECH4, verdict low): par idêntico no baseline `b58b38e` (o token swap não mudou as cores); estado raro (permissão de câmera negada); o fix exige uma variante on-dark de erro — "Ask First" frozen (cor nova fora do DESIGN.md).
 - source_spec: `1-11-revisao-da-paleta-de-cores.md`
   summary: Dívida editorial do DESIGN.md, 2º lote — `button-pricing-pill` usa Haas que o próprio Do/Don't proíbe; `description:` do front-matter diz "pill CTA" contra o sistema de raios (pill é pricing-only); elevation documenta "blue-tinted glow" e nega glow 4 linhas depois; `pricing-ink` ausente da prosa de Text; footer com `padding: 64px` fora da escala de spacing.
   evidence: Triagem da review da 1.11, iteração 2 (rows 22–24, 35–36, verdict low cada): fatos verificados nas linhas do documento; a story 1.11 não pode tocá-lo (frozen: DESIGN.md intocado).
+- source_spec: `1-11-revisao-da-paleta-de-cores.md`
+  summary: Dívida editorial do DESIGN.md, 3º lote — exemplo "path to 10×" citado para três superfícies diferentes (surface-dark, cream, hero-card-dark); "Navigation Variants" contém footer/cta-band-light com top-nav fora de subseção; front-matter hardcoda 96px/32px/64px contra a própria política de tokens; instrução `npx @google/design.md lint` não executável no repo; button-legal ~40px abaixo do piso de 44px da própria seção Touch Targets.
+  evidence: Triagem da review da 1.11, iteração 3 (rows 46–50, verdict low cada): fatos verificados nas linhas do documento (313/328/451, 544, 163/437); a story 1.11 não pode tocá-lo (frozen: DESIGN.md intocado).
+- source_spec: `1-11-revisao-da-paleta-de-cores.md`
+  summary: Legibilidade do contador do scanner depende da cena da câmera — texto branco sobre scrim 55% cai a ~3.5:1 no pior caso de cena clara (abaixo do 4.5:1 de texto normal a 18px).
+  evidence: Triagem da review da 1.11, iteração 3 (row 64, verdict low): par e scrim idênticos no baseline; depende da luminância do feed (não determinístico em teste); padrão de chrome de câmera aceito na 3.3b (NFR18).
