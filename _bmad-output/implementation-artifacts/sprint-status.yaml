@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "13-09-2026 19:35"
+last_updated: "13-09-2026 20:17"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -124,7 +124,7 @@ development_status:
   # pré-existentes, lint limpo, caminhada visual nos dois temas 34/34 com
   # bordas outlined SEM regressão vs baseline. Falta abrir o PR — status vira
   # `done` no merge.
-  1-11-revisao-da-paleta-de-cores: review # re-derivação concluída (iteração 2 + patches da review iteração 3), gates verdes; PR pendente da confirmação do Lucas — status vira `done` no merge
+  1-11-revisao-da-paleta-de-cores: done # PR #50 mergeada em 13/09/2026 — paleta única sobre o DESIGN.md (D1–D7), guarda de 47 testes; defers de dark-theme/DESIGN.md em deferred-work.md
   epic-1-retrospective: done # retro de 11/05/2026 — cobre as stories 1.1-1.5
 
   # === Epic 2: Identidade, Acesso e Organização ===
