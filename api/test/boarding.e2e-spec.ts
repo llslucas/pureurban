@@ -616,6 +616,19 @@ describe('BoardingController (e2e)', () => {
       await events(studentToken).expect(403);
     });
 
+    // ADMIN nunca foi exercitado nos endpoints novos (RV8): a matriz original
+    // pinou DRIVER/STUDENT/anônimo — um typo de @Roles que concedesse ADMIN
+    // passaria com a suíte toda verde.
+    it('ADMIN nos 4 endpoints novos deve dar 403 — nenhum deles é dele (RV8)', async () => {
+      const forbidden = (response: { body: ApiResponse }) =>
+        expect(response.body.error?.code).toBe('FORBIDDEN');
+
+      forbidden(await notReturning(adminToken).expect(403));
+      forbidden(await cancelAbsence(adminToken).expect(403));
+      forbidden(await reminder(adminToken).expect(403));
+      forbidden(await events(adminToken).expect(403));
+    });
+
     it('sem token, as rotas novas devem dar 401', async () => {
       await notReturning(null).expect(401);
       await cancelAbsence(null).expect(401);
@@ -1462,6 +1475,66 @@ describe('BoardingController (e2e)', () => {
 
       expect(body.data.students[0].status).toBe('CHECKED_IN');
       expect(body.data.summary).toEqual({ boarded: 1, total: 1 });
+    });
+
+    // Pluralidade sem teste era o RV2: todos os casos anteriores exercitavam
+    // UMA ausência. Dois alunos ausentes na MESMA viagem têm de refletir 2 no
+    // estado que o motorista vê — 2 badges NOT_RETURNING e o total excluindo os
+    // dois (o ajuste otimista 2x da tela consome este contrato).
+    it('2 alunos ausentes na MESMA viagem: 2 NOT_RETURNING no roster e o total exclui os dois (RV2)', async () => {
+      const tripId = await seedActiveTrip('RETURN');
+
+      // Segundo aluno NA rota, semeado no teste: o beforeAll do arquivo vincula
+      // só o allowedStudentId, e o @@unique([tripId, studentId]) pede alunos
+      // distintos — não reaproveito a viagem de outro teste.
+      const secondStudentId = await createUser('/api/v1/students', {
+        name: 'Segundo Aluno Ausente E2E',
+        email: `student-second-absent-${stamp}@escola.com`,
+        password: 'senha12345',
+      });
+      await post(`/api/v1/routes/${routeId}/students`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ studentId: secondStudentId })
+        .expect(201);
+      const secondStudentToken = await login(
+        `student-second-absent-${stamp}@escola.com`,
+        'senha12345',
+      );
+
+      await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId })
+        .expect(201);
+      await post('/api/v1/boarding/not-returning')
+        .set('Authorization', `Bearer ${secondStudentToken}`)
+        .set('X-Idempotency-Key', randomUUID())
+        .send({ tripId })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/trips/${tripId}/students`)
+        .set('Authorization', `Bearer ${driverToken}`)
+        .expect(200);
+
+      const body = response.body as unknown as {
+        data: {
+          students: Array<{ studentId: string; status: string }>;
+          summary: { boarded: number; total: number };
+        };
+      };
+
+      // Ordem-independente de propósito: ordenar por studentId aqui flakaria
+      // (localeCompare não ordena hex como codepoint e o id do segundo aluno é
+      // aleatório por execução).
+      expect(body.data.students).toHaveLength(2);
+      const statusByStudent = new Map(
+        body.data.students.map((s) => [s.studentId, s.status]),
+      );
+      expect(statusByStudent.get(allowedStudentId)).toBe('NOT_RETURNING');
+      expect(statusByStudent.get(secondStudentId)).toBe('NOT_RETURNING');
+      // O total do resumo exclui AMBOS os ausentes — não só o primeiro.
+      expect(body.data.summary).toEqual({ boarded: 0, total: 0 });
     });
   });
 

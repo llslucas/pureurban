@@ -386,4 +386,89 @@ describe('scanCheckinReminders', () => {
     expect(notDue.reminderRepo.create).not.toHaveBeenCalled();
     expect(events).toEqual([]);
   });
+
+  // Pluralidade (RV2b): até aqui todo caso exercitava o ramo de create UMA vez
+  // por teste. Dois elegíveis na MESMA varredura têm de gerar duas linhas e
+  // dois eventos no mesmo tick — o loop por-aluno roda o ramo N vezes.
+  it('2+ elegíveis na mesma varredura: um create e um evento POR aluno no mesmo tick (RV2b)', async () => {
+    const ports = happyPorts();
+    (
+      ports.boardingRepo.findCheckInsByTrip as ReturnType<typeof vi.fn>
+    ).mockImplementation((tripId: string) =>
+      Effect.succeed(
+        tripId === returnTrip.relatedTripId
+          ? [outboundCheckIn('student-1'), outboundCheckIn('student-2')]
+          : [],
+      ),
+    );
+
+    const { result, events } = await run(NOW, ports);
+
+    expect(ports.reminderRepo.create).toHaveBeenCalledTimes(2);
+    // Ordem determinística do forEach sobre os check-ins da ida.
+    expect(
+      (ports.reminderRepo.create as ReturnType<typeof vi.fn>).mock.calls.map(
+        (call) => (call[0] as { studentId: string }).studentId,
+      ),
+    ).toEqual(['student-1', 'student-2']);
+    expect(events).toHaveLength(2);
+    expect(
+      events.map((e) => (e as { data: { studentId: string } }).data.studentId),
+    ).toEqual(['student-1', 'student-2']);
+    expect(result).toMatchObject({ scannedTrips: 1, remindersCreated: 2 });
+  });
+
+  // Semântica skip-vs-die no meio da varredura (RV5): o create de UM aluno que
+  // morre (defect do adapter, orDie) derruba a fibra — os alunos seguintes NÃO
+  // são lembrados naquele tick (die, não skip). O scheduler loga e o tick
+  // seguinte se auto-cura sem duplicar (o create que morreu não persistiu).
+  it('create de um aluno morre no meio do tick: a fibra MORRE (alunos seguintes ficam sem lembrete) e o tick seguinte se auto-cura (RV5)', async () => {
+    const ports = happyPorts();
+    (
+      ports.boardingRepo.findCheckInsByTrip as ReturnType<typeof vi.fn>
+    ).mockImplementation((tripId: string) =>
+      Effect.succeed(
+        tripId === returnTrip.relatedTripId
+          ? [outboundCheckIn('student-1'), outboundCheckIn('student-2')]
+          : [],
+      ),
+    );
+    (ports.reminderRepo.create as ReturnType<typeof vi.fn>).mockImplementation(
+      (args: Parameters<ReminderRepositoryApi['create']>[0]) =>
+        args.studentId === 'student-1'
+          ? Effect.die(new Error('infra boom no create'))
+          : Effect.succeed({ created: true, record: storedReminder(args) }),
+    );
+
+    // O tick inteiro rejeita — o scheduler captura, loga e mantém o intervalo.
+    const outcome = await run(NOW, ports).then(
+      () => ({ died: false as const }),
+      (error: unknown) => ({ died: true as const, error }),
+    );
+    expect(outcome.died).toBe(true);
+
+    // Die, não skip: student-2 (elegível, atrás na fila) não teve create.
+    const studentIds = (
+      ports.reminderRepo.create as ReturnType<typeof vi.fn>
+    ).mock.calls.map((call) => (call[0] as { studentId: string }).studentId);
+    expect(studentIds).toEqual(['student-1']);
+
+    // Tick seguinte (infra curada): os DOIS são lembrados, sem duplicar —
+    // nada do tick morto ficou gravado.
+    (ports.reminderRepo.create as ReturnType<typeof vi.fn>).mockImplementation(
+      (args: Parameters<ReminderRepositoryApi['create']>[0]) =>
+        Effect.succeed({ created: true, record: storedReminder(args) }),
+    );
+    const second = await run(NOW, ports);
+    expect(ports.reminderRepo.create).toHaveBeenCalledTimes(3);
+    expect(
+      second.events.map(
+        (e) => (e as { data: { studentId: string } }).data.studentId,
+      ),
+    ).toEqual(['student-1', 'student-2']);
+    expect(second.result).toMatchObject({
+      scannedTrips: 1,
+      remindersCreated: 2,
+    });
+  });
 });

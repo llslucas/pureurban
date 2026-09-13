@@ -181,7 +181,7 @@ describe('useTripGpsCapture — classificação de falha de envio (AI3)', () => 
   })
 
   it('gate reativo: tripId null (viagem encerrada no cache) não gera POST nenhum (NFR10)', async () => {
-    mockIngest.mockResolvedValue({ receivedAt: '2026-09-12T12:00:00.000Z' })
+    mockIngest.mockResolvedValue({ tripId: TRIP_ID, receivedAt: '2026-09-12T12:00:00.000Z' })
     const view = renderCapture({ tripId: null, granted: true })
 
     await act(async () => {
@@ -196,5 +196,50 @@ describe('useTripGpsCapture — classificação de falha de envio (AI3)', () => 
       await flush()
     })
     expect(mockIngest).toHaveBeenCalledTimes(1)
+  })
+
+  it('gate de permissão: denied ⇒ 0 POSTs; conceder depois arma a cadência normal (NFR10/R15)', async () => {
+    // O cego do R15: toda instância de browser/Playwright nasce COM permissão,
+    // então remover `&& permissionGranted` do gate passava por toda suíte e2e.
+    // Este caso exercita o corpo do hook nos DOIS lados da borda — a mutação
+    // agora quebra aqui.
+    mockIngest.mockResolvedValue({ tripId: TRIP_ID, receivedAt: '2026-09-12T12:00:00.000Z' })
+    const view = renderCapture({ tripId: TRIP_ID, granted: false })
+
+    // Viagem ativa + permissão negada: nem o primeiro envio imediato parte.
+    await act(async () => {
+      await flush()
+    })
+    expect(mockIngest).not.toHaveBeenCalled()
+
+    await act(async () => {
+      jest.advanceTimersByTime(GPS_CAPTURE_INTERVAL_MS * 3)
+      await flush()
+    })
+    expect(mockIngest).not.toHaveBeenCalled()
+
+    // Permissão concedida com a viagem ainda ativa: o primeiro POST parte na
+    // hora e a cadência segue (mais um tick ⇒ mais um POST).
+    view.rerenderWith({ granted: true })
+    await act(async () => {
+      await flush()
+    })
+    expect(mockIngest).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      jest.advanceTimersByTime(GPS_CAPTURE_INTERVAL_MS)
+      await flush()
+    })
+    expect(mockIngest).toHaveBeenCalledTimes(2)
+
+    // Direção revogada: negada de novo NO MEIO da viagem PARA a captura sozinha
+    // (o else do gate — sem isto a captura continuaria postando com permissão
+    // negada até a viagem acabar).
+    view.rerenderWith({ granted: false })
+    await act(async () => {
+      jest.advanceTimersByTime(GPS_CAPTURE_INTERVAL_MS * 3)
+      await flush()
+    })
+    expect(mockIngest).toHaveBeenCalledTimes(2)
   })
 })

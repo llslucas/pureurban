@@ -548,6 +548,23 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
       expect((nonIsoCapturedAt.body as ApiResponse).error?.code).toBe(
         'VALIDATION_ERROR',
       );
+
+      // Borda accuracy >= 0 do contrato (R16): -5 é coordenada válida de
+      // longitude na mão errada — atravessaria Redis/evento/tela com tudo
+      // verde se o limite sair do schema.
+      const negativeAccuracy = await ingest(driverToken, {
+        ...validBody(tripId),
+        accuracy: -5,
+      }).expect(400);
+      expect((negativeAccuracy.body as ApiResponse).error?.code).toBe(
+        'VALIDATION_ERROR',
+      );
+
+      // Lado inclusivo da mesma borda: 0 É accuracy válida (leitura perfeita
+      // da Geolocation API) — o schema não pode derivar de gte(0) para gt(0).
+      await ingest(driverToken, { ...validBody(tripId), accuracy: 0 }).expect(
+        200,
+      );
     });
   });
 
@@ -967,6 +984,65 @@ describe('TrackingController (e2e) — Stories 5.1 e 5.2 (ingestão, last-known,
       expect((response.body as ApiResponse).data).toEqual({
         tripId,
         type: 'RETURN',
+      });
+    });
+
+    // Tie-break da descoberta (R14): duas ativas na mesma rota acontecem no
+    // fluxo normal (iniciar a volta sem encerrar a ida) e o adapter resolve
+    // com `startedAt desc, id desc`. Inverter qualquer um dos dois para `asc`
+    // faz o aluno seguir a perna errada do ônibus — sem estes casos, nada
+    // quebra.
+    it('OUTBOUND e RETURN ativas na mesma rota: a mais recente por startedAt vence (R14)', async () => {
+      const outboundId = await seedActiveTrip(driverId, 'OUTBOUND');
+      const returnId = await seedActiveTrip(driverId, 'RETURN');
+
+      // startedAt explícito: o default now() das duas criações pode cair no
+      // mesmo microssegundo do Postgres e o caso degeneraria no tie-break por id.
+      await prisma.trip.update({
+        where: { id: outboundId },
+        data: { startedAt: new Date(Date.now() - 60 * 60 * 1000) },
+      });
+      await prisma.trip.update({
+        where: { id: returnId },
+        data: { startedAt: new Date() },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      expect((response.body as ApiResponse).data).toEqual({
+        tripId: returnId,
+        type: 'RETURN',
+      });
+    });
+
+    it('startedAt empatado: o maior id vence — tiebreak determinístico (R14)', async () => {
+      const firstId = await seedActiveTrip(driverId, 'OUTBOUND');
+      const secondId = await seedActiveTrip(driverId, 'RETURN');
+
+      const tie = new Date('2026-09-12T12:00:00.000Z');
+      await prisma.trip.update({
+        where: { id: firstId },
+        data: { startedAt: tie },
+      });
+      await prisma.trip.update({
+        where: { id: secondId },
+        data: { startedAt: tie },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/tracking/trips/active')
+        .set('Authorization', `Bearer ${studentToken}`)
+        .expect(200);
+
+      // O vencedor é calculado, não escolhido: a ordem de criação não decide
+      // qual UUID é lexicograficamente maior.
+      const expectedId = [firstId, secondId].sort()[1];
+      expect((response.body as ApiResponse).data).toEqual({
+        tripId: expectedId,
+        type: expectedId === secondId ? 'RETURN' : 'OUTBOUND',
       });
     });
 
