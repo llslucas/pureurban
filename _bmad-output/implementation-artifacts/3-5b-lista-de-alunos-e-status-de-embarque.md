@@ -39,6 +39,14 @@ Para que **eu saiba quem já entrou e quem ainda falta, inclusive sem sinal de i
 2. **And** a contagem resumida aparece no topo, no formato `"28/32 embarcados"`, lida de `summary` da resposta e **nunca** recalculada no cliente (FR25)
 3. **And** a lista é cacheada offline pelo `persistQueryClient` já montado (Architecture §5, Tier 1) e **continua legível sem rede**, com indicador visível de que o dado pode estar desatualizado (FR24)
 4. **And** um check-in feito na tela de scan reflete na lista sem que o motorista recarregue a tela
+   *(reconciliado no wrap-3 — item 8 da retro 3 — para descrever o desfecho real: o reflexo
+   sem recarregar cobre o check-in **online**, pela invalidação de `['trip', tripId, 'students']`
+   no sucesso do `submit` (Task 5.1). No caminho **offline**, o item enfileirado que o dreno
+   entrega depois só aparece no próximo `staleTime`/pull-to-refresh — o dreno não invalida
+   queries; comportamento pinado como baseline consciente no wrap-2 e roteado ao wrap-5
+   (AI3 da retro 3). A lista offline em si (AC #3) é o fix do PR #19 — `networkMode: 'always'`
+   + Banner de dado velho —, com a linha "F5 offline" desse fix diferida para device
+   (Story 1.7).)*
 5. **And** a tela tem ponto de entrada in-app a partir de `(driver)/trip.tsx` **e** de `(driver)/scan.tsx` — hoje ela só é alcançável digitando a URL no alvo web
 6. **And** a interface é otimizada para uma mão: alvos de toque ≥ 48dp, contraste alto, sem gesto fino (NFR18)
 7. **And** a story é desenvolvida contra os handlers MSW da Story 3.0, sem backend de pé
