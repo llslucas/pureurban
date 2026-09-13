@@ -16,6 +16,7 @@ import { tripService } from '@/services/trip.service'
 import type { TripType } from '@/services/trip.service'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
 import { useTripGpsCapture } from '@/hooks/use-trip-gps-capture'
+import { lightPalette } from '@/lib/palette'
 import { activeTripKey, activeTripOptions, tripStudentsOptions } from '@/lib/trip-queries'
 
 function TripStatusChip({ status }: { status: 'ACTIVE' | 'COMPLETED' }) {
@@ -494,7 +495,7 @@ export default function TripScreen() {
         contentStyle={styles.buttonContent}
         labelStyle={styles.buttonLabel}
         icon="stop-circle"
-        buttonColor="#D32F2F"
+        buttonColor={lightPalette.error}
       >
         Encerrar Viagem
       </Button>
@@ -507,7 +508,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 20,
     paddingTop: 40,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.background,
   },
   centered: {
     flex: 1,
@@ -517,13 +518,13 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
-    color: '#666',
+    color: lightPalette.textMuted,
     fontSize: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1A1A2E',
+    color: lightPalette.text,
     marginBottom: 24,
   },
   retryButton: {
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 24,
     elevation: 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: lightPalette.surface,
   },
   statusChip: {
     alignSelf: 'flex-start',
@@ -542,10 +543,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chipActive: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: lightPalette.successTint,
   },
   chipCompleted: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: lightPalette.infoTint,
   },
   chipText: {
     fontSize: 13,
@@ -554,29 +555,29 @@ const styles = StyleSheet.create({
   tripTypeLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: lightPalette.textBody,
     marginBottom: 4,
   },
   infoText: {
     fontSize: 15,
-    color: '#555',
+    color: lightPalette.textBody,
     marginTop: 6,
   },
   permissionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: lightPalette.textBody,
     marginBottom: 8,
   },
   permissionText: {
     fontSize: 15,
-    color: '#555',
+    color: lightPalette.textBody,
     lineHeight: 22,
     marginBottom: 12,
   },
   permissionError: {
     fontSize: 13,
-    color: '#B3261E',
+    color: lightPalette.error,
     marginTop: 8,
   },
   routesLoading: {
@@ -590,12 +591,12 @@ const styles = StyleSheet.create({
   },
   routesErrorText: {
     fontSize: 16,
-    color: '#444',
+    color: lightPalette.textBody,
     fontWeight: '600',
   },
   routesHint: {
     fontSize: 14,
-    color: '#888',
+    color: lightPalette.textMuted,
     lineHeight: 20,
   },
   selectorBlock: {
@@ -604,7 +605,7 @@ const styles = StyleSheet.create({
   },
   selectorLabel: {
     fontSize: 15,
-    color: '#333',
+    color: lightPalette.textBody,
     fontWeight: '600',
   },
   // NFR18: botões grandes, mínimo 48dp, operação com uma mão

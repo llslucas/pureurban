@@ -89,6 +89,9 @@ export function QrScanner({ onScan, isPaused, onMountError }: QrScannerProps) {
 }
 
 const styles = StyleSheet.create({
+  // Hexes allowlistados no palette.guard.test (story 1.11): chrome da câmera —
+  // backdrop e máscara sobre o feed, com cantos brancos para contraste máximo
+  // sob sol direto (NFR18). Cores funcionais de leitura, não semânticas.
   container: {
     flex: 1,
     backgroundColor: '#000000',

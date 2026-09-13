@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native'
 import { Text, Card, ActivityIndicator, Snackbar, Divider, Button } from 'react-native-paper'
 import { useQuery } from '@tanstack/react-query'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
+import { lightPalette } from '@/lib/palette'
 
 function RouteCard({ route }: { route: AssignedRoute }) {
   return (
@@ -59,7 +60,7 @@ export default function DriverRoutesScreen() {
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#1A1A2E" />
+        <ActivityIndicator size="large" color={lightPalette.text} />
         <Text style={styles.loadingText}>Carregando rotas...</Text>
       </View>
     )
@@ -136,7 +137,7 @@ export default function DriverRoutesScreen() {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.background,
   },
   container: {
     flexGrow: 1,
@@ -148,34 +149,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.background,
   },
   loadingText: {
     marginTop: 8,
-    color: '#666',
+    color: lightPalette.textMuted,
     fontSize: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1A1A2E',
+    color: lightPalette.text,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: lightPalette.textMuted,
     marginBottom: 24,
   },
   card: {
     borderRadius: 12,
     marginBottom: 16,
     elevation: 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: lightPalette.surface,
   },
   routeName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: lightPalette.text,
     marginBottom: 12,
     lineHeight: 24,
   },
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   },
   routeLabel: {
     fontSize: 13,
-    color: '#888',
+    color: lightPalette.textMuted,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -199,13 +200,13 @@ const styles = StyleSheet.create({
   },
   routeValue: {
     fontSize: 15,
-    color: '#333',
+    color: lightPalette.textBody,
     fontWeight: '500',
     flex: 1,
     textAlign: 'right',
   },
   description: {
-    color: '#555',
+    color: lightPalette.textBody,
     fontWeight: '400',
     fontStyle: 'italic',
   },
@@ -222,14 +223,14 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#444',
+    color: lightPalette.textBody,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 8,
   },
   emptyHint: {
     fontSize: 14,
-    color: '#888',
+    color: lightPalette.textMuted,
     textAlign: 'center',
     lineHeight: 20,
   },

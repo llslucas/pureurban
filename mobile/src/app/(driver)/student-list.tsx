@@ -17,6 +17,7 @@ import {
   tripStudentsKey,
   tripStudentsOptions,
 } from '@/lib/trip-queries'
+import { lightPalette } from '@/lib/palette'
 import { useAuthStore } from '@/stores/auth.store'
 
 // Eventos aplicados ao cache como NOVO array + novos objetos (StudentCard é
@@ -377,19 +378,19 @@ function Centered({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.background,
   },
   header: {
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: lightPalette.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: lightPalette.hairline,
   },
   count: {
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: lightPalette.text,
   },
   empty: {
     alignItems: 'center',
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyTitle: {
-    color: '#555',
+    color: lightPalette.textBody,
     textAlign: 'center',
   },
   emptyContent: {
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 24,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: lightPalette.background,
   },
   centeredTitle: {
     textAlign: 'center',
