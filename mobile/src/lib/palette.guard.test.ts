@@ -448,6 +448,26 @@ describe('lock de binding dos temas Paper', () => {
     expect(source).not.toContain('darkTheme')
     expect(source.match(/<PaperProvider theme=\{lightTheme\}>/g)).toHaveLength(2)
   })
+
+  it('app.json: chrome nativo (userInterfaceStyle/splash/ícone) também travado em light (1.11b)', () => {
+    // A varredura de hex cobre só src/: o chrome nativo (headers, status bar,
+    // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, a
+    // metade nativa da trava light reverteria em silêncio (era o azul #208AEF
+    // da paleta antiga).
+    const appConfig = JSON.parse(
+      readFileSync(join(SRC_ROOT, '..', 'app.json'), 'utf8'),
+    ) as {
+      expo: {
+        userInterfaceStyle: string
+        android: { adaptiveIcon: { backgroundColor: string } }
+        plugins: [string, Record<string, unknown>][]
+      }
+    }
+    expect(appConfig.expo.userInterfaceStyle).toBe('light')
+    expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe('#ffffff')
+    const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
+    expect(splash?.[1].backgroundColor).toBe('#ffffff')
+  })
 })
 
 describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', () => {
