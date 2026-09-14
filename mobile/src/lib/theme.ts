@@ -1,12 +1,11 @@
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper'
 
-import { darkPalette, lightPalette } from '@/lib/palette'
+import { darkMapping, darkPalette, lightPalette } from '@/lib/palette'
 // Os papéis abaixo são os ÚNICOS sobrescritos sobre o default MD3, todos
-// derivados da paleta (Story 1.11). `outline`/`outlineVariant` permanecem no
-// default MD3 de propósito: hairline dá ~1.36:1 no branco e não atinge o 3:1 de
-// borda de componente interativo (WCAG 1.4.11). A paleta `elevation` também
-// permanece default MD3 — resíduo violeta visível só no <Banner> (defer
-// registrado na story).
+// derivados da paleta (Story 1.11; `elevation` na 1.11b — fim do resíduo
+// violeta do <Banner>/Surface). `outline`/`outlineVariant` permanecem no
+// default MD3 de propósito: hairline dá ~1.36:1 no branco e não atinge o 3:1
+// de borda de componente interativo (WCAG 1.4.11).
 export const lightTheme = {
   ...MD3LightTheme,
   colors: {
@@ -24,6 +23,17 @@ export const lightTheme = {
     onSurfaceVariant: lightPalette.textMuted,
     error: lightPalette.error,
     onError: lightPalette.onPrimary,
+    // Surface elevada lê `colors.elevation.level{n}` (Banner default = 1) e o
+    // default MD3 é violeta — agora tons da paleta. level0 permanece o default
+    // 'transparent'.
+    elevation: {
+      ...MD3LightTheme.colors.elevation,
+      level1: lightPalette.surfaceSoft,
+      level2: lightPalette.surfaceSoft,
+      level3: lightPalette.surfaceStrong,
+      level4: lightPalette.surfaceStrong,
+      level5: lightPalette.surfaceStrong,
+    },
   },
 }
 
@@ -46,5 +56,15 @@ export const darkTheme = {
     onSurfaceVariant: darkPalette.textBody,
     error: darkPalette.error,
     onError: darkPalette.onPrimary,
+    elevation: {
+      ...MD3DarkTheme.colors.elevation,
+      // hairline é a "borda-forte" do D6 — o único tom do vocabulário escuro
+      // que eleva sobre o canvas.
+      level1: darkMapping.element,
+      level2: darkMapping.element,
+      level3: darkMapping.hairline,
+      level4: darkMapping.hairline,
+      level5: darkMapping.hairline,
+    },
   },
 }

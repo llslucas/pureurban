@@ -1,20 +1,19 @@
 import { Stack } from 'expo-router'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import React, { useEffect, useState } from 'react'
-import { useColorScheme, View } from 'react-native'
+import { View } from 'react-native'
 import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
 import { initializeDatabase } from '@/lib/database'
 import { registerOfflineQueueLifecycle } from '@/lib/offline-queue-lifecycle'
 import { mmkvPersister } from '@/lib/mmkv-persister'
 import { queryClient } from '@/lib/query-client'
-import { darkTheme, lightTheme } from '@/lib/theme'
+import { lightTheme } from '@/lib/theme'
 import { enableMocking, MOCKS_ENABLED } from '@/mocks'
 import { useAuthStore } from '@/stores/auth.store'
 import { ROLE_ROUTES, ROLES } from '@/utils/role-routes'
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme()
   // Loading gate: o navegador não monta antes do banco estar pronto.
   const [isDbReady, setIsDbReady] = useState(false)
   // Loading gate: mocks DEVEM estar prontos antes do navegador montar, senão a
@@ -58,7 +57,7 @@ export default function RootLayout() {
   // Hooks no render em que mockError deixa de ser null.
   if (mockError) {
     return (
-      <PaperProvider theme={colorScheme === 'dark' ? darkTheme : lightTheme}>
+      <PaperProvider theme={lightTheme}>
         <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 8 }}>
           <Text variant="titleMedium">Falha ao inicializar os mocks (MSW)</Text>
           <Text variant="bodySmall">{mockError}</Text>
@@ -82,7 +81,11 @@ export default function RootLayout() {
         maxAge: 1000 * 60 * 60 * 24, // 24 horas — deve ser <= gcTime
       }}
     >
-      <PaperProvider theme={colorScheme === 'dark' ? darkTheme : lightTheme}>
+      {/* Trava light (story 1.11b): sem ela o provider flipa com o esquema do
+          SO e os widgets Paper entram em dark sobre telas light-locked — o
+          render misto do defer da 1.11. Consumo reativo real (useTheme/
+          darkPalette) é story futura. */}
+      <PaperProvider theme={lightTheme}>
         {isBooting ? (
           // Nunca null enquanto os portões de boot não abrem: um layout raiz sem
           // saída de router é exatamente a tela em branco que esta tela evita.
