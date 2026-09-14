@@ -143,6 +143,8 @@ context:
 
 ### Registro pós-review (2026-09-13)
 
+- **Fechamento: PR #51 mergeado na `main` em 14/09/2026** (merge `1e6d7a2`).
+
 - Isenção documentada (triage #7): os dois `#ffffff` do `app.json` são o canvas da
   paleta num arquivo que não importa módulo JS — o lock da guarda (valor exato +
   negação dos hexes antigos) é o pin.
