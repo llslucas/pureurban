@@ -2,7 +2,7 @@
 title: '1.11b — Render coerente sob esquema escuro (defer da story 1.11)'
 type: 'bugfix'
 created: '2026-09-13'
-status: 'in-review'
+status: 'done'
 baseline_commit: bd2f5da782ee7821bfd10a2d77952991691f2dd7
 route: 'dispatch'
 review_loop_iteration: 0
