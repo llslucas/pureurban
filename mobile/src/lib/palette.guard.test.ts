@@ -467,6 +467,12 @@ describe('lock de binding dos temas Paper', () => {
     expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe('#ffffff')
     const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
     expect(splash?.[1].backgroundColor).toBe('#ffffff')
+    // Varredura negativa no config inteiro: os scalars acima não cobrem outras
+    // chaves nativas (ícone, imagens, plugins futuros) onde o azul da paleta
+    // antiga poderia voltar em silêncio.
+    const serialized = JSON.stringify(appConfig).toLowerCase()
+    expect(serialized).not.toContain('#208aef')
+    expect(serialized).not.toContain('#e6f4fe')
   })
 })
 
