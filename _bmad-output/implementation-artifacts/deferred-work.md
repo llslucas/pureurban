@@ -468,3 +468,14 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `1-11-revisao-da-paleta-de-cores.md`
   summary: Legibilidade do contador do scanner depende da cena da câmera — texto branco sobre scrim 55% cai a ~3.5:1 no pior caso de cena clara (abaixo do 4.5:1 de texto normal a 18px).
   evidence: Triagem da review da 1.11, iteração 3 (row 64, verdict low): par e scrim idênticos no baseline; depende da luminância do feed (não determinístico em teste); padrão de chrome de câmera aceito na 3.3b (NFR18).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-11b-consumo-do-tema-escuro.md`
+  summary: Arte dos ícones/splash na paleta antiga (azul) — adaptive icon background PNG (#E6F4FE
+    com veios azuis), app icon `icon.png` (família #3E9FFE/#0475E0) e provavelmente o
+    `splash-icon.png` — regenerar com a paleta nova.
+  evidence: Review da 1.11b (blind-hunter + edge-case-hunter, decodificação dos PNGs): o
+    prebuild Android 8+ prefere `backgroundImage` sobre `adaptiveIcon.backgroundColor`, e o
+    foreground do ícone adaptativo é quase todo transparente (glyph com alfa ≤2) — o fundo
+    azul É a camada visível do ícone; trocar por branco deixaria o ícone em branco. Arte nova
+    é decisão de design (fora do escopo de código); o lock do `app.json` nega os hexes
+    antigos no config, mas os binários de asset ficaram.

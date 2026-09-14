@@ -2,7 +2,7 @@
 title: '1.11b — Render coerente sob esquema escuro (defer da story 1.11)'
 type: 'bugfix'
 created: '2026-09-13'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: bd2f5da782ee7821bfd10a2d77952991691f2dd7
 route: 'dispatch'
 review_loop_iteration: 0
@@ -129,6 +129,28 @@ context:
 - `darkTheme` e o mapeamento D6 permanecem sem consumidores (intencional — story
   futura de consumo reativo), continuando cobertos pelos locks da guarda.
 
+### Auditoria da matriz de I/O (2026-09-13, pós-implementação)
+
+- Lacuna fechada: a linha "SO escuro + nativo" não tinha teste — a guarda varre só
+  `src/` e o chrome nativo é dirigido pelo `app.json`. Adicionado lock
+  "app.json: chrome nativo (userInterfaceStyle/splash/ícone) também travado em light"
+  na suíte de binding — commit `9a1aeda`, suíte 348/348, lint limpo.
+- Cobertura final por linha da matriz: web/login → source-lock do `_layout`; nativo
+  → lock do `app.json`; claro → lock de binding do `elevation` + pares AA novos;
+  Banner → lock nível a nível (`level1` = `surfaceSoft`); tela de erro de mocks →
+  source-lock (exatamente dois `theme={lightTheme}`). Todas rodaram e passaram na
+  verificação.
+
+### Registro pós-review (2026-09-13)
+
+- Isenção documentada (triage #7): os dois `#ffffff` do `app.json` são o canvas da
+  paleta num arquivo que não importa módulo JS — o lock da guarda (valor exato +
+  negação dos hexes antigos) é o pin.
+- Correção de claim (triage #1): "fim do resíduo azul" vale para o **config**
+  (splash/adaptiveIcon `backgroundColor`); a camada visível do ícone adaptativo no
+  Android 8+ continua no PNG de `backgroundImage` (azul) — a regeneração da arte é
+  dívida registrada no `deferred-work.md`.
+
 ## Spec Change Log
 
 <!-- Append-only. Populated by step-04 during review loops. -->
@@ -136,6 +158,22 @@ context:
 ## Review Triage Log
 
 <!-- Append-only. Populated by step-04 on every review pass. -->
+
+| # | Finding (camada) | Veredito | Evidência |
+|---|------------------|----------|-----------|
+| 1 | `backgroundImage` do ícone adaptativo (PNG `#E6F4FE`) tem precedência no prebuild Android 8+; `adaptiveIcon.backgroundColor` branco vira fallback — resíduo azul persiste na camada visível e a claim da task era falsa (blind-hunter + edge-case-hunter) | low | Prebuild Expo: `backgroundImage ? '@mipmap/ic_launcher_background' : ...`; PNG decodificado = rgb(230,244,254) com veios azuis; foreground quase transparente (glyph alfa ≤2) — o fundo É o ícone; branquear deixaria ícone em branco → arte nova é decisão de design → **defer** (asset) |
+| 2 | Lock do app.json descreve "ícone" mas só afirma 3 escalares; hexes antigos poderiam reentrar no config (blind-hunter) | low | Real e barato: asserção negativa sobre o JSON serializado → **patch** |
+| 3 | Falta par AA ink×surfaceSoft (elevation 1–2 light) (blind-hunter) | false | Par pré-existe: `LIGHT_PAIRS` "títulos (ink) × surface-soft" (guarda, linha 221) |
+| 4 | Banner (level1 `surfaceSoft`) fica igual ao fundo do student-list; ~1.03:1 sobre canvas — borda invisível (blind-hunter + verification-gap) | low | Paridade pré-existente: o violeta `#F7F3F9` era ~1.03:1 sobre branco — igualmente invisível; distinctness exigiria tom/borda nova (frozen Never: decisão de cor) → reject |
+| 5 | Dark level1 `element` ~1.1:1 sobre canvas escuro — mesmo defeito no darkTheme futuro (blind-hunter) | low | `darkTheme` sem consumidores hoje (trava light); vocabulário D6 frozen não tem tom intermediário → reject |
+| 6 | Vocabulário assimétrico no elevation dark (`darkMapping.*` vs papéis `darkPalette.*`) (blind-hunter) | low | Valores presos iguais pelos locks; `darkMapping` documenta a derivação D6 → reject (churn) |
+| 7 | `#ffffff` em app.json viola literalmente "nenhum hex novo fora de palette.ts" (blind-hunter) | low | JSON não importa módulo; valor = canvas (`#ffffff`); lock da guarda prende; isenção registrada nas Implementation Notes |
+| 8 | Contagens inconsistentes na spec (334+ / 343 / 348; "4 novos") (blind-hunter) | false | "334+" é piso frozen (fim da 1.11); 343 = baseline do HEAD; 347 = +4 do subagente; 348 = +1 do audit — a conta fecha |
+| 9 | Screenshot frozen do /track-bus nunca rodou; audit "conflaria" cobertura unit com verificação visual (blind-hunter) | low | Seção manual é condicional ("se nenhum CLI cobrir") e o CLI cobre o valor determinístico (lock nível a nível do `elevation` + Surface.js); risco residual documentado nas Notes → reject |
+| 10 | Lock do `_layout` bane substrings até em comentários; `match()` null daria erro feio (blind-hunter) | low | Fonte atual não cita o hook; `match()` null só ocorre no caminho que já é falha → ergonomia de falha → reject |
+| 11 | Comentários em PT contrariam AGENTS.md ("comentários de código em inglês") (blind-hunter) | low | Convenção do `mobile/src` é PT (todos os vizinhos nos arquivos tocados, precedente 1.11); mudar criaria arquivo bilíngue — conflito interno da AGENTS.md com o repo, a decidir pelo humano → reject |
+| 12 | Code Map cita linhas de `node_modules` (efêmeras para spec frozen) (blind-hunter) | low | Fix = editar a spec (Code Map) → reject pela regra |
+| 13 | Hooks legados de esquema (`use-theme`, `use-color-scheme*`) fora do alcance da guarda; import futuro reintroduziria reatividade sem teste (verification-gap) | low | Zero consumidores (grep); o próprio revisor a classifica como risco residual do escopo escolhido; deleção pertence à story futura de consumo → reject |
 
 ## Design Notes
 
