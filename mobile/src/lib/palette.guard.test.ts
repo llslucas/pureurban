@@ -27,10 +27,11 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 //     visível: trocar error → outro vermelho passa no contraste, mas falha aqui);
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
-// (4) locks de binding — os papéis sobrescritos dos temas Paper, o mapa de
-//     status do StudentCard, as faixas do OfflineBanner e os call-sites das
-//     telas presos aos papéis da paleta (a migração manual não pode trocar
-//     tokens silenciosamente).
+// (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
+//     `elevation`, 1.11b) e o provider travado em lightTheme no _layout, o
+//     mapa de status do StudentCard, as faixas do OfflineBanner e os
+//     call-sites das telas presos aos papéis da paleta (a migração manual não
+//     pode trocar tokens silenciosamente).
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
 // varredura: o teste contém os hexes de referência por definição.
 
@@ -223,6 +224,7 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × botão primário (tinta)', fg: lightPalette.onPrimary, bg: lightPalette.primary, min: 4.5 },
   { desc: 'erro × canvas', fg: lightPalette.error, bg: lightPalette.canvas, min: 4.5 },
   { desc: 'onSurfaceVariant × surfaceVariant (chips/labels Paper)', fg: lightPalette.textMuted, bg: lightPalette.surfaceStrong, min: 4.5 },
+  { desc: 'títulos (ink) × superfície elevada (elevation 3–5)', fg: lightPalette.text, bg: lightPalette.surfaceStrong, min: 4.5 },
   { desc: 'sucesso × tinte de sucesso', fg: lightPalette.success, bg: statusTints.success, min: 4.5 },
   { desc: 'info × tinte de info (chip Concluída)', fg: lightPalette.info, bg: statusTints.info, min: 4.5 },
   { desc: 'erro × tinte de erro', fg: lightPalette.error, bg: statusTints.error, min: 4.5 },
@@ -243,6 +245,7 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'texto secundário × elemento escuro', fg: darkPalette.textBody, bg: darkPalette.surface, min: 4.5 },
   { desc: 'onPrimary × botão primário branco em dark', fg: darkPalette.onPrimary, bg: darkPalette.primary, min: 4.5 },
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
+  { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
 ]
 
 // ---- Helpers dos render-probes ----
@@ -413,13 +416,37 @@ describe('lock de binding dos temas Paper', () => {
     expect(darkTheme.colors.onError).toBe(darkPalette.onPrimary)
   })
 
-  it('papéis NÃO sobrescritos permanecem com o default MD3 (outline e elevation)', () => {
+  it('outline/outlineVariant permanecem no default MD3 (resíduo documentado)', () => {
     expect(lightTheme.colors.outline).toBe(MD3LightTheme.colors.outline)
     expect(lightTheme.colors.outlineVariant).toBe(MD3LightTheme.colors.outlineVariant)
     expect(darkTheme.colors.outline).toBe(MD3DarkTheme.colors.outline)
     expect(darkTheme.colors.outlineVariant).toBe(MD3DarkTheme.colors.outlineVariant)
-    expect(lightTheme.colors.elevation).toEqual(MD3LightTheme.colors.elevation)
-    expect(darkTheme.colors.elevation).toEqual(MD3DarkTheme.colors.elevation)
+  })
+
+  it('elevation casa nível a nível com a paleta (1.11b — fim do violeta do <Banner>)', () => {
+    expect(lightTheme.colors.elevation).toEqual({
+      ...MD3LightTheme.colors.elevation,
+      level1: lightPalette.surfaceSoft,
+      level2: lightPalette.surfaceSoft,
+      level3: lightPalette.surfaceStrong,
+      level4: lightPalette.surfaceStrong,
+      level5: lightPalette.surfaceStrong,
+    })
+    expect(darkTheme.colors.elevation).toEqual({
+      ...MD3DarkTheme.colors.elevation,
+      level1: darkMapping.element,
+      level2: darkMapping.element,
+      level3: darkMapping.hairline,
+      level4: darkMapping.hairline,
+      level5: darkMapping.hairline,
+    })
+  })
+
+  it('_layout: PaperProvider travado em lightTheme, sem flip por esquema do SO (trava da trava, 1.11b)', () => {
+    const source = readSource('app/_layout.tsx')
+    expect(source).not.toContain('useColorScheme')
+    expect(source).not.toContain('darkTheme')
+    expect(source.match(/<PaperProvider theme=\{lightTheme\}>/g)).toHaveLength(2)
   })
 })
 
