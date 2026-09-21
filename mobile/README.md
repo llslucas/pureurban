@@ -205,6 +205,23 @@ emulador. O Metro, esse sim, precisa do reverse (ou do IP de LAN do dev server).
   `adb logcat -d | grep -i displayed`. Registre **método + número** — mesmo que o
   emulador não cumpra os 3s, o registro vira achado, não falha da story.
 
+### Troubleshooting — "conexão com a API caiu"
+
+As regras de `adb reverse` **não sobrevivem** a um restart do servidor adb nem a uma
+reconexão do transporte do emulador (sintomas: request com `Connection refused` /
+"Network request failed" no app, às vezes voltando a funcionar sozinho). Recrie as duas
+regras e tente de novo — vale colar no PowerShell do Windows, onde roda o `adb` que o
+emulador enxerga:
+
+```powershell
+C:\Users\lucas\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:8081 tcp:8081
+C:\Users\lucas\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:3001 tcp:3001
+```
+
+Teste rápido de cada elo, de dentro do emulador: `nc localhost 8081` (Metro responde
+HTTP) e `nc localhost 3001` (API responde HTTP). Se o Metro responder e a API não,
+quase sempre é a regra do 3001 que morreu.
+
 ### Limitações
 
 | Limitação | Consequência |
