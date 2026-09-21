@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "20-09-2026 23:32"
+last_updated: "20-09-2026 23:35"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -81,7 +81,7 @@ development_status:
   # DEMOVIDA de bloqueio para validação final (sprint-change-proposal-2026-08-28): push saiu
   # do MVP, o GPS usa a Geolocation API no alvo web e o Tier 2 foi verificado em wa-sqlite/OPFS
   # na Story 1.6. Restam NFR5 e NFR18-NFR20. BLOQUEIA A DEFESA, não o desenvolvimento.
-  1-7-development-build-android-para-validacao-nativa: review
+  1-7-development-build-android-para-validacao-nativa: done
   # Criada pelo code review da 1.6 (28/08/2026). O seed está quebrado por drift do
   # Prisma 7 e não é alcançável por nenhum comando documentado: `npm run seed` não
   # existe (é hook `prisma.seed`, não script), `npx prisma db seed` responde
