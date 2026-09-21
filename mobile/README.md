@@ -152,10 +152,17 @@ Expo Go **não é alvo** em nenhum passo: MMKV (Nitro Modules) não roda nele.
 
 ```bash
 npx eas login          # conta Expo (só uma vez por máquina)
-npx eas init           # grava extra.eas.projectId em app.json — commitar e nunca mais mudar
+npx eas init           # SÓ NA PRIMEIRA VEZ — veja abaixo antes de rodar
 npx eas build -p android --profile development   # APK de validação (dev client)
 npx eas build -p android --profile preview       # APK release p/ medição de boot (NFR5)
 ```
+
+O `eas init` cria o projeto EAS e grava `extra.eas.projectId` em `app.json` — commitado
+uma vez e mantido estável. **Se o seu `app.json` já tem `extra.eas.projectId`, pule o
+`eas init`**: o projeto já existe (é do dono, o `owner` em `app.json`) e rodar de novo
+criaria um projeto paralelo que você não tem acesso. Para um segundo desenvolvedor
+buildar o projeto do dono, o dono precisa convidá-lo como colaborador no dashboard EAS
+(expo.dev → projeto → Access) com a conta usada no `eas login`.
 
 O build imprime a URL do artefato. Baixe o `.apk` e instale no emulador:
 
@@ -199,6 +206,10 @@ emulador. O Metro, esse sim, precisa do reverse (ou do IP de LAN do dev server).
   virtual scene. QR de teste: o próprio app renderiza o QR do aluno em `/qr-code`
   (usuário STUDENT, via MSW), ou qualquer gerador com o payload da Story 3.2b.
   Em `/scan` (DRIVER), a leitura dispara o fluxo de check-in.
+- **Ergonomia de device (NFR18–NFR20):** abra o AVD de 5" 720x1280 dos pré-requisitos
+  e percorra as telas principais com uma mão, avaliando alcance do polegar nos botões
+  primários, tamanho dos alvos de toque e contraste. São NFRs **medidos, não
+  entregues, aqui** — achados viram insumo das stories de feature, não bloqueio.
 - **Boot real (NFR5, alvo < 3s):** use o APK `preview` — build de dev baixa o bundle
   do Metro e **não** mede boot. `adb shell am force-stop com.pureurban.mobile`, inicie
   o app frio, confirme que a tela está operacional, então:
@@ -211,16 +222,27 @@ As regras de `adb reverse` **não sobrevivem** a um restart do servidor adb nem 
 reconexão do transporte do emulador (sintomas: request com `Connection refused` /
 "Network request failed" no app, às vezes voltando a funcionar sozinho). Recrie as duas
 regras e tente de novo — vale colar no PowerShell do Windows, onde roda o `adb` que o
-emulador enxerga:
+emulador enxerga. A porta da API tem que casar com o `PORT` do `api/.env` — default
+**3000** (o 3001 visto antes aqui era só o setup desta máquina). Se o seu `PORT` for
+outro, ajuste as duas regras e os `nc` abaixo:
 
 ```powershell
-C:\Users\lucas\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:8081 tcp:8081
-C:\Users\lucas\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:3001 tcp:3001
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe reverse tcp:8081 tcp:8081
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe reverse tcp:3000 tcp:3000
 ```
 
-Teste rápido de cada elo, de dentro do emulador: `nc localhost 8081` (Metro responde
-HTTP) e `nc localhost 3001` (API responde HTTP). Se o Metro responder e a API não,
-quase sempre é a regra do 3001 que morreu.
+Teste rápido de cada elo, de dentro do emulador — o `nc` roda no Android, não no
+Windows (`-w 2` desiste após 2s; a porta tem que casar com `PORT` da API / 8081 do
+Metro):
+
+```powershell
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe shell "nc -w 2 localhost 8081"   # Metro
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe shell "nc -w 2 localhost 3000"   # API
+```
+
+**Silêncio é sucesso** (o `nc` fica aguardando dados — `Ctrl+C` para sair);
+`Connection refused` significa que a regra do reverse morreu — recrie-a. Se o Metro
+responder e a API não, quase sempre é a regra da porta da API que morreu.
 
 ### Limitações
 
