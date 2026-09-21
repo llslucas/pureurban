@@ -479,3 +479,10 @@ comparativa em vez de afirmação de viabilidade sem controle.
     azul É a camada visível do ícone; trocar por branco deixaria o ícone em branco. Arte nova
     é decisão de design (fora do escopo de código); o lock do `app.json` nega os hexes
     antigos no config, mas os binários de asset ficaram.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-7-development-build-android-para-validacao-nativa.md`
+  summary: Story técnica para os 3 erros pré-existentes de `tsc --noEmit` no mobile (scan.tsx:315, use-trip-gps-capture.test.tsx:92, tracking-stream.service.test.ts:172), provados no baseline dd73585 durante a 1.7.
+  evidence: Achado do review da 1.7 (blind-hunter #13); hoje o portão tsc do mobile exige "zero regressão vs. baseline" em vez de "0 erros", mascarando regressões futuras que pousem em cima dos mesmos padrões.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-7-development-build-android-para-validacao-nativa.md`
+  summary: Regenerar `_bmad-output/implementation-artifacts/epic-1-context.md` (gerado antes da 1.7 abrir: status da 1.7 stale e frase "Drift check no guarda o contrato." possivelmente truncada da origem).
+  evidence: Achado do review da 1.7 (blind-hunter #12 / edge-case #6); o próprio arquivo avisa "Regenerate with compile-epic-context if planning docs change" — basta recompilar com os docs atuais.
