@@ -11,7 +11,7 @@ O projeto tem **dois** ambientes, e nenhum deles é o Expo Go — o app depende 
 | Ambiente | Comando | Para quê |
 |---|---|---|
 | **Alvo web** (Story 1.6) | `npm run web` | Desenvolvimento e verificação do dia a dia |
-| **Development build Android** (Story 1.7) | ver a Story 1.7 | Validação nativa: push, GPS em background, Tier 2 real |
+| **Development build Android** (Story 1.7) | [seção abaixo](#development-build-android) | Validação nativa: MMKV/SQLite nativos, câmera real, boot (NFR5), NFR18–NFR20 |
 
 As telas do produto são alcançáveis (shell de navegação da Story 1.8). O ponto de
 entrada roteia por papel: `DRIVER` cai em `/(driver)/trip`, `STUDENT` em
@@ -122,6 +122,136 @@ Além dos headers, o servidor precisa de **rewrite catch-all para `/index.html`*
 `app.json` usa `web.output: "single"` — é um SPA com um único HTML, não mais um
 arquivo por rota. Sem o rewrite, acesso direto ou F5 em `/scan`, `/qr-code` ou
 `/login` devolve 404.
+
+## Development build Android
+
+O APK nativo é gerado na **nuvem EAS** (`eas-cli` faz o build, nada compila na sua
+máquina — sem Android SDK/JDK local). Existem dois profiles, ambos `buildType: "apk"`
+e `distribution: "internal"` (instalável direto no emulador, sem loja e sem AAB):
+
+| Profile | `eas.json` | Para quê |
+|---|---|---|
+| `development` | `developmentClient: true` | Dia a dia: o app é um shell que carrega o bundle do Metro (`expo-dev-client`) |
+| `preview` | sem dev client | APK release de verdade — é o único que mede boot real (NFR5), pois o build de dev baixa o bundle do Metro |
+
+Expo Go **não é alvo** em nenhum passo: MMKV (Nitro Modules) não roda nele.
+
+### Pré-requisitos
+
+1. Conta Expo gratuita (o projeto usa `android.package` `com.pureurban.mobile`).
+2. `eas-cli` — já é devDependency do projeto; use `npx eas ...` dentro de `mobile/`
+   (não precisa de instalação global).
+3. Emulador no **Windows** (o dev server e a API rodam no WSL2, o emulador não):
+   `adb.exe` do Android SDK no PATH do Windows, e um AVD. Para validar tela pequena
+   (NFR20), crie no AVD Manager um device de **5" 720x1280 (~300dpi)**.
+4. API no ar (`cd ../api && npm run start:dev` com `docker compose up -d` na raiz) e
+   `mobile/.env` criado a partir de `.env.example` (para o emulador, a linha
+   `EXPO_PUBLIC_API_URL` fica **comentada** — ver nota de `adb reverse` abaixo).
+
+### Build (uma vez, ou quando a config nativa mudar)
+
+```bash
+npx eas login          # conta Expo (só uma vez por máquina)
+npx eas init           # SÓ NA PRIMEIRA VEZ — veja abaixo antes de rodar
+npx eas build -p android --profile development   # APK de validação (dev client)
+npx eas build -p android --profile preview       # APK release p/ medição de boot (NFR5)
+```
+
+O `eas init` cria o projeto EAS e grava `extra.eas.projectId` em `app.json` — commitado
+uma vez e mantido estável. **Se o seu `app.json` já tem `extra.eas.projectId`, pule o
+`eas init`**: o projeto já existe (é do dono, o `owner` em `app.json`) e rodar de novo
+criaria um projeto paralelo que você não tem acesso. Para um segundo desenvolvedor
+buildar o projeto do dono, o dono precisa convidá-lo como colaborador no dashboard EAS
+(expo.dev → projeto → Access) com a conta usada no `eas login`.
+
+O build imprime a URL do artefato. Baixe o `.apk` e instale no emulador:
+
+```bash
+adb install pureurban-<profile>.apk
+```
+
+### Rodar conectado ao dev server
+
+O emulador roda no Windows; o Metro (8081) e a API (3000) rodam no WSL2. O `adb` é o
+do Windows e o `adb reverse` faz o `localhost` do emulador alcançar o host — o
+port-forwarding de localhost do WSL2 completa o caminho:
+
+```bash
+adb reverse tcp:8081 tcp:8081   # Metro (obrigatório p/ o dev client carregar o bundle)
+adb reverse tcp:3000 tcp:3000   # API (alternativa ao fallback 10.0.2.2)
+adb reverse --list              # deve listar 8081 e 3000
+```
+
+```bash
+npx expo start --dev-client     # dentro de mobile/
+```
+
+Abra o app no emulador — ele lista o dev server, carrega o bundle e cai na tela de
+login contra a API local. **Sem `adb reverse`**, o caminho alternativo da API é o
+fallback `http://10.0.2.2:3000` (`src/utils/constants.ts`, com
+`EXPO_PUBLIC_API_URL` comentada no `.env`): `10.0.2.2` é o alias do host dentro do
+emulador. O Metro, esse sim, precisa do reverse (ou do IP de LAN do dev server).
+
+### Verificação nativa (roteiro manual)
+
+- **MMKV nativo (Nitro/mmap):** logue, force o stop do processo
+  (`adb shell am force-stop com.pureurban.mobile`), reabra — a sessão tem que estar
+  preservada, sem `localStorage` envolvido.
+- **SQLite nativo:** o banco `pureurban.db` existe no armazenamento do app (build de
+  dev é debuggable, então `run-as` funciona):
+  `adb shell "run-as com.pureurban.mobile ls files/SQLite/"` — e a fila
+  `offline_queue` responde às migrações.
+- **QR pela câmera do emulador:** o emulador aceita a webcam do host como câmera
+  (dispositivo `Webcam0` nas configurações do AVD — aponte um QR na tela) ou usa a
+  virtual scene. QR de teste: o próprio app renderiza o QR do aluno em `/qr-code`
+  (usuário STUDENT, via MSW), ou qualquer gerador com o payload da Story 3.2b.
+  Em `/scan` (DRIVER), a leitura dispara o fluxo de check-in.
+- **Ergonomia de device (NFR18–NFR20):** abra o AVD de 5" 720x1280 dos pré-requisitos
+  e percorra as telas principais com uma mão, avaliando alcance do polegar nos botões
+  primários, tamanho dos alvos de toque e contraste. São NFRs **medidos, não
+  entregues, aqui** — achados viram insumo das stories de feature, não bloqueio.
+- **Boot real (NFR5, alvo < 3s):** use o APK `preview` — build de dev baixa o bundle
+  do Metro e **não** mede boot. `adb shell am force-stop com.pureurban.mobile`, inicie
+  o app frio, confirme que a tela está operacional, então:
+  `adb logcat -d | grep -i displayed`. Registre **método + número** — mesmo que o
+  emulador não cumpra os 3s, o registro vira achado, não falha da story.
+
+### Troubleshooting — "conexão com a API caiu"
+
+As regras de `adb reverse` **não sobrevivem** a um restart do servidor adb nem a uma
+reconexão do transporte do emulador (sintomas: request com `Connection refused` /
+"Network request failed" no app, às vezes voltando a funcionar sozinho). Recrie as duas
+regras e tente de novo — vale colar no PowerShell do Windows, onde roda o `adb` que o
+emulador enxerga. A porta da API tem que casar com o `PORT` do `api/.env` — default
+**3000** (o 3001 visto antes aqui era só o setup desta máquina). Se o seu `PORT` for
+outro, ajuste as duas regras e os `nc` abaixo:
+
+```powershell
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe reverse tcp:8081 tcp:8081
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe reverse tcp:3000 tcp:3000
+```
+
+Teste rápido de cada elo, de dentro do emulador — o `nc` roda no Android, não no
+Windows (`-w 2` desiste após 2s; a porta tem que casar com `PORT` da API / 8081 do
+Metro):
+
+```powershell
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe shell "nc -w 2 localhost 8081"   # Metro
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe shell "nc -w 2 localhost 3000"   # API
+```
+
+**Silêncio é sucesso** (o `nc` fica aguardando dados — `Ctrl+C` para sair);
+`Connection refused` significa que a regra do reverse morreu — recrie-a. Se o Metro
+responder e a API não, quase sempre é a regra da porta da API que morreu.
+
+### Limitações
+
+| Limitação | Consequência |
+|---|---|
+| Build na nuvem EAS | Consome os créditos do plano gratuito; requer `eas login` |
+| `extra.eas.projectId` em `app.json` | Identidade do projeto EAS — comitada uma vez e mantida estável |
+| Nada de iOS | Sem conta Apple, sem macOS, sem signing iOS |
+| Nada de loja | Sem Play Console, sem AAB, sem CI — APK `internal` distribution only |
 
 ## Convenções
 
