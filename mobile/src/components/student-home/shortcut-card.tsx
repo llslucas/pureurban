@@ -60,8 +60,10 @@ const styles = StyleSheet.create({
   slot: {
     flex: 1,
   },
+  // Grows with the slot so a label wrapping in one card keeps both the same height.
   card: {
     ...elevation.level1,
+    flexGrow: 1,
     minHeight: SHORTCUT_HEIGHT,
     borderRadius: radius.lg,
     padding: spacing[4],
