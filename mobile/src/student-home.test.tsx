@@ -743,4 +743,100 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     expect(queryClient.getQueryData(statusKey)).toEqual(STATUS_ABSENT)
     expect(screen.getByText('Ausência registrada')).toBeTruthy()
   })
+
+  it('notify: a status GET in flight during the POST does not overwrite the outcome', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    const held = deferred<StudentBoardingStatusResponse>()
+    mockBoarding.getMyStatus.mockReturnValueOnce(held.promise)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+
+    renderScreen()
+
+    fireEvent.press(await openDialog())
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+
+    // The GET that started before the POST lands with the pre-POST state.
+    await act(async () => {
+      held.resolve(STATUS_PENDING)
+      await held.promise
+    })
+
+    expect(queryClient.getQueryData(statusKey)).toEqual(STATUS_ABSENT)
+    expect(screen.getByText('Ausência registrada')).toBeTruthy()
+  })
+
+  it('cancel: a status GET in flight during the POST does not overwrite the outcome', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus.mockResolvedValue(STATUS_ABSENT)
+    mockBoarding.cancelAbsence.mockResolvedValue(CANCELLATION)
+
+    renderScreen()
+
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+
+    // A poll starts and stays open while the student cancels.
+    const held = deferred<StudentBoardingStatusResponse>()
+    mockBoarding.getMyStatus.mockReturnValueOnce(held.promise)
+    void queryClient.refetchQueries({ queryKey: statusKey })
+    await waitFor(() => expect(mockBoarding.getMyStatus).toHaveBeenCalledTimes(2))
+
+    fireEvent.press(screen.getByText('Cancelar'))
+    expect(await screen.findByText('Não vou voltar')).toBeTruthy()
+
+    await act(async () => {
+      held.resolve(STATUS_ABSENT)
+      await held.promise
+    })
+
+    expect(queryClient.getQueryData(statusKey)).toEqual(STATUS_PENDING)
+    expect(screen.queryByText('Ausência registrada')).toBeNull()
+  })
+
+  it('ignores a status that belongs to another trip', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus.mockResolvedValue({
+      ...STATUS_CHECKED_IN,
+      tripId: 'trip-return-2',
+    })
+
+    renderScreen()
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(statusKey)?.status).toBe('success'),
+    )
+    expect(screen.queryByText('Embarque confirmado')).toBeNull()
+    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByText('Não vou voltar')).not.toBeDisabled(),
+    )
+  })
+
+  it('polling brings the reminder banner without a remount', async () => {
+    jest.useFakeTimers()
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getPendingReminder
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(REMINDER)
+
+    renderScreen()
+
+    await waitFor(() =>
+      expect(mockBoarding.getPendingReminder).toHaveBeenCalledTimes(1),
+    )
+    expect(screen.queryByText(/ainda não confirmou o retorno/)).toBeNull()
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15_000)
+    })
+
+    expect(await screen.findByText(/ainda não confirmou o retorno/)).toBeTruthy()
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
