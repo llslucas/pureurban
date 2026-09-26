@@ -262,7 +262,7 @@ development_status:
   6-2-componentes-base-de-estado-e-acao: done # FECHADO em 26/09/2026 (PR #57); plan-6-2 done
   6-3-cabecalho-padrao-e-saida-da-conta: done # FECHADO em 26/09/2026 (PR #59); plan-6-3 done
   6-4-redesign-login: done # FECHADO em 26/09/2026 (PR #61); plan-6-4 done
-  6-5-redesign-viagem-do-motorista: review # plan-6-5 built em 26/09/2026; aguarda PR
+  6-5-redesign-viagem-do-motorista: done # FECHADO em 26/09/2026 (PR #62); plan-6-5 done
   6-6-redesign-escanear-qr: backlog
   6-7-redesign-alunos-da-viagem: backlog
   6-8-redesign-inicio-do-aluno: backlog
