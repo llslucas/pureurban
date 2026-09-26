@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { View } from 'react-native'
 import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
+import { setupAppFocus } from '@/lib/app-focus'
 import { initializeDatabase } from '@/lib/database'
 import { registerOfflineQueueLifecycle } from '@/lib/offline-queue-lifecycle'
 import { mmkvPersister } from '@/lib/mmkv-persister'
@@ -38,6 +39,8 @@ export default function RootLayout() {
     // parte de qualquer tela e o storage por baixo espera o banco abrir sozinho.
     return registerOfflineQueueLifecycle()
   }, [])
+
+  useEffect(() => setupAppFocus(), [])
 
   useEffect(() => {
     if (!MOCKS_ENABLED) return
