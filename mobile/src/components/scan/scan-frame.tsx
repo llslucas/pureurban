@@ -106,11 +106,15 @@ const styles = StyleSheet.create({
     // "moldura" virava uma fenda horizontal de ponta a ponta. O `stretch`
     // padrão faz os painéis acompanharem a altura da janela.
     justifyContent: 'center',
+    // Same overhang, below: keeps the bottom corners above the hint panel.
+    zIndex: 1,
   },
   window: {
     // Sem fundo: é o recorte por onde a câmera aparece.
     backgroundColor: 'transparent',
-    overflow: 'visible',
+    // The corners overhang the window by their stroke; without this the right
+    // mask panel, painted later, covers that overhang.
+    zIndex: 1,
   },
   line: {
     position: 'absolute',
