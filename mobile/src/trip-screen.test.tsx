@@ -13,6 +13,7 @@ import type { LocationPermissionResponse } from 'expo-location'
 import { useTripGpsCapture } from '@/hooks/use-trip-gps-capture'
 import { TEST_INSETS } from '@/components/ui/test-utils'
 import { lightTheme } from '@/lib/theme'
+import { activeTripKey } from '@/lib/trip-queries'
 
 // Lives at src/ root, not src/app/: Expo Router turns every file under src/app/
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap and
@@ -447,6 +448,35 @@ describe('TripScreen — redesign (story 6.5)', () => {
     await waitFor(() => expect(endDialogVisible()).toBe(false))
     expect(mockTrip.endTrip).not.toHaveBeenCalled()
     expect(screen.getByText('Escanear QR Code')).toBeTruthy()
+  })
+
+  it('a trip swapped by a refetch while the dialog is open does not open it on the next trip', async () => {
+    const first = makeTrip()
+    mockTrip.getActiveTrip.mockResolvedValue(first)
+
+    renderScreen()
+
+    fireEvent.press(await screen.findByText('Encerrar Viagem'))
+    await waitFor(() => expect(endDialogVisible()).toBe(true))
+
+    act(() => {
+      queryClient.setQueryData(activeTripKey, {
+        ...first,
+        status: 'COMPLETED',
+        endedAt: '2026-09-06T10:00:00.000Z',
+      })
+    })
+    expect(await screen.findByText('Iniciar Retorno')).toBeTruthy()
+
+    act(() => {
+      queryClient.setQueryData(
+        activeTripKey,
+        makeTrip({ id: 'trip-return-1', type: 'RETURN', relatedTripId: first.id }),
+      )
+    })
+    expect(await screen.findByText('Encerrar Viagem')).toBeTruthy()
+    expect(endDialogVisible()).toBe(false)
+    expect(mockTrip.endTrip).not.toHaveBeenCalled()
   })
 
   it('end trip error: current Alert and the dialog closes', async () => {

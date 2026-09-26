@@ -34,7 +34,9 @@ function resolveRouteId(
 export default function TripScreen() {
   const queryClient = useQueryClient()
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
-  const [confirmEndVisible, setConfirmEndVisible] = useState(false)
+  // Keyed by trip id: a refetch that swaps the trip must not carry the dialog
+  // over to the next ACTIVE trip.
+  const [confirmEndTripId, setConfirmEndTripId] = useState<string | null>(null)
 
   const {
     data: activeTrip,
@@ -161,13 +163,12 @@ export default function TripScreen() {
     }
   }, [startMutation, activeTrip])
 
-  // The dialog closes on both outcomes: on error the Alert takes over, and a
-  // dialog left open would pop back up on the next active trip.
+  // The dialog closes on both outcomes: on error the Alert takes over.
   const handleEnd = useCallback(() => {
     if (activeTrip) {
       endMutation.mutate(activeTrip.id, {
-        onSuccess: () => setConfirmEndVisible(false),
-        onError: () => setConfirmEndVisible(false),
+        onSuccess: () => setConfirmEndTripId(null),
+        onError: () => setConfirmEndTripId(null),
       })
     }
   }, [endMutation, activeTrip])
@@ -282,11 +283,11 @@ export default function TripScreen() {
       testID="trip-screen"
       footer={
         <ActiveTripActions
-          // Contagem de toques da NFR19: o login leva o motorista direto a esta
-          // tela (0 toques) → 1 toque aqui → câmera aberta. `navigate`, não
-          // `push`: dois toques rápidos empilhavam duas telas, cada uma com sua câmera.
+          // NFR19 tap count: login lands the driver here (0 taps) → 1 tap →
+          // camera open. `navigate`, not `push`: two quick taps stacked two
+          // screens, each with its own camera.
           onScan={() => router.navigate('/(driver)/scan')}
-          onEnd={() => setConfirmEndVisible(true)}
+          onEnd={() => setConfirmEndTripId(activeTrip.id)}
           disabled={isMutating}
         />
       }
@@ -300,7 +301,7 @@ export default function TripScreen() {
           startedAt={activeTrip.startedAt}
         />
         {permissionCard}
-        {/* `navigate`, não `push` (finding da 3.2b). */}
+        {/* `navigate`, not `push` (story 3.2b finding). */}
         <TripLinkRow
           icon="account-group"
           label="Alunos da Viagem"
@@ -310,14 +311,14 @@ export default function TripScreen() {
         />
       </View>
       <ConfirmDialog
-        visible={confirmEndVisible}
+        visible={confirmEndTripId === activeTrip.id}
         title="Encerrar viagem?"
         message="A viagem é concluída, a posição do ônibus deixa de ser enviada aos alunos e novos embarques não entram nela. Não dá para desfazer."
         confirmLabel="Encerrar"
         destructive
         loading={endMutation.isPending}
         onConfirm={handleEnd}
-        onDismiss={() => setConfirmEndVisible(false)}
+        onDismiss={() => setConfirmEndTripId(null)}
         testID="end-trip-dialog"
       />
     </Screen>
