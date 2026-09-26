@@ -37,13 +37,10 @@ const HIDE_EVENT = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide
 const HERO_SHARE = 0.38
 const HERO_ICON_SIZE = 56
 // Icon + wordmark only: the tagline is what gives way to the keyboard.
-const HERO_COMPACT_CONTENT =
-  HERO_ICON_SIZE + spacing[2] + typography.headline.lineHeight + spacing[5] * 2
+const HERO_COMPACT_FIXED = HERO_ICON_SIZE + spacing[2] + spacing[5] * 2
 const TAGLINE_HEIGHT = spacing[1] + typography.body.lineHeight
 // A ceiling, not a height, so a scaled-up font isn't clipped when expanded.
 const TAGLINE_MAX_HEIGHT = TAGLINE_HEIGHT * 3
-// Paper's TextInput.Icon is a 40dp IconButton; widen the target to 48dp.
-const EYE_HIT_SLOP = { top: 4, right: 4, bottom: 4, left: 4 }
 
 function useKeyboardOpen() {
   const [open, setOpen] = useState(() => Keyboard.isVisible())
@@ -89,7 +86,7 @@ export default function LoginScreen() {
   const { login } = useAuthStore()
 
   const insets = useSafeAreaInsets()
-  const { height: windowHeight } = useWindowDimensions()
+  const { height: windowHeight, fontScale } = useWindowDimensions()
   const reducedMotion = useReducedMotion()
   const keyboardOpen = useKeyboardOpen()
   const compact = useSharedValue(keyboardOpen ? 1 : 0)
@@ -100,8 +97,13 @@ export default function LoginScreen() {
     })
   }, [compact, keyboardOpen, reducedMotion])
 
-  const compactHeight = insets.top + HERO_COMPACT_CONTENT
-  const fullHeight = Math.max(windowHeight * HERO_SHARE, compactHeight + TAGLINE_HEIGHT)
+  // Text grows with the system font scale; the hero clips, so its floor must too.
+  const compactHeight =
+    insets.top + HERO_COMPACT_FIXED + typography.headline.lineHeight * fontScale
+  const fullHeight = Math.max(
+    windowHeight * HERO_SHARE,
+    compactHeight + spacing[1] + typography.body.lineHeight * fontScale,
+  )
 
   const heroStyle = useAnimatedStyle(() => ({
     height: interpolate(compact.value, [0, 1], [fullHeight, compactHeight]),
@@ -121,7 +123,6 @@ export default function LoginScreen() {
 
     setIsLoading(true)
     try {
-      // Normalize email to lowercase before sending to backend
       const result = await authService.login(email.trim().toLowerCase(), password)
 
       tokenStorage.setAccessToken(result.accessToken)
@@ -201,7 +202,7 @@ export default function LoginScreen() {
                   icon={passwordVisible ? 'eye-off' : 'eye'}
                   onPress={() => setPasswordVisible((v) => !v)}
                   accessibilityLabel={passwordVisible ? 'Ocultar senha' : 'Mostrar senha'}
-                  hitSlop={EYE_HIT_SLOP}
+                  disabled={isLoading}
                 />
               }
             />
