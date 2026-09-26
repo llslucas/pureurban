@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "20-09-2026 23:35"
+last_updated: "26-09-2026"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -251,6 +251,28 @@ development_status:
   5-2-acompanhamento-do-onibus-em-tempo-real: done
   5-3-e2e-do-epico-5: done
   epic-5-retrospective: done
+
+  # === Epic 6: Redesign da Interface Mobile ===
+  # Criado em 26/09/2026 (Fase 2 do PRD, "Polish de UX"). Spec de UX aprovada:
+  # planning-artifacts/ux-designs/ux-pureurban-2026-09-26/ (DESIGN.md + EXPERIENCE.md,
+  # decisões D-UX-1..13). Visual + microinterações, fluxos intactos (exceções: Sair e
+  # confirmação de Encerrar viagem). Marco = 6.12, antes da defesa; 6.13/6.14 opcionais.
+  epic-6: backlog
+  6-1-tokens-tema-paper-e-dependencias-de-marca: backlog
+  6-2-componentes-base-de-estado-e-acao: backlog
+  6-3-cabecalho-padrao-e-saida-da-conta: backlog
+  6-4-redesign-login: backlog
+  6-5-redesign-viagem-do-motorista: backlog
+  6-6-redesign-escanear-qr: backlog
+  6-7-redesign-alunos-da-viagem: backlog
+  6-8-redesign-inicio-do-aluno: backlog
+  6-9-redesign-meu-qr-code: backlog
+  6-10-redesign-acompanhar-onibus: backlog
+  6-11-polimento-de-estados: backlog
+  6-12-gate-visual-da-demo: backlog
+  6-13-redesign-minhas-rotas-e-admin: backlog # P2 opcional, pós-marco
+  6-14-consumo-do-tema-escuro: backlog # P2 opcional, pós-defesa
+  epic-6-retrospective: optional
 
 action_items:
   # === Specs de execução do wrap pós-MVP (12/09/2026) — _bmad-output/implementation-artifacts/ ===

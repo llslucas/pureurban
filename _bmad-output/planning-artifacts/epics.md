@@ -152,7 +152,7 @@ This document provides the complete epic and story breakdown for PureUrban, deco
 
 ### UX Design Requirements
 
-Nenhum documento de UX Design foi encontrado. Requisitos de UX derivados dos NFRs do PRD (NFR18-NFR20) e das decisões de Architecture (React Native Paper, Zustand stores por domínio).
+**Atualização 26/09/2026:** a especificação de UX existe desde o Épico 6 — `ux-designs/ux-pureurban-2026-09-26/` (`DESIGN.md` + `EXPERIENCE.md`). Até então: nenhum documento de UX Design foi encontrado. Requisitos de UX derivados dos NFRs do PRD (NFR18-NFR20) e das decisões de Architecture (React Native Paper, Zustand stores por domínio).
 
 ### FR Coverage Map
 
@@ -215,6 +215,10 @@ Aluno pode avisar "não vou voltar" com um toque, motorista recebe instantaneame
 ### Epic 5: Localização em Tempo Real
 Aluno acompanha o ônibus em tempo real — última posição conhecida com distância e tempo estimado até seu ponto — e o motorista transmite GPS automaticamente durante as viagens. Ansiedade de espera no ponto eliminada.
 **FRs cobertos:** FR31, FR32, FR33, FR34, FR35
+
+### Epic 6: Redesign da Interface Mobile
+Design system e redesign visual + microinterações das telas da demo, sem mudar fluxos — o app deixa de parecer protótipo e cumpre de fato a usabilidade em campo. Fase 2 do PRD ("Polish de UX"), criado em 26/09/2026.
+**FRs cobertos:** Nenhum novo (qualidade de experiência) · **NFRs:** NFR13, NFR18, NFR19, NFR20
 
 ---
 
@@ -1096,6 +1100,294 @@ Para que o épico seja considerado entregue de fato.
 **Cobertura do épico: 5/5 FRs (FR31–FR35).**
 
 ---
+## Epic 6: Redesign da Interface Mobile
+
+O app funciona, mas parece amador: cada tela inventa o próprio estilo, emojis viram caixas vazias,
+o card da viagem mostra UUID e o motorista não lê o status de relance sob o sol. Este épico entrega
+um design system e redesenha as telas da demo — **visual + microinterações, sem mudar fluxos** —
+para que o app pareça produto diante da banca do TCC e cumpra de fato os NFR13 e NFR18–NFR20.
+
+**Origem:** Fase 2 do PRD ("Polish de UX e tratamento de edge cases"). Especificação de UX
+aprovada em 26/09/2026: `planning-artifacts/ux-designs/ux-pureurban-2026-09-26/DESIGN.md` e
+`EXPERIENCE.md` (decisões D-UX-1 a D-UX-13 registradas no fim do `EXPERIENCE.md`).
+
+**Composição:** 14 stories — 3 de fundação, 7 de tela (P0), 1 de polimento (P1), 1 gate da demo
+e 2 opcionais pós-marco (P2). **Prazo:** o marco (Story 6.12) fecha antes da defesa; 6.13 e 6.14
+só entram se sobrar tempo.
+
+**Regras que valem para todas as stories deste épico:**
+
+- **Fluxos e navegação não mudam.** Únicas exceções aprovadas: "Sair" para motorista e aluno
+  (D-UX-5, Story 6.3) e confirmação em "Encerrar viagem" (D-UX-7, Story 6.5). "Minhas rotas"
+  continua sem entrada (D-UX-6 recusada).
+- **Contrato de teste preservado:** todo texto visível, nome acessível, `id`/`testID` e
+  `accessibilityRole` usados pelos testes Jest e Playwright permanecem idênticos. Se uma mudança
+  de copy for inevitável (ex.: remover emoji), a story adiciona `testID` primeiro e atualiza Jest
+  e e2e **no mesmo PR**.
+- **Nenhum hex fora de `lib/palette.ts`**; telas consomem `theme.colors`/`theme.custom` via
+  `useTheme<AppTheme>()` — nunca `lightPalette` direto. A guarda `palette.guard.test.ts` continua
+  verde e é atualizada na mesma story que mudar token.
+- **Dependências nativas só na Story 6.1** (uma única rebuild do dev build).
+- **Evidência visual:** cada story de tela anexa capturas "antes/depois" dos estados listados no
+  `EXPERIENCE.md`, no alvo web (390×844), com os mocks do app.
+- Tema claro apenas (D-UX-4); o `darkTheme` não é consumido antes da Story 6.14.
+- **Guarda-corpo:** story acima de ~8 ACs ou ~15 arquivos é dividida. Telas grandes (`scan.tsx`,
+  `trip.tsx`) começam com um commit de extração de componentes **sem mudança de comportamento**,
+  com a suíte verde, antes do restyle.
+
+### Story 6.1: Tokens, Tema Paper e Dependências de Marca
+
+Como desenvolvedor,
+Quero uma fonte única de tokens e um tema Paper tipado,
+Para que todas as telas do redesign consumam o mesmo vocabulário visual.
+
+**Acceptance Criteria:**
+
+**Given** o `DESIGN.md` aprovado
+**When** implemento a fundação
+**Then** `lib/tokens.ts` define escala tipográfica, spacing, radius, elevation e motion conforme o `DESIGN.md`
+**And** `lib/theme.ts` exporta `AppTheme` (MD3 + `configureFonts` com Inter + `custom: { spacing, radius, motion }`) e o `useTheme<AppTheme>()` tipado
+**And** os fundos divergentes (`#fffbfe`, `#f2f2f2`) somem: `background`/`surface` usam os papéis `surface-soft`/`canvas`, e o tema do React Navigation é alinhado
+**And** o amarelo-escolar é adotado como papel de marca full-bleed (D-UX-1) e a guarda de paleta é atualizada
+**And** `@expo-google-fonts/inter` e `expo-haptics` são instalados (D-UX-2, D-UX-3) e o dev build Android é regenerado uma única vez
+**And** `app.json` passa a se chamar "PureUrban", com ícone e splash de marca (D-UX-11)
+**And** o código morto do template (`Colors` em `constants/theme.ts`, `hooks/use-theme.ts` sem consumidores) é removido ou substituído
+**And** nenhuma tela muda visualmente além do fundo e da fonte; suíte Jest e e2e verdes
+
+**Camada:** Mobile · **Depende de:** — · **NFRs:** habilitador (NFR18)
+
+### Story 6.2: Componentes Base de Estado e Ação
+
+Como desenvolvedor,
+Quero componentes compartilhados para os padrões que hoje são copiados entre telas,
+Para que o redesign de cada tela seja composição, não reinvenção.
+
+**Acceptance Criteria:**
+
+**Given** a fundação da 6.1
+**When** crio `components/ui/`
+**Then** existem `Screen`, `PrimaryAction`, `StickyActionBar`, `StatusChip`, `StateView` (loading/empty/error/blocked), `Skeleton`, `Banner` e `ConfirmDialog`, com os estados definidos no `EXPERIENCE.md`
+**And** alvos de toque ≥ 48dp (ações principais 56dp) e contraste AA nos textos de status
+**And** as três cópias de `Loading` (`scan`, `student-list`, `track-bus`) e de `Centered`/`Blocked` são substituídas por `StateView`, **sem mudança de texto**
+**And** `StatusChip` mapeia os estados do aluno como no código: embarcou = verde, não vai voltar = âmbar, aguardando = neutro (D-UX-12)
+**And** cada componente tem teste de render (Jest) cobrindo seus estados
+**And** ícones são desenhados (MaterialCommunityIcons do Paper), nunca emoji ou glifo de texto
+
+**Camada:** Mobile · **Depende de:** 6.1 · **NFRs:** NFR18, NFR20
+
+### Story 6.3: Cabeçalho Padrão e Saída da Conta
+
+Como motorista ou aluno,
+Quero um cabeçalho consistente com a opção de sair da conta,
+Para que eu consiga trocar de usuário sem limpar os dados do app.
+
+**Acceptance Criteria:**
+
+**Given** qualquer tela dos grupos `(driver)` e `(student)`
+**When** ela é exibida
+**Then** o cabeçalho segue o `AppHeader` do `DESIGN.md` via `screenOptions` dos `_layout`, e os títulos H1 duplicados sob o header são removidos
+**And** um menu de overflow oferece "Sair" (D-UX-5)
+**And** ao sair, a sessão é encerrada por `useAuthStore().logout()` — o mesmo caminho do admin e do refresh rejeitado — e o app volta ao login
+**And** como o logout purga a fila offline (D5/AC7 da spec-wrap-5), se houver check-ins pendentes um `ConfirmDialog` avisa que eles serão descartados antes de sair
+**And** teste Jest cobre o logout e o aviso de fila pendente
+
+**Camada:** Mobile · **Depende de:** 6.2 · **FRs:** exceção de fluxo aprovada (D-UX-5)
+
+### Story 6.4: Redesign — Login
+
+Como usuário,
+Quero uma tela de entrada com identidade clara,
+Para que o primeiro contato com o app transmita confiança.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Login — P0" do `EXPERIENCE.md`
+**When** abro o app sem sessão
+**Then** vejo o hero amarelo com ícone de ônibus, o wordmark "PureUrban" e a tagline
+**And** o formulário tem e-mail, senha com botão de mostrar (48dp) e "Entrar" (56dp)
+**And** o erro de validação aparece em `Banner` de erro inline, acima do botão
+**And** com o teclado aberto, o formulário sobe e o hero encolhe
+**And** os ids `#login-email`, `#login-password` e `#login-submit` e os textos usados pelos testes são preservados
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0
+
+### Story 6.5: Redesign — Viagem do Motorista
+
+Como motorista,
+Quero ver o estado da viagem e a contagem de embarque de relance,
+Para que eu opere com uma mão, em movimento, sem ler texto miúdo.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Motorista › Viagem — P0"
+**When** abro a tela com viagem ativa
+**Then** o `TripCard` mostra tipo de viagem, **nome da rota** (nunca UUID), `StatusChip` "Em andamento", `BoardingCounter` grande e "Iniciada às HH:MM"
+**And** "Escanear QR" fica na `StickyActionBar` como ação primária; "Ver alunos da viagem" vira item de lista de 56dp
+**And** "Encerrar viagem" sai do destaque (secundário, vermelho) e pede confirmação em `ConfirmDialog` (D-UX-7); o e2e do Playwright é atualizado para confirmar
+**And** os estados "sem viagem", "ida concluída" e "turma vazia" usam `StateView`/`TripCard` conforme a especificação
+**And** o primeiro commit extrai os blocos de `trip.tsx` em componentes sem mudança de comportamento, com a suíte verde
+**And** o emoji de "✅ Concluída" é substituído por ícone, com o e2e `tracking-live` atualizado no mesmo PR
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0 · **NFRs:** NFR18, NFR19
+
+### Story 6.6: Redesign — Escanear QR (Clímax da Demo)
+
+Como motorista,
+Quero feedback imediato e inconfundível a cada leitura,
+Para que eu saiba sem olhar duas vezes se o aluno embarcou.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Motorista › Escanear — P0" e a Tabela de Verdade da Story 3.3b
+**When** escaneio um QR
+**Then** o `ScanResultOverlay` mostra o **nome do aluno**, ícone do tom, barra regressiva e dispara háptico de sucesso/aviso/erro (`expo-haptics`), mapeado a partir de `utils/scan-feedback.ts`
+**And** o `ScanHud` mostra o contador da viagem "X/Y embarcados" a partir do roster em cache (D-UX-8) e o atalho "Ver lista" (48dp)
+**And** o `ScanFrame` tem moldura com linha de varredura animada (Reanimated) e dica de enquadramento
+**And** tons, códigos e regras de repetição da 3.3b ficam inalterados — só a apresentação muda
+**And** estados bloqueados (sem viagem, sem permissão de câmera) usam `StateView`/`PermissionCard`
+**And** o primeiro commit extrai overlay e estados bloqueados de `scan.tsx` sem mudança de comportamento
+**And** o overlay âmbar atinge contraste com tipo grande (D-UX-9)
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0 · **NFRs:** NFR1, NFR18
+
+### Story 6.7: Redesign — Alunos da Viagem
+
+Como motorista,
+Quero a lista de embarque legível e com totais claros,
+Para que eu saiba quem falta sem contar linha a linha.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Motorista › Alunos da viagem — P0"
+**When** abro a lista
+**Then** um cabeçalho fixo mostra o `BoardingCounter` e a mini-legenda ("N embarcaram · N não vão voltar · N aguardando")
+**And** cada aluno é um `StudentRow` com avatar de iniciais e `StatusChip` com ícone; a ordem do servidor é mantida
+**And** uma mudança recebida por SSE faz a linha pulsar (Reanimated), mantendo o Snackbar atual
+**And** o banner de dado desatualizado e o estado vazio usam `Banner`/`StateView`
+**And** a lista de 60 alunos continua dentro do NFR4
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0 · **NFRs:** NFR4, NFR13
+
+### Story 6.8: Redesign — Início do Aluno
+
+Como aluno,
+Quero um painel do dia em vez de uma pilha de botões,
+Para que eu veja meu status e chegue ao que preciso em um toque.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Aluno › Início — P0"
+**When** abro o início
+**Then** vejo a saudação alinhada à esquerda e um cartão de status da viagem com `StatusChip` (aguardando / embarcou / não vai voltar) e horário
+**And** "Meu QR" e "Onde está o ônibus" são dois cartões tocáveis lado a lado (112dp), com espaçamento entre eles
+**And** o lembrete "E a volta?" aparece como `Banner` de aviso quando existe
+**And** "Não vou voltar" fica como ação secundária na `StickyActionBar`, ainda em no máximo 2 toques (NFR19)
+**And** ausência registrada mostra o cartão com `CountdownPill` e "Desfazer"
+**And** os textos usados pelos testes Jest da home (94 consultas por texto) são preservados ou migrados para `testID` no mesmo PR
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0 · **NFRs:** NFR19
+
+### Story 6.9: Redesign — Meu QR Code
+
+Como aluno,
+Quero um "cartão de embarque" com meu QR,
+Para que o motorista me escaneie rápido e a tela transmita identidade.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Aluno › Meu QR Code — P0"
+**When** abro o QR
+**Then** o `QrPass` mostra faixa amarela com ícone, nome e rota, o QR no tamanho atual com quiet zone intacta e o rodapé "Mostre ao motorista"
+**And** os estados de rota (carregando/erro/sem rota) aparecem como linha discreta dentro da faixa
+**And** sessão inválida usa `StateView` bloqueado
+**And** o QR continua sendo lido pelo scanner do motorista (verificado no alvo web)
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0
+
+### Story 6.10: Redesign — Acompanhar Ônibus
+
+Como aluno,
+Quero ver em quanto tempo o ônibus chega, não coordenadas,
+Para que eu decida quando sair de casa.
+
+**Acceptance Criteria:**
+
+**Given** a especificação "Aluno › Acompanhar ônibus — P0"
+**When** há viagem ativa com posição
+**Then** o `BusEtaCard` herói mostra ETA ("~8 min"), distância e chip "Ao vivo" ou "Sem sinal GPS há N min"
+**And** a última posição e a precisão aparecem em legenda; coordenadas brutas saem do herói
+**And** aguardando, sem viagem e erro usam `StateView`; permissão de localização negada usa `PermissionCard`
+**And** o comportamento de SSE e fallback da Story 5.2 não muda
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P0 · **NFRs:** NFR2
+
+### Story 6.11: Polimento de Estados (P1)
+
+Como usuário,
+Quero estados de carregamento, offline e permissão consistentes em todas as telas,
+Para que o app nunca pareça quebrado nos momentos intermediários.
+
+**Acceptance Criteria:**
+
+**Given** as telas P0 redesenhadas
+**When** estão carregando, offline ou sem permissão
+**Then** usam `Skeleton` no lugar de spinners genéricos
+**And** o `OfflineBanner` é restilizado mantendo o texto do NFR13, o `testID` `offline-banner-dismiss` e `role=alert`
+**And** as solicitações de permissão (câmera, localização) usam `PermissionCard`
+**And** `+not-found` segue os tokens
+
+**Camada:** Mobile · **Depende de:** 6.5–6.10 · **Prioridade:** P1 · **NFRs:** NFR13
+
+### Story 6.12: Gate Visual da Demo (Marco do Épico)
+
+Como autor do TCC,
+Quero o redesign verificado ponta a ponta e documentado,
+Para que a demo e a monografia mostrem o "antes/depois" com evidência.
+
+**Acceptance Criteria:**
+
+**Given** as stories 6.1–6.11 concluídas
+**When** rodo o gate
+**Then** lint, Jest (mobile e API), supertest, `pw:api` e `pw:e2e` estão verdes, com os NFRs de performance dentro do budget
+**And** as 25 capturas "depois" são geradas nos mesmos estados das capturas `audit/` (antes) e versionadas lado a lado (D-UX-13)
+**And** os fluxos da demo (embarque na ida, partida da volta, "onde está o ônibus", "não vou voltar") são percorridos no alvo web e no dev build Android (fonte Inter, háptico, ícone e splash conferidos em device)
+**And** nenhum hex fora da paleta e nenhum import de `lightPalette` em telas (verificado por busca)
+
+**Camada:** Verificação · **Depende de:** 6.1–6.11 · **Marco demonstrável do épico**
+
+### Story 6.13 (P2, opcional): Redesign — Minhas Rotas e Painel Admin
+
+Como motorista ou administrador,
+Quero as telas secundárias no mesmo padrão visual,
+Para que nenhuma tela destoe do resto.
+
+**Acceptance Criteria:**
+
+**Given** a seção P2 do `EXPERIENCE.md`
+**When** as telas são redesenhadas
+**Then** "Minhas rotas" usa `RouteCard` (nome, origem → destino com ícone, descrição sem itálico), **sem ganhar entrada nova** (D-UX-6 recusada)
+**And** o painel admin mostra `StateView` "Em breve" com a marca
+
+**Camada:** Mobile · **Depende de:** 6.2 · **Prioridade:** P2 (pós-marco)
+
+### Story 6.14 (P2, opcional): Consumo do Tema Escuro
+
+Como usuário,
+Quero que o app siga o tema escuro do sistema,
+Para que eu use o app à noite sem ofuscamento.
+
+**Acceptance Criteria:**
+
+**Given** a trava de tema claro (spec-1-11b, D-UX-4)
+**When** a trava é removida
+**Then** o provider escolhe o tema pelo esquema do sistema e `app.json` passa a `userInterfaceStyle: "automatic"`
+**And** os papéis de status ganham variantes on-dark com contraste AA, com a guarda de paleta atualizada
+**And** todas as telas P0 são verificadas em claro e escuro
+
+**Camada:** Mobile · **Depende de:** 6.12 · **Prioridade:** P2 (pós-defesa)
+
+---
+
 ## Validação de Cobertura Total
 
 | Épico | FRs cobertos | Qtd |
@@ -1105,6 +1397,7 @@ Para que o épico seja considerado entregue de fato.
 | Epic 3 | FR11–FR25 | 15 |
 | Epic 4 | FR26–FR30 | 5 |
 | Epic 5 | FR31–FR35 | 5 |
+| Epic 6 | Nenhum novo (NFR13, NFR18–NFR20) | 0 |
 | **Total MVP** | | **35/37** |
 | **Diferido (Fase 2)** | FR36, FR37 | 2 |
 
