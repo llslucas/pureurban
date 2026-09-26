@@ -236,6 +236,7 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × overlay de erro', fg: lightPalette.onPrimary, bg: lightPalette.error, min: 4.5 },
   { desc: 'onPrimary × overlay Verificando (tinta)', fg: lightPalette.onPrimary, bg: lightPalette.primary, min: 4.5 },
   { desc: 'onPrimary × faixa offline (body)', fg: lightPalette.onPrimary, bg: lightPalette.textBody, min: 4.5 },
+  { desc: 'onBrand × brand (superfície full-bleed, D-UX-1)', fg: lightPalette.onBrand, bg: lightPalette.brand, min: 4.5 },
 ]
 
 const DARK_PAIRS: ColorPair[] = [
@@ -246,6 +247,7 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × botão primário branco em dark', fg: darkPalette.onPrimary, bg: darkPalette.primary, min: 4.5 },
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
+  { desc: 'onBrand × brand em dark', fg: darkPalette.onBrand, bg: darkPalette.brand, min: 4.5 },
 ]
 
 // ---- Helpers dos render-probes ----
@@ -383,6 +385,13 @@ describe('contraste AA dos pares dos temas', () => {
 })
 
 describe('lock de binding dos temas Paper', () => {
+  it('brand é o amarelo-escolar com texto tinta, igual nos dois temas (D-UX-1)', () => {
+    for (const palette of [lightPalette, darkPalette]) {
+      expect(palette.brand).toBe(designTokens.signatureYellow)
+      expect(palette.onBrand).toBe(designTokens.ink)
+    }
+  })
+
   it('lightTheme mapeia cada papel sobrescrito ao papel da paleta (secondary é SUPERFÍCIE, não texto)', () => {
     expect(lightTheme.colors.primary).toBe(lightPalette.primary)
     expect(lightTheme.colors.onPrimary).toBe(lightPalette.onPrimary)

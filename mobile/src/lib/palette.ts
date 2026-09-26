@@ -55,8 +55,8 @@ export const designTokens = {
   // story — como borda de componente em superfície clara, exige decisão registrada.
   successBorder: '#39bf45',
   pricingInk: '#1d1f25',
-  // Signature card surfaces (D7: registrados, não adotados em tela — full-bleed
-  // apenas, nunca acento pequeno)
+  // Signature card surfaces (D7). Só o amarelo foi adotado, full-bleed (D-UX-1,
+  // papel `brand`); os demais seguem registrados sem uso. Nunca acento pequeno.
   signatureCoral: '#aa2d00',
   signatureForest: '#0a2e0e',
   signatureCream: '#f5e9d4',
@@ -127,6 +127,10 @@ export interface SemanticColors {
   linkActive: string
   info: string
   infoBorder: string
+  /** Superfície de marca full-bleed (D-UX-1): splash, ícone, hero do login, passe QR. Nunca texto, borda ou chip. */
+  brand: string
+  /** Texto/ícone sobre `brand`. */
+  onBrand: string
 }
 
 export const lightPalette: SemanticColors = {
@@ -149,6 +153,8 @@ export const lightPalette: SemanticColors = {
   linkActive: designTokens.linkActive,
   info: designTokens.info,
   infoBorder: designTokens.infoBorder,
+  brand: designTokens.signatureYellow,
+  onBrand: designTokens.ink,
 }
 
 // D6 define só dois tons de texto no escuro: `textBody` e `textMuted` colapsam
@@ -177,6 +183,8 @@ export const darkPalette: SemanticColors = {
   linkActive: designTokens.linkActive,
   info: designTokens.info,
   infoBorder: designTokens.infoBorder,
+  brand: designTokens.signatureYellow,
+  onBrand: designTokens.ink,
 }
 
 /**
