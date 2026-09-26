@@ -92,12 +92,12 @@ const ALLOWLIST: Record<string, { value: string; why: string }[]> = {
     { value: 'rgba(0,0,0,0.6)', why: 'máscara escura ao redor da janela de leitura — chrome de câmera' },
   ],
   // Chrome da câmera na tela de scan: fundos preto puro da câmera/tela fora de
-  // foco, scrim do contador e botão translúcido sobre o viewfinder. A paleta do
-  // DESIGN.md não tem preto puro.
+  // foco e scrim do HUD sobre o viewfinder.
   'app/(driver)/scan.tsx': [
     { value: '#000000', why: 'fundo da câmera/offscreen — chrome de câmera' },
-    { value: 'rgba(0,0,0,0.55)', why: 'scrim do contador sobre a câmera — chrome de câmera' },
-    { value: 'rgba(255,255,255,0.16)', why: 'botão translúcido sobre o viewfinder — chrome de câmera' },
+  ],
+  'components/scan/scan-hud.tsx': [
+    { value: 'rgba(0,0,0,0.55)', why: 'scrim do HUD sobre a câmera — chrome de câmera' },
   ],
   // Botão "Dispensar" sobre a faixa vermelha de falha: branco 92% para o rótulo
   // ter contraste — overlay funcional, não papel do tema.

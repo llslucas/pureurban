@@ -1,9 +1,8 @@
 import * as Crypto from 'expo-crypto'
-import { router, useFocusEffect } from 'expo-router'
+import { useFocusEffect } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState, StyleSheet, View } from 'react-native'
-import { Button, Text } from 'react-native-paper'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useIsFocused } from '@react-navigation/native'
 import { useCameraPermissions } from 'expo-camera'
 
@@ -13,19 +12,20 @@ import {
   NoActiveTripState,
   RoleGuardState,
 } from '@/components/scan/scan-blocked-states'
+import { ScanHud } from '@/components/scan/scan-hud'
 import { ScanResultOverlay, type ScanResult } from '@/components/scan/scan-result-overlay'
 import { StateView } from '@/components/ui/state-view'
 import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
-import { lightPalette } from '@/lib/palette'
 import { boardingService } from '@/services/boarding.service'
 import { ApiClientError } from '@/services/api-client'
-import { activeTripOptions, tripStudentsKey } from '@/lib/trip-queries'
+import { activeTripOptions, tripStudentsKey, tripStudentsOptions } from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 import { enqueueCheckIn, isTransportFailure, type QueueOwner } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
 import { registerE2eScanHook } from '@/utils/e2e-scan-hook'
 import { describeFailure, QUEUE_FULL_FEEDBACK, QUEUED_FEEDBACK } from '@/utils/scan-feedback'
+import { tripBoardedCount } from '@/utils/trip-boarded-count'
 
 // Quanto tempo o resultado de SUCESSO fica na tela antes de a câmera voltar
 // sozinha. Só o sucesso auto-retoma: nos estados de erro o motorista precisa ler
@@ -50,6 +50,13 @@ interface Attempt {
   owner: QueueOwner
 }
 
+// Read from the cached roster, never fetched: the name must show offline too.
+function cachedStudentName(queryClient: QueryClient, attempt: Attempt): string | undefined {
+  return queryClient
+    .getQueryData(tripStudentsOptions(attempt.tripId).queryKey)
+    ?.students.find((student) => student.studentId === attempt.studentId)?.name
+}
+
 export default function ScanScreen() {
   const { user, logout } = useAuthStore()
   const queryClient = useQueryClient()
@@ -60,7 +67,9 @@ export default function ScanScreen() {
   const isFocused = useIsFocused()
   const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
-  const [boardedCount, setBoardedCount] = useState(0)
+  // Students accepted on this screen (server or queue), one entry per check-in:
+  // its length is the session line, and the ids feed the optimistic trip count.
+  const [sessionStudentIds, setSessionStudentIds] = useState<string[]>([])
   const [cameraError, setCameraError] = useState<string | null>(null)
   const lastAttempt = useRef<Attempt | null>(null)
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,6 +96,9 @@ export default function ScanScreen() {
     status: tripStatus,
     refetch: refetchTrip,
   } = useQuery(activeTripOptions())
+  const { data: roster } = useQuery(
+    tripStudentsOptions(activeTrip?.status === 'ACTIVE' ? activeTrip.id : undefined),
+  )
 
   // O estado 2 manda o motorista às configurações do sistema, mas
   // `useCameraPermissions` não reavalia sozinho quando o app volta ao primeiro
@@ -168,11 +180,12 @@ export default function ScanScreen() {
       // `summary` é agregado do servidor (AC #2). `void`: a tela de scan não
       // aguarda o roster; a rede trabalha enquanto o overlay de sucesso aparece.
       void queryClient.invalidateQueries({ queryKey: tripStudentsKey(attempt.tripId) })
-      setBoardedCount((n) => n + 1)
+      setSessionStudentIds((ids) => [...ids, attempt.studentId])
       setResult({
         kind: 'success',
         title: 'Embarque confirmado',
         detail: 'Aluno registrado nesta viagem.',
+        studentName: cachedStudentName(queryClient, attempt),
       })
       resumeTimer.current = setTimeout(() => {
         resumeTimer.current = null
@@ -203,8 +216,12 @@ export default function ScanScreen() {
           // nasceria com chave NOVA — duas linhas na fila, e um
           // DUPLICATE_CHECK_IN garantido no dreno.
           lastSuccessStudentId.current = attempt.studentId
-          setBoardedCount((n) => n + 1)
-          setResult({ kind: 'failure', ...described })
+          setSessionStudentIds((ids) => [...ids, attempt.studentId])
+          setResult({
+            kind: 'failure',
+            ...described,
+            studentName: cachedStudentName(queryClient, attempt),
+          })
           resumeTimer.current = setTimeout(() => {
             resumeTimer.current = null
             lastAttempt.current = null
@@ -213,12 +230,20 @@ export default function ScanScreen() {
           }, SUCCESS_RESUME_MS)
           return
         }
-        setResult({ kind: 'failure', ...described })
+        setResult({
+          kind: 'failure',
+          ...described,
+          studentName: cachedStudentName(queryClient, attempt),
+        })
         return
       }
 
       const described = describeFailure(error)
-      setResult({ kind: 'failure', ...described })
+      setResult({
+        kind: 'failure',
+        ...described,
+        studentName: cachedStudentName(queryClient, attempt),
+      })
     } finally {
       isSubmitting.current = false
     }
@@ -392,29 +417,10 @@ export default function ScanScreen() {
         <View style={styles.offscreen} />
       )}
 
-      {/* `box-none`: a barra não intercepta toques (a câmera continua atrás),
-          mas o botão "Ver lista" dentro dela sim. */}
-      <View style={styles.counterBar} pointerEvents="box-none">
-        <Text variant="titleMedium" style={styles.counterText}>
-          {boardedCount === 1
-            ? '1 embarque nesta sessão'
-            : `${boardedCount} embarques nesta sessão`}
-        </Text>
-        {/* `navigate`, nunca `push`: dois toques rápidos empilhavam duas telas
-            (finding da 3.2b). */}
-        <Button
-          mode="contained"
-          compact
-          buttonColor="rgba(255, 255, 255, 0.16)"
-          textColor={lightPalette.onPrimary}
-          onPress={() => router.navigate('/(driver)/student-list')}
-          style={styles.listButton}
-          contentStyle={styles.listButtonContent}
-          labelStyle={styles.listButtonLabel}
-        >
-          Ver lista
-        </Button>
-      </View>
+      <ScanHud
+        count={tripBoardedCount(roster, sessionStudentIds)}
+        sessionCount={sessionStudentIds.length}
+      />
 
       <ScanResultOverlay
         result={result}
@@ -436,35 +442,5 @@ const styles = StyleSheet.create({
   offscreen: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
-  },
-  counterBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    // Scrim sobre a câmera: chrome de câmera (allowlist da guarda).
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-  },
-  counterText: {
-    color: lightPalette.onPrimary,
-    fontSize: 18,
-    lineHeight: 24,
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-  listButton: {
-    marginTop: 10,
-    alignSelf: 'center',
-    borderRadius: 10,
-  },
-  listButtonContent: {
-    height: 44,
-    paddingHorizontal: 12,
-  },
-  listButtonLabel: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 })
