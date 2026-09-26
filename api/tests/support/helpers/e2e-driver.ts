@@ -42,7 +42,7 @@ export async function openScanner(page: Page): Promise<void> {
 /**
  * Mesmo fluxo de `loginAsDriver` — a tela de login é única e o redirecionamento
  * por papel leva o aluno a `/(student)/home`, cujo primeiro elemento estável é
- * o botão "Meu QR Code".
+ * o atalho "Meu QR".
  */
 export async function loginAsStudent(
   page: Page,
@@ -52,7 +52,7 @@ export async function loginAsStudent(
   await page.locator('#login-email').fill(creds.email);
   await page.locator('#login-password').fill(creds.password);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByRole('button', { name: 'Meu QR Code' })).toBeVisible({
+  await expect(page.getByTestId('home-qr-shortcut')).toBeVisible({
     timeout: 30_000,
   });
 }

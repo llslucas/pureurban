@@ -19,7 +19,7 @@ import { loginAsDriver, loginAsStudent } from '../support/helpers/e2e-driver';
 import { ageAbsence, ageTrip } from '../support/helpers/prisma-time';
 import type { Epic3Credentials } from '../support/helpers/seed-helpers';
 
-// Teto da NFR3, medido como WALL-CLOCK do clique em "Confirmar" até o
+// Teto da NFR3, medido como WALL-CLOCK do clique em "Avisar motorista" até o
 // badge/contagem visível na página do motorista (cross-screen: rede + SSE +
 // render). A prova de rede pura <3s já vive no supertest; aqui o budget é
 // folgado para o ambiente local — mesmo critério do NFR1 do happy path.
@@ -157,7 +157,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       await expect(notReturning).toBeVisible();
 
       await notReturning.click();
-      const confirm = page.getByRole('button', { name: 'Confirmar' });
+      const confirm = page.getByRole('button', { name: 'Avisar motorista' });
       await expect(confirm).toBeVisible();
 
       const absenceResponse = page.waitForResponse(
@@ -165,7 +165,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
           res.url().includes('/api/v1/boarding/not-returning') &&
           res.request().method() === 'POST',
       );
-      // NFR3: t0 é o clique em Confirmar — o AC é a EXPERIÊNCIA completa
+      // NFR3: t0 é o clique em Avisar motorista — o AC é a EXPERIÊNCIA completa
       // (toque do aluno → tela do motorista), não só a chamada de rede.
       const t0 = Date.now();
       await confirm.click();
@@ -177,7 +177,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       const nfr3Ms = Date.now() - t0;
 
       console.log(
-        `[NFR3] Confirmar → badge/contagem do motorista: ${nfr3Ms}ms (budget ${NFR3_BUDGET_MS}ms)`,
+        `[NFR3] Avisar motorista → badge/contagem do motorista: ${nfr3Ms}ms (budget ${NFR3_BUDGET_MS}ms)`,
       );
       expect(nfr3Ms).toBeLessThan(NFR3_BUDGET_MS);
 
@@ -188,13 +188,11 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       ).toBeVisible();
 
       // Home do aluno vira estado registrado com countdown vivo.
-      await expect(page.getByText('Ausência registrada')).toBeVisible();
-      await expect(
-        page.getByText(/Janela de cancelamento \d{1,2}:\d{2}/),
-      ).toBeVisible();
+      await expect(page.getByText('Motorista avisado')).toBeVisible();
+      await expect(page.getByText(/Desfazer em \d{1,2}:\d{2}/)).toBeVisible();
 
-      // Cancelar dentro da janela: home volta ao botão e o motorista reverte.
-      await page.getByRole('button', { name: 'Cancelar' }).click();
+      // Desfazer dentro da janela: o rodapé volta e o motorista reverte.
+      await page.getByRole('button', { name: 'Desfazer', exact: true }).click();
       await expect(notReturning).toBeVisible();
       await expect(badge).toHaveCount(0);
       await expectRosterCount(driverPage, 0, total);
@@ -203,7 +201,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     }
   });
 
-  test('fora da janela: card consolidado sem Cancelar e CANCELLATION_PERIOD_EXPIRED na API', async ({
+  test('fora da janela: card consolidado sem Desfazer e CANCELLATION_PERIOD_EXPIRED na API', async ({
     page,
     request,
     epic4,
@@ -215,13 +213,11 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     // é ele que persiste no MMKV e reidrata no reload).
     await loginAsStudent(page, student);
     await page.getByRole('button', { name: 'Não vou voltar' }).click();
-    await page.getByRole('button', { name: 'Confirmar' }).click();
-    await expect(page.getByText('Ausência registrada')).toBeVisible();
-    const cancel = page.getByRole('button', { name: 'Cancelar' });
+    await page.getByRole('button', { name: 'Avisar motorista' }).click();
+    await expect(page.getByText('Motorista avisado')).toBeVisible();
+    const cancel = page.getByRole('button', { name: 'Desfazer', exact: true });
     await expect(cancel).toBeVisible();
-    await expect(
-      page.getByText(/Janela de cancelamento \d{1,2}:\d{2}/),
-    ).toBeVisible();
+    await expect(page.getByText(/Desfazer em \d{1,2}:\d{2}/)).toBeVisible();
 
     // Aging (única escrita direta no banco): desloca notifiedAt E cancellableUntil
     // 10 min para trás — o fim da janela (~2 min após o registro) fica então há
@@ -237,10 +233,10 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     // os 2 min reais (ver ageAbsenceInClientCache).
     await ageAbsenceInClientCache(page, epic4.returnTripId, 10);
     await page.reload();
-    await expect(page.getByText('Ausência registrada')).toBeVisible();
-    // Consolidado: SEM botão Cancelar e SEM countdown.
+    await expect(page.getByText('Motorista avisado')).toBeVisible();
+    // Consolidado: SEM botão Desfazer e SEM countdown.
     await expect(cancel).toHaveCount(0);
-    await expect(page.getByText(/Janela de cancelamento/)).toHaveCount(0);
+    await expect(page.getByText(/Desfazer em/)).toHaveCount(0);
 
     // API fora da janela: erro tipado com mensagem clara, sem 500.
     const response = await request.post(
@@ -264,7 +260,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
 
     // A ausência persiste: novo reload mantém o card consolidado.
     await page.reload();
-    await expect(page.getByText('Ausência registrada')).toBeVisible();
+    await expect(page.getByText('Motorista avisado')).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Não vou voltar' }),
     ).toHaveCount(0);
@@ -351,13 +347,13 @@ test.describe('Épico 4 — ausência e lembrete', () => {
         timeout: 5_000,
       });
     }).toPass({ timeout: 120_000, intervals: [1_000, 5_000] });
-    // Banner E botão da home: responder por qualquer um é a MESMA mutation.
-    await expect(notReturning).toHaveCount(2);
-    await notReturning.first().click();
-    await page.getByRole('button', { name: 'Confirmar' }).click();
+    // O banner não tem ação própria: o rodapé é a única entrada do aviso.
+    await expect(notReturning).toHaveCount(1);
+    await notReturning.click();
+    await page.getByRole('button', { name: 'Avisar motorista' }).click();
 
-    // Mesmo estado do botão da 4.1, e o banner some com a pendência resolvida.
-    await expect(page.getByText('Ausência registrada')).toBeVisible();
+    // Mesmo estado da 4.1, e o banner some com a pendência resolvida.
+    await expect(page.getByText('Motorista avisado')).toBeVisible();
     await expect(page.getByText('E a volta?')).toHaveCount(0);
 
     // O motorista vê o badge: roster aberto depois reflete o servidor
