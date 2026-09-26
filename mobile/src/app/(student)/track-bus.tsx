@@ -1,9 +1,10 @@
 import * as Location from 'expo-location'
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Banner, Button, Card, Chip, Text } from 'react-native-paper'
+import { Banner, Card, Chip, Text } from 'react-native-paper'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { StateView } from '@/components/ui/state-view'
 import {
   activeTrackingTripKey,
   activeTrackingTripOptions,
@@ -238,23 +239,28 @@ export default function TrackBusScreen() {
   // ---- Render ----
 
   if (tripStatus === 'pending') {
-    return <Loading label="Carregando sua viagem..." />
+    return <StateView kind="loading" title="Carregando sua viagem..." />
   }
 
   if (tripStatus === 'error' && activeTrip === undefined) {
     return (
-      <Centered
+      <StateView
+        kind="error"
         title="Não foi possível carregar sua viagem"
         detail="Verifique sua conexão e tente novamente."
-        actionLabel="Tentar novamente"
-        onAction={() => void refetchTrip()}
+        action={{
+          label: 'Tentar novamente',
+          onPress: () => void refetchTrip(),
+        }}
       />
     )
   }
 
   if (!tripId || tripEnded) {
     return (
-      <Centered
+      <StateView
+        kind="empty"
+        icon="bus-clock"
         title="Nenhuma viagem ativa no momento"
         detail="Esta tela atualiza sozinha quando o motorista iniciar a viagem."
       />
@@ -353,75 +359,11 @@ export default function TrackBusScreen() {
   )
 }
 
-function Loading({ label }: { label: string }) {
-  return (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" />
-      <Text variant="bodyLarge" style={styles.centeredText}>
-        {label}
-      </Text>
-    </View>
-  )
-}
-
-function Centered({
-  title,
-  detail,
-  actionLabel,
-  onAction,
-}: {
-  title: string
-  detail: string
-  actionLabel?: string
-  onAction?: () => void
-}) {
-  return (
-    <View style={styles.centered}>
-      <Text variant="titleLarge" style={styles.centeredTitle}>
-        {title}
-      </Text>
-      <Text variant="bodyLarge" style={styles.centeredText}>
-        {detail}
-      </Text>
-      {actionLabel && onAction ? (
-        <Button
-          mode="contained"
-          onPress={onAction}
-          style={styles.action}
-          contentStyle={styles.actionContent}
-        >
-          {actionLabel}
-        </Button>
-      ) : null}
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     gap: 16,
     padding: 16,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    padding: 24,
-  },
-  centeredTitle: {
-    textAlign: 'center',
-  },
-  centeredText: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  action: {
-    marginTop: 8,
-  },
-  actionContent: {
-    paddingVertical: 8,
   },
   positionCard: {
     borderRadius: 16,

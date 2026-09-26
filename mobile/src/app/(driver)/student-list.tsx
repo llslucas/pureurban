@@ -1,10 +1,11 @@
 import { router } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Banner, Button, Snackbar, Text } from 'react-native-paper'
+import { Banner, Snackbar, Text } from 'react-native-paper'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { StudentCard } from '@/components/student-card'
+import { StateView } from '@/components/ui/state-view'
 import { ApiClientError } from '@/services/api-client'
 import { lightPalette } from '@/lib/palette'
 import {
@@ -164,13 +165,16 @@ export default function StudentListScreen() {
   // da 1.8 já redireciona um não-motorista para longe desta rota.)
   if (!user || user.role !== 'DRIVER') {
     return (
-      <Centered
+      <StateView
+        kind="blocked"
         title="Acesso restrito"
         detail="Apenas motoristas veem a lista de embarque."
-        actionLabel="Entrar novamente"
-        onAction={() => {
-          logout()
-          router.replace('/(auth)/login')
+        action={{
+          label: 'Entrar novamente',
+          onPress: () => {
+            logout()
+            router.replace('/(auth)/login')
+          },
         }}
       />
     )
@@ -179,7 +183,7 @@ export default function StudentListScreen() {
   // Estado 2 — `status === 'pending'`, nunca `isLoading`: com o cache do MMKV
   // reidratado ou a query pausada, `isLoading` mente.
   if (tripStatus === 'pending') {
-    return <Loading label="Carregando viagem..." />
+    return <StateView kind="loading" title="Carregando viagem..." />
   }
 
   // Estado 3 — erro na viagem não é "sem viagem". Com o `networkMode: 'always'`
@@ -188,11 +192,14 @@ export default function StudentListScreen() {
   // estado 7 (lista + Banner de dado velho assumem a partir daqui).
   if (tripStatus === 'error' && activeTrip === undefined) {
     return (
-      <Centered
+      <StateView
+        kind="error"
         title="Não foi possível carregar a viagem"
         detail="Verifique sua conexão e tente novamente."
-        actionLabel="Tentar novamente"
-        onAction={() => void refetchTrip()}
+        action={{
+          label: 'Tentar novamente',
+          onPress: () => void refetchTrip(),
+        }}
       />
     )
   }
@@ -201,11 +208,15 @@ export default function StudentListScreen() {
   // COMPLETED não é alcançável a partir daqui (ver Tabela de Verdade).
   if (!activeTrip || activeTrip.status !== 'ACTIVE') {
     return (
-      <Centered
+      <StateView
+        kind="blocked"
+        icon="bus-clock"
         title="Nenhuma viagem ativa"
         detail="Inicie uma viagem para ver a lista de alunos."
-        actionLabel="Ir para Viagem"
-        onAction={() => router.navigate('/(driver)/trip')}
+        action={{
+          label: 'Ir para Viagem',
+          onPress: () => router.navigate('/(driver)/trip'),
+        }}
       />
     )
   }
@@ -223,22 +234,28 @@ export default function StudentListScreen() {
 
     if (code === 'DRIVER_NOT_ASSIGNED') {
       return (
-        <Centered
+        <StateView
+          kind="blocked"
           title="Viagem de outro motorista"
           detail="Você não é o responsável por esta viagem."
-          actionLabel="Ir para Viagem"
-          onAction={() => router.navigate('/(driver)/trip')}
+          action={{
+            label: 'Ir para Viagem',
+            onPress: () => router.navigate('/(driver)/trip'),
+          }}
         />
       )
     }
 
     if (code === 'TRIP_NOT_FOUND') {
       return (
-        <Centered
+        <StateView
+          kind="blocked"
           title="Viagem não encontrada"
           detail="Esta viagem não existe mais."
-          actionLabel="Ir para Viagem"
-          onAction={() => router.navigate('/(driver)/trip')}
+          action={{
+            label: 'Ir para Viagem',
+            onPress: () => router.navigate('/(driver)/trip'),
+          }}
         />
       )
     }
@@ -247,24 +264,27 @@ export default function StudentListScreen() {
   // Estado 5 — roster carregando E sem dado em cache. Com `data` do MMKV já
   // presente, cai direto na lista (Tier 1) em vez de um spinner por cima dele.
   if (roster.status === 'pending' && !roster.data) {
-    return <Loading label="Carregando alunos..." />
+    return <StateView kind="loading" title="Carregando alunos..." />
   }
 
   // Estado 6 — erro sem cache: erro ≠ vazio.
   if (roster.isError && !roster.data) {
     return (
-      <Centered
+      <StateView
+        kind="error"
         title="Não foi possível carregar a lista"
         detail="Verifique sua conexão e tente novamente."
-        actionLabel="Tentar novamente"
-        onAction={() => void roster.refetch()}
+        action={{
+          label: 'Tentar novamente',
+          onPress: () => void roster.refetch(),
+        }}
       />
     )
   }
 
   // Defensivo — `enabled` é true aqui (viagem ACTIVE), então `data` deve existir.
   if (!roster.data) {
-    return <Loading label="Carregando alunos..." />
+    return <StateView kind="loading" title="Carregando alunos..." />
   }
 
   const { students, summary } = roster.data
@@ -332,49 +352,6 @@ export default function StudentListScreen() {
   )
 }
 
-function Loading({ label }: { label: string }) {
-  return (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" />
-      <Text variant="bodyLarge" style={styles.centeredText}>
-        {label}
-      </Text>
-    </View>
-  )
-}
-
-function Centered({
-  title,
-  detail,
-  actionLabel,
-  onAction,
-}: {
-  title: string
-  detail: string
-  actionLabel: string
-  onAction: () => void
-}) {
-  return (
-    <View style={styles.centered}>
-      <Text variant="titleLarge" style={styles.centeredTitle}>
-        {title}
-      </Text>
-      <Text variant="bodyLarge" style={styles.centeredText}>
-        {detail}
-      </Text>
-      <Button
-        mode="contained"
-        onPress={onAction}
-        style={styles.action}
-        contentStyle={styles.actionContent}
-        labelStyle={styles.actionLabel}
-      >
-        {actionLabel}
-      </Button>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -404,32 +381,5 @@ const styles = StyleSheet.create({
   emptyContent: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    padding: 24,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  centeredTitle: {
-    textAlign: 'center',
-  },
-  centeredText: {
-    textAlign: 'center',
-    opacity: 0.75,
-  },
-  action: {
-    marginTop: 12,
-    borderRadius: 12,
-    alignSelf: 'stretch',
-  },
-  actionContent: {
-    height: 56,
-  },
-  actionLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 })

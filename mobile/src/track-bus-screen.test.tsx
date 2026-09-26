@@ -149,6 +149,27 @@ afterEach(() => {
 })
 
 describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
+  it('descoberta falha: "Não foi possível carregar sua viagem" e "Tentar novamente" consulta de novo', async () => {
+    mockTracking.getActiveTrackingTrip.mockRejectedValue(new Error('offline'))
+
+    renderScreen()
+
+    // The query retries twice with the default backoff (1s, 2s) under fake timers.
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(5_000)
+      })
+    }
+    expect(await screen.findByText('Não foi possível carregar sua viagem')).toBeTruthy()
+    const callsAtError = mockTracking.getActiveTrackingTrip.mock.calls.length
+
+    fireEvent.press(screen.getByText('Tentar novamente'))
+
+    await waitFor(() =>
+      expect(mockTracking.getActiveTrackingTrip.mock.calls.length).toBeGreaterThan(callsAtError),
+    )
+  })
+
   it('sem viagem ativa: "Nenhuma viagem ativa no momento" e nenhum stream aberto', async () => {
     mockTracking.getActiveTrackingTrip.mockResolvedValue(null)
 

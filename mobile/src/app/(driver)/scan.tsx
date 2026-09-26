@@ -8,6 +8,7 @@ import { useIsFocused } from '@react-navigation/native'
 import { useCameraPermissions } from 'expo-camera'
 
 import { QrScanner } from '@/components/qr-scanner'
+import { StateView } from '@/components/ui/state-view'
 import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
 import { lightPalette } from '@/lib/palette'
@@ -290,7 +291,7 @@ export default function ScanScreen() {
       }
       lastSuccessStudentId.current = null
 
-      // Invariante, não estado da tabela: o caminho de render devolve `Blocked`
+      // Invariante, não estado da tabela: o caminho de render devolve o `StateView`
       // (estado 4) antes de o `QrScanner` montar, então aqui `activeTrip` é
       // sempre ACTIVE. A guarda existe para estreitar o tipo — antes ela
       // carregava uma segunda cópia do texto do estado 12, que nenhum teste ou
@@ -344,17 +345,20 @@ export default function ScanScreen() {
   // Guarda de role: um aluno que chegue nesta rota não pode escanear ninguém.
   if (!user || user.role !== 'DRIVER') {
     return (
-      <Blocked
+      <StateView
+        kind="blocked"
         title="Acesso restrito"
         detail="Apenas motoristas podem registrar embarques."
-        actionLabel="Entrar novamente"
-        onAction={() => {
-          // `logout()` ANTES do replace, como em `(student)/qr-code.tsx`
-          // (Task 7.11). Só navegar deixaria `isAuthenticated` true: o aluno
-          // ficaria estacionado num formulário de login com a sessão viva, e o
-          // shell continuaria montado atrás.
-          logout()
-          router.replace('/(auth)/login')
+        action={{
+          label: 'Entrar novamente',
+          onPress: () => {
+            // `logout()` ANTES do replace, como em `(student)/qr-code.tsx`
+            // (Task 7.11). Só navegar deixaria `isAuthenticated` true: o aluno
+            // ficaria estacionado num formulário de login com a sessão viva, e o
+            // shell continuaria montado atrás.
+            logout()
+            router.replace('/(auth)/login')
+          },
         }}
       />
     )
@@ -363,38 +367,46 @@ export default function ScanScreen() {
   // Estados 1 e 2 da Tabela de Verdade.
   if (!permission) {
     // O hook ainda não resolveu o estado da permissão.
-    return <Loading label="Preparando câmera..." />
+    return <StateView kind="loading" title="Preparando câmera..." />
   }
 
   if (!permission.granted) {
     return permission.canAskAgain ? (
-      <Blocked
+      <StateView
+        kind="blocked"
+        icon="camera"
         title="Permissão da câmera"
         detail="O PureUrban precisa da câmera para ler o QR code dos alunos."
-        actionLabel="Permitir acesso à câmera"
         note={actionError}
-        onAction={() => {
-          setActionError(null)
-          requestPermission().catch(() =>
-            setActionError(
-              'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
-            ),
-          )
+        action={{
+          label: 'Permitir acesso à câmera',
+          onPress: () => {
+            setActionError(null)
+            requestPermission().catch(() =>
+              setActionError(
+                'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
+              ),
+            )
+          },
         }}
       />
     ) : (
-      <Blocked
+      <StateView
+        kind="blocked"
+        icon="camera-off"
         title="Câmera bloqueada"
         detail="A permissão foi negada. Libere o acesso à câmera nas configurações do sistema."
-        actionLabel="Abrir configurações"
         note={actionError}
-        onAction={() => {
-          setActionError(null)
-          Linking.openSettings().catch(() =>
-            setActionError(
-              'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
-            ),
-          )
+        action={{
+          label: 'Abrir configurações',
+          onPress: () => {
+            setActionError(null)
+            Linking.openSettings().catch(() =>
+              setActionError(
+                'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
+              ),
+            )
+          },
         }}
       />
     )
@@ -404,7 +416,7 @@ export default function ScanScreen() {
   // (offline) `isLoading` é false e a tela afirmaria "sem viagem ativa" sem
   // nunca ter buscado. Finding literal do review da 3.2b.
   if (tripStatus === 'pending') {
-    return <Loading label="Carregando viagem..." />
+    return <StateView kind="loading" title="Carregando viagem..." />
   }
 
   // Erro NÃO é vazio — sem esta guarda a query que terminou em `error` cai no
@@ -415,11 +427,14 @@ export default function ScanScreen() {
   // enfileiram offline. Só erro sem dado nenhum é tela de bloqueio.
   if (tripStatus === 'error' && activeTrip === undefined) {
     return (
-      <Blocked
+      <StateView
+        kind="error"
         title="Não foi possível carregar a viagem"
         detail="Verifique sua conexão e tente novamente."
-        actionLabel="Tentar novamente"
-        onAction={() => void refetchTrip()}
+        action={{
+          label: 'Tentar novamente',
+          onPress: () => void refetchTrip(),
+        }}
       />
     )
   }
@@ -427,11 +442,15 @@ export default function ScanScreen() {
   // Estado 4.
   if (!activeTrip || activeTrip.status !== 'ACTIVE') {
     return (
-      <Blocked
+      <StateView
+        kind="blocked"
+        icon="bus-clock"
         title="Nenhuma viagem ativa"
         detail="Inicie uma viagem para começar a registrar embarques."
-        actionLabel="Ir para Viagem"
-        onAction={() => router.navigate('/(driver)/trip')}
+        action={{
+          label: 'Ir para Viagem',
+          onPress: () => router.navigate('/(driver)/trip'),
+        }}
       />
     )
   }
@@ -440,11 +459,14 @@ export default function ScanScreen() {
   // acontece nunca, porque `onBarcodeScanned` não dispara.
   if (cameraError) {
     return (
-      <Blocked
+      <StateView
+        kind="error"
         title="Não foi possível abrir a câmera"
         detail={cameraError}
-        actionLabel="Tentar novamente"
-        onAction={() => setCameraError(null)}
+        action={{
+          label: 'Tentar novamente',
+          onPress: () => setCameraError(null),
+        }}
       />
     )
   }
@@ -587,57 +609,6 @@ export default function ScanScreen() {
   )
 }
 
-function Loading({ label }: { label: string }) {
-  return (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" />
-      <Text variant="bodyLarge" style={styles.centeredText}>
-        {label}
-      </Text>
-    </View>
-  )
-}
-
-function Blocked({
-  title,
-  detail,
-  actionLabel,
-  onAction,
-  note,
-}: {
-  title: string
-  detail: string
-  actionLabel: string
-  onAction: () => void
-  /** Mensagem extra quando a própria ação do botão falha. */
-  note?: string | null
-}) {
-  return (
-    <View style={styles.centered}>
-      <Text variant="titleLarge" style={styles.centeredTitle}>
-        {title}
-      </Text>
-      <Text variant="bodyLarge" style={styles.centeredText}>
-        {detail}
-      </Text>
-      {note ? (
-        <Text variant="bodyLarge" style={styles.centeredNote}>
-          {note}
-        </Text>
-      ) : null}
-      <Button
-        mode="contained"
-        onPress={onAction}
-        style={styles.action}
-        contentStyle={styles.actionContent}
-        labelStyle={styles.actionLabel}
-      >
-        {actionLabel}
-      </Button>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   // Fundos pretos da câmera/offscreen: chrome de câmera (allowlist da guarda) —
   // a paleta do DESIGN.md não tem preto puro.
@@ -648,25 +619,6 @@ const styles = StyleSheet.create({
   offscreen: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    padding: 24,
-  },
-  centeredTitle: {
-    textAlign: 'center',
-  },
-  centeredText: {
-    textAlign: 'center',
-    opacity: 0.75,
-  },
-  centeredNote: {
-    textAlign: 'center',
-    color: lightPalette.error,
-    fontWeight: 'bold',
   },
   counterBar: {
     position: 'absolute',
