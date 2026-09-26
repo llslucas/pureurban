@@ -30,8 +30,8 @@ const STATUS_RACE_CODES = new Set([
   'ABSENCE_NOT_FOUND',
 ])
 
-// Cada erro tipado do contrato tem mensagem clara em pt-BR. ALREADY_NOT_RETURNING
-// não está aqui: não é erro nesta tela, o status refeito mostra a ausência.
+// Every typed contract error has a clear pt-BR message. ALREADY_NOT_RETURNING
+// is not here: on this screen it is not an error, the status shows the absence.
 const ERROR_MESSAGES: Record<string, string> = {
   STUDENT_NOT_ON_TRIP: 'Você não pertence à rota desta viagem.',
   TRIP_NOT_ACTIVE: 'A viagem não está mais ativa.',
@@ -52,9 +52,9 @@ export default function StudentHomeScreen() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  // Mesma entrada de cache do motorista (factory `activeTripOptions`): para o
-  // aluno a API devolve a viagem de retorno ativa na rota dele (ou null). O
-  // polling é só desta tela — o motorista usa a factory sem ele.
+  // Same cache entry as the driver (`activeTripOptions` factory): for a
+  // student the API returns the active return trip on their route (or null).
+  // Polling is this screen's only — the driver uses the factory without it.
   const { data: activeTrip, status: tripStatus } = useQuery({
     ...activeTripOptions(),
     refetchInterval: HOME_POLL_MS,
@@ -165,9 +165,9 @@ export default function StudentHomeScreen() {
       )
     },
     onSuccess: async (_cancellation, currentTripId) => {
-      // Sucesso = voltar ao ramo normal: "Não vou voltar" volta a ficar
-      // disponível — o próprio ramo normal é o estado confirmado do
-      // cancelamento. Same in-flight poll guard as the notify mutation.
+      // Success = back to the normal branch: "Não vou voltar" is available
+      // again — that branch is the confirmed state of the cancellation. Same
+      // in-flight poll guard as the notify mutation.
       await queryClient.cancelQueries({
         queryKey: studentBoardingStatusKey(currentTripId),
       })
@@ -175,7 +175,7 @@ export default function StudentHomeScreen() {
         studentBoardingStatusKey(currentTripId),
         { tripId: currentTripId, status: 'NOT_CHECKED_IN', absence: null },
       )
-      // Cancelar reabre a pendência do lembrete no servidor.
+      // Cancelling reopens the reminder's pending state on the server.
       void queryClient.invalidateQueries({
         queryKey: ['studentReminder', currentTripId],
       })

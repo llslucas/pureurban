@@ -638,7 +638,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     expect(screen.queryByText('Ausência registrada')).toBeNull()
     expect(screen.queryByText('Não vou voltar')).toBeNull()
     expect(screen.queryByText('Cancelar')).toBeNull()
-    // O QR continua acessível.
+    // The QR stays reachable.
     expect(screen.getByText('Meu QR Code')).toBeTruthy()
   })
 

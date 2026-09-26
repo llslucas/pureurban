@@ -3,12 +3,12 @@ title: 'Fix: home do aluno não reflete o estado do servidor (viagem de retorno 
 type: 'bugfix'
 ticket: ''
 created: '2026-09-26'
-status: 'in-progress'
+status: 'in-review'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'auto'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 baseline_revision: '7c82ed6db45f2faf94243228ffb494af1e84443c'
 context:
@@ -185,3 +185,26 @@ primeiro plano só por causa do `focusManager`.
 ## Plan Change Log
 
 ## Review Triage Log
+
+### Pass 1 (2026-09-26) — high 0 · medium 2 · low 13 · false 3 · maybe-false 0
+
+| # | Lens | Finding | Verdict | Route | Evidence / action |
+|---|------|---------|---------|-------|-------------------|
+| 1 | BH | Botão habilitado antes do status carregar → POST que só pode dar 409 | low | reject | Os 409 (`ALREADY_*`) já convergem via invalidação + mensagem; janela de ~1 request. Fix exigiria novo estado de gating. |
+| 2 | BH, ECH | Dialog aberto não fecha quando o polling vira CHECKED_IN/NOT_RETURNING | medium | patch | `dialogVisible` só muda por mutation/dismiss (home.tsx:361); confirmar gera 409 com o aluno já embarcado. Fechar o dialog quando `checkedIn \|\| registered`. |
+| 3 | BH | Cache key (tripId do cliente) vs payload (trip do servidor) | low | reject | O guard `tripId === tripId` já impede exibição errada; divergência dura até o próximo poll de activeTrip. |
+| 4 | BH | Polling continua com a home montada atrás de outra rota | low | reject | Custo de 3 GETs/15s enquanto QR/track-bus está aberto; sem efeito visível ao usuário. |
+| 5 | BH | 3 requests por ciclo + lookups repetidos | low | reject | Carga compatível com o tracking (10s); otimização não pedida. |
+| 6 | BH | e2e sem janela expirada/cross-tenant/200 no roles matrix | low | reject | `findActiveByTripAndStudent` filtra só `cancelledAt` (port); tenant coberto pelos adapters existentes; 200 coberto em student-status.e2e. |
+| 7 | BH | Teste "check-in wins" redundante | false | reject | O teste anterior (spec:141-155) já afirma `absence not.toHaveBeenCalled`, travando a precedência. |
+| 8 | BH | Comentários novos/editados em português (CLAUDE.md exige inglês) | low | patch | Confirmado no diff de home.tsx (ex.: "Cancelar reabre a pendência..."). Tradução direta. |
+| 9 | BH | DTO: nome genérico, sem `format: date-time`, root sem `type` | low | reject | Mesmo padrão do `PendingReminderResponseDto` existente; sem conflito de nome hoje. |
+| 10 | BH | Chaves `['studentAbsence']` órfãs no MMKV | low | reject | Expiram em 24h (`maxAge`), nada as lê. |
+| 11 | BH | `nowMs` velho renderiza countdown de janela expirada | low | reject | Dura até o primeiro tick (1s) e corrige sozinho. |
+| 12 | BH | Plan Change Log/Triage Log vazios | false | reject | Change Log é só para loopbacks; o Triage Log é escrito agora, nesta revisão. |
+| 13 | BH | Snackbar de ALREADY_CHECKED_IN sem teste | false | reject | Coberto em student-home.test.tsx:291. Parte do race de `cancelQueries` → #15. |
+| 14 | VG | Wiring de `setupAppFocus` no `_layout.tsx` sem teste | low | defer | Sem harness de render do RootLayout; checagem em emulador cobre. |
+| 15 | VG, BH | Guard `cancelQueries` contra GET em voo sem teste | medium | patch | Nenhum mock com promise pendente; remover o `await` não quebra nada. Adicionar teste com GET diferido (notify e cancel). |
+| 16 | VG | Guard `serverStatus.tripId === tripId` sem teste | low | patch | Todos os fixtures usam RETURN_TRIP.id. Adicionar caso de trip divergente. |
+| 17 | VG | Polling do reminder sem teste | low | patch | Remover `refetchInterval` do reminder não quebra nada. Adicionar caso com fake timers. |
+| 18 | ECH | onError de corrida depende do refetch ter sucesso (ALREADY_NOT_RETURNING, ABSENCE_NOT_FOUND, CANCELLATION_PERIOD_EXPIRED) | low | patch | Com o refetch falhando, a tela fica no estado velho (sem card ou com Cancelar). Restaurar a escrita imediata do desfecho conhecido antes de invalidar (inclui ALREADY_CHECKED_IN → CHECKED_IN). |

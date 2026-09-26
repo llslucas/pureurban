@@ -486,3 +486,6 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-development-build-android-para-validacao-nativa.md`
   summary: Regenerar `_bmad-output/implementation-artifacts/epic-1-context.md` (gerado antes da 1.7 abrir: status da 1.7 stale e frase "Drift check no guarda o contrato." possivelmente truncada da origem).
   evidence: Achado do review da 1.7 (blind-hunter #12 / edge-case #6); o próprio arquivo avisa "Regenerate with compile-epic-context if planning docs change" — basta recompilar com os docs atuais.
+- source_plan: `_bmad-output/implementation-artifacts/plan-fix-student-home-trip-refresh.md`
+  summary: Não há teste que garanta que o `RootLayout` chama `setupAppFocus()` e devolve o unsubscribe; remover a linha de `mobile/src/app/_layout.tsx` não quebra a suíte.
+  evidence: Review (verification-gap) do fix da home do aluno — o repo não tem harness de render do RootLayout (DB, MSW, persister, expo-router). Coberto hoje só pela verificação manual em emulador.
