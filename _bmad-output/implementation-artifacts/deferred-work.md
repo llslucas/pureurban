@@ -495,3 +495,9 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_plan: `_bmad-output/implementation-artifacts/plan-6-1-tokens-tema-paper-e-dependencias-de-marca.md`
   summary: (NÃO VERIFICADO, médio se real) no Android, variantes Paper com `fontFamily: 'Inter_700Bold'` + `fontWeight: '700'` podem ganhar negrito duplo/sintético ou cair na fonte do sistema.
   evidence: Review da 6.1 (blind-hunter). Resolve-se olhando o APK de dev nos AVDs (títulos bold vs regular lado a lado); se confirmado, emitir as variantes sem `fontWeight` (ou `'normal'`) no `configureFonts`.
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-1-tokens-tema-paper-e-dependencias-de-marca.md`
+  summary: No Android, os ícones da status bar ficam brancos sobre o header/fundo claro (ilegíveis): o app não declara `<StatusBar style="dark" />` (expo-status-bar) em lugar nenhum.
+  evidence: Validação do dev build da 6.1 nos AVDs (Android 16, edge-to-edge do RN 0.83). Não é regressão da 6.1 (nada de status bar mudou); encaixa na Story 6.3 (cabeçalho padrão).
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-1-tokens-tema-paper-e-dependencias-de-marca.md`
+  summary: RESOLVIDO — o maybe-false do negrito dobrado no Android (família por peso + `fontWeight`) não se confirmou: títulos e botões renderizam em Inter bold normal no APK da 6.1.
+  evidence: Capturas do dev build `f70e35da` nos AVDs (login, trip do motorista, home do aluno), 26/09/2026.

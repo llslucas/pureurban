@@ -85,7 +85,7 @@ inteiro (~2.500 tokens), num PR só, para garantir uma única rebuild nativa.
 - [x] `mobile/src/lib/palette.guard.test.ts` -- locks novos: app.json amarelo, brand/onBrand, background, navigationTheme, ThemeProvider no `_layout` -- a guarda acompanha o token.
 - [x] `mobile/app.json` + `mobile/assets/images/*.png` -- nome, ícone e splash de marca -- D-UX-11.
 - [x] Remover os 5 arquivos do template listados no Code Map -- código morto.
-- [ ] Dev build Android -- depois do merge-ready, **perguntar** e só então rodar `eas build -p android --profile development`, instalar via `adb.exe install` e validar o boot nos 2 AVDs -- AC da rebuild única.
+- [x] Dev build Android -- depois do merge-ready, **perguntar** e só então rodar `eas build -p android --profile development`, instalar via `adb.exe install` e validar o boot nos 2 AVDs -- AC da rebuild única.
 
 **Acceptance Criteria:**
 - Given o app no Expo Web (390×844), when abro login, trip e home do aluno, then o fundo de toda tela e o fundo dos TextInput são `#f8fafc`, o texto está em Inter na escala do DESIGN.md, e nada além de fundo e tipografia mudou em relação às capturas de `audit/`.
@@ -105,6 +105,9 @@ inteiro (~2.500 tokens), num PR só, para garantir uma única rebuild nativa.
 - `tsc --noEmit`: 3 erros pré-existentes no baseline `527b094` (`scan.tsx:315`, `use-trip-gps-capture.test.tsx:92`, `tracking-stream.service.test.ts:172`); nenhum novo.
 - Expo Web + mocks: login, trip ativa (com geolocalização concedida) e home do aluno com fundo `rgb(248,250,252)` em tela e TextInput e texto em Inter; layout idêntico ao de `audit/light-01`, `light-11` e `light-30`. Títulos de tela com `fontWeight: '700'` avulso sobre variante Regular ganham negrito sintético (previsto nas Design Notes).
 - Pós-review (passada 1): 7 patches em `b92c928`, `85e38e2` e `c33bd82`; gate de fonte com teste unitário em `ccdaeae`. Depois deles, a suíte completa ficou vermelha em ~60% das rodadas por um flake de carga em `trip-screen.test.tsx:160` (`waitFor` com default de 1s; no baseline, 2/9 rodadas). `8f397ab` sobe só esse timeout para 3s: 6/6 rodadas verdes, 389/389.
+- Dev build (26/09/2026): o `projectId` da 1.7 (`73144243-…`) não existia mais no EAS ("Experience … does not exist"). Com a aprovação do Lucas, criei um projeto novo (`53e555d5-…`, commit `11ba8fe`, guard da 1.7 atualizado) e rodei o build `f70e35da-0452-4972-9b30-a936d0df6f6d` (FINISHED). A keystore nova obrigou a desinstalar o app antigo nos 2 AVDs. Os logins foram recriados na "Rota Teste 17": `motorista61@pureurban.dev` / `aluno61@pureurban.dev`, senha `pureurban61`.
+- Validação nos AVDs (Android 16): o launcher mostra "PureUrban" com o ônibus em tinta sobre amarelo; o splash é amarelo com o glifo (pequeno, `imageWidth` 76); o login, a trip do motorista e a home do aluno aparecem em Inter com fundo `#f8fafc`. Não se vê negrito dobrado nos títulos e botões, o que fecha o defer maybe-false do `fontWeight`. Os ícones da status bar ficam brancos sobre fundo claro dentro do app: nada configura a status bar (nem `src/` nem `app.json`, antes ou depois da 6.1), então não é regressão desta story → defer.
+- Ambiente: o adb travou com 1.299 processos `adb.exe` órfãos no Windows (timeouts do WSL não matam o processo Windows); `taskkill /IM adb.exe /F` resolveu. Instalar o APK a partir de `\\wsl.localhost` é lento: copie para `C:\Users\lucas\Downloads` antes.
 
 ## Plan Change Log
 
