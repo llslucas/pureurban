@@ -1,14 +1,14 @@
 import { lightPalette } from '@/lib/palette'
 
 /**
- * Vocabulário único de tipografia, spacing, radius, elevation e motion (Story 6.1).
- * Os valores vêm do DESIGN.md do redesign (`ux-pureurban-2026-09-26`) e do
- * EXPERIENCE.md → Microinterações; `tokens.test.ts` fixa cada um contra o documento.
- * Cor não vive aqui: tudo que é cor referencia um papel de `lib/palette.ts`.
+ * Single vocabulary for typography, spacing, radius, elevation and motion (story 6.1).
+ * Values come from the redesign DESIGN.md (`ux-pureurban-2026-09-26`) and
+ * EXPERIENCE.md → Microinterações; `tokens.test.ts` pins each one to the docs.
+ * No color lives here: every color references a role from `lib/palette.ts`.
  */
 
-// As chaves são os nomes que `useFonts` registra. No Android, família custom
-// não sintetiza `fontWeight` de forma confiável: cada peso é uma família própria.
+// Keys are the names `useFonts` registers. Android doesn't reliably synthesize
+// `fontWeight` on a custom family, so each weight is its own family.
 export const fontFamily = {
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
@@ -29,7 +29,7 @@ export interface TypographyToken {
   fontFamily: string
   fontSize: number
   fontWeight: FontWeightToken
-  /** Em px: o DESIGN.md dá a razão; RN exige o valor absoluto (arredondado). */
+  /** In px: DESIGN.md gives a ratio; RN needs the absolute (rounded) value. */
   lineHeight: number
   letterSpacing: number
 }
@@ -74,6 +74,7 @@ export const spacing = {
   sectionGap: 24,
   touchMin: 48,
   actionHeight: 56,
+  contentMaxWidth: 560,
 } as const
 
 export const radius = {
@@ -84,7 +85,7 @@ export const radius = {
   full: 9999,
 } as const
 
-// Profundidade vem de tom e borda; sombra só no nível 2 (o que flutua).
+// Depth comes from tone and border; shadow only on level 2 (floating surfaces).
 export const elevation = {
   level0: {
     backgroundColor: lightPalette.surfaceSoft,
@@ -100,16 +101,17 @@ export const elevation = {
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
     shadowOpacity: 0.12,
+    // shadow* props are iOS/web-only; Android needs `elevation`.
     elevation: 4,
   },
-  // Overlay full-screen do scan: cor chapada, sem sombra.
+  // Full-screen scan overlay: flat color, no shadow.
   level3: {
     shadowOpacity: 0,
     elevation: 0,
   },
 } as const
 
-/** Durações em ms (EXPERIENCE.md → Microinterações). */
+/** Durations in ms plus the press scale factor (EXPERIENCE.md → Microinterações). */
 export const motion = {
   press: 90,
   reduced: 120,

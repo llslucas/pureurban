@@ -29,7 +29,7 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
-//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
+//     `elevation`, 1.11b; background, fonts, brand and navigation theme, 6.1) e o
 //     provider travado em lightTheme no _layout, o
 //     mapa de status do StudentCard, as faixas do OfflineBanner e os
 //     call-sites das telas presos aos papéis da paleta (a migração manual não
@@ -531,8 +531,8 @@ describe('lock de binding dos temas Paper', () => {
     expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(designTokens.signatureYellow)
     const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
     expect(splash?.[1].backgroundColor).toBe(designTokens.signatureYellow)
-    // D-UX-11: só o nome de exibição muda. slug/scheme/package ligam o projeto
-    // EAS, o deep link e o APK instalado.
+    // D-UX-11: only the display name changes. slug/scheme/package tie the EAS
+    // project, the deep link and the installed APK.
     expect(appConfig.expo.name).toBe('PureUrban')
     expect(appConfig.expo.slug).toBe('mobile')
     expect(appConfig.expo.scheme).toBe('mobile')

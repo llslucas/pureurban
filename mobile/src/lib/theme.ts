@@ -19,9 +19,9 @@ import {
   type TypographyToken,
 } from '@/lib/tokens'
 
-// Mapeamento DESIGN.md → variantes MD3. labelLarge (botões Paper) usa `label`
-// 15/600, não `button` 17/700: o crescimento de texto na 6.1 fica em 1–2px e o
-// botão ganha a própria escala na story de componentes.
+// DESIGN.md → MD3 variant mapping. labelLarge (Paper buttons) uses `label`
+// 15/600, not `button` 17/700: story 6.1 caps text growth at 1–2px, and buttons
+// get their own scale in the component story.
 const DESIGN_VARIANTS: Partial<Record<MD3TypescaleKey, TypographyToken>> = {
   displaySmall: typography.displayCount,
   headlineMedium: typography.headline,
@@ -33,8 +33,8 @@ const DESIGN_VARIANTS: Partial<Record<MD3TypescaleKey, TypographyToken>> = {
   bodySmall: typography.caption,
 }
 
-// Variantes que o DESIGN não mapeia mantêm a escala MD3 e só trocam para a
-// família Inter do peso MD3 (400 → Regular, 500 → Medium).
+// Variants DESIGN.md doesn't map keep the MD3 scale and only switch to the Inter
+// family for their MD3 weight (400 → Regular, 500 → Medium).
 function interVariant(key: MD3TypescaleKey) {
   const design = DESIGN_VARIANTS[key]
   if (design) return { ...design }
@@ -68,7 +68,7 @@ export const lightTheme = {
   custom,
   colors: {
     ...MD3LightTheme.colors,
-    // O background default do MD3 vazava no fundo do TextInput outlined.
+    // The MD3 default background leaked into the outlined TextInput fill.
     background: lightPalette.surfaceSoft,
     primary: lightPalette.primary,
     onPrimary: lightPalette.onPrimary,
@@ -97,7 +97,7 @@ export const lightTheme = {
   },
 }
 
-// App travado em claro: fonts/custom aqui só mantêm o tipo AppTheme.
+// The app is locked to light: fonts/custom here only keep the AppTheme type.
 export const darkTheme: AppTheme = {
   ...MD3DarkTheme,
   fonts,

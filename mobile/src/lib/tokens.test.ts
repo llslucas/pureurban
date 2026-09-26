@@ -1,9 +1,9 @@
 import { lightPalette } from '@/lib/palette'
 import { elevation, fontFamily, motion, radius, spacing, typography } from '@/lib/tokens'
 
-// Token-pin (mesmo padrão da guarda de paleta): cada valor fixado ao DESIGN.md do
-// redesign (`ux-pureurban-2026-09-26`) e ao EXPERIENCE.md → Microinterações.
-// Mudou um token? Mude o documento primeiro e este teste na mesma mudança.
+// Token pin (same pattern as the palette guard): each value pinned to the redesign
+// DESIGN.md (`ux-pureurban-2026-09-26`) and EXPERIENCE.md → Microinterações.
+// Changing a token? Change the doc first, and this test in the same change.
 
 const DOCUMENTED_TYPOGRAPHY = {
   displayCount: { fontFamily: 'Inter_700Bold', fontSize: 40, fontWeight: '700', lineHeight: 44, letterSpacing: -0.5 },
@@ -45,6 +45,7 @@ describe('tokens — pin contra o DESIGN.md', () => {
       sectionGap: 24,
       touchMin: 48,
       actionHeight: 56,
+      contentMaxWidth: 560,
     })
   })
 
@@ -59,11 +60,13 @@ describe('tokens — pin contra o DESIGN.md', () => {
       borderColor: lightPalette.hairline,
       borderWidth: 1,
     })
-    expect(elevation.level2).toMatchObject({
+    expect(elevation.level2).toEqual({
+      backgroundColor: lightPalette.canvas,
       shadowColor: lightPalette.text,
       shadowOffset: { width: 0, height: 2 },
       shadowRadius: 8,
       shadowOpacity: 0.12,
+      elevation: 4,
     })
     expect(elevation.level3).toEqual({ shadowOpacity: 0, elevation: 0 })
   })
