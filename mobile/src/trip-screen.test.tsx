@@ -1,6 +1,6 @@
 import React from 'react'
-import { Alert } from 'react-native'
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react-native'
+import { Alert, Linking, StyleSheet } from 'react-native'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Provider as PaperProvider } from 'react-native-paper'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -12,6 +12,7 @@ import { useForegroundPermissions } from 'expo-location'
 import type { LocationPermissionResponse } from 'expo-location'
 import { useTripGpsCapture } from '@/hooks/use-trip-gps-capture'
 import { TEST_INSETS } from '@/components/ui/test-utils'
+import { lightPalette } from '@/lib/palette'
 import { lightTheme } from '@/lib/theme'
 import { activeTripKey } from '@/lib/trip-queries'
 
@@ -21,9 +22,9 @@ import { activeTripKey } from '@/lib/trip-queries'
 // src/lib/roster-stale-banner.test.ts:14-16).
 //
 // QueryClientProvider (retryDelay zeroed — the screens pin retry: 2 on the query
-// itself) + SafeArea/Paper providers + jest mocks of trip.service/routes.service. Covers the spec-3-1 I/O matrix: the
-// PLACEHOLDER_ROUTE_ID is gone and the real routeId from /routes/mine has to
-// reach POST /trips.
+// itself) + SafeArea/Paper providers + jest mocks of trip.service/routes.service.
+// Covers the spec-3-1 I/O matrix: the PLACEHOLDER_ROUTE_ID is gone and the real
+// routeId from /routes/mine has to reach POST /trips.
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -368,8 +369,39 @@ function endDialogVisible(): boolean {
     .some((node) => node.props.visible === true)
 }
 
+type JsonNode = { children: (JsonNode | string)[] | null }
+
+// Text nodes only: props such as testIDs legitimately carry route UUIDs.
 function renderedText(): string {
-  return JSON.stringify(screen.toJSON())
+  const texts: string[] = []
+  const walk = (node: JsonNode | string | null) => {
+    if (node === null) return
+    if (typeof node === 'string') {
+      texts.push(node)
+      return
+    }
+    node.children?.forEach(walk)
+  }
+  const tree = screen.toJSON() as JsonNode | JsonNode[] | null
+  ;(Array.isArray(tree) ? tree : [tree]).forEach(walk)
+  return texts.join('\n')
+}
+
+function expectNoUuidOrEmoji() {
+  const text = renderedText()
+  expect(text).not.toMatch(UUID)
+  expect(text).not.toMatch(EMOJI)
+}
+
+// Depth-first order of the given testIDs under `rootTestID`.
+function orderOf(rootTestID: string, testIDs: string[]): string[] {
+  return screen
+    .getByTestId(rootTestID)
+    .findAll((node: { props: { testID?: unknown } }) =>
+      testIDs.includes(node.props.testID as string),
+    )
+    .map((node: { props: { testID?: unknown } }) => node.props.testID as string)
+    .filter((id: string, index: number, all: string[]) => all.indexOf(id) === index)
 }
 
 describe('TripScreen — redesign (story 6.5)', () => {
@@ -384,8 +416,7 @@ describe('TripScreen — redesign (story 6.5)', () => {
     expect(screen.getByText('Em andamento')).toBeTruthy()
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalled())
     expect(mockRoutes.getMyRoutes).not.toHaveBeenCalled()
-    expect(renderedText()).not.toMatch(UUID)
-    expect(renderedText()).not.toMatch(EMOJI)
+    expectNoUuidOrEmoji()
   })
 
   it('cold start without the route in cache: "Rota atribuída", no UUID, no emoji', async () => {
@@ -394,8 +425,7 @@ describe('TripScreen — redesign (story 6.5)', () => {
     renderScreen()
 
     expect(await screen.findByText('Rota atribuída')).toBeTruthy()
-    expect(renderedText()).not.toMatch(UUID)
-    expect(renderedText()).not.toMatch(EMOJI)
+    expectNoUuidOrEmoji()
     expect(mockRoutes.getMyRoutes).not.toHaveBeenCalled()
   })
 
@@ -505,6 +535,7 @@ describe('TripScreen — redesign (story 6.5)', () => {
     expect(screen.getByText('Concluída')).toBeTruthy()
     expect(await screen.findByText('4/4')).toBeTruthy()
     expect(screen.queryByText(/Iniciada às/)).toBeNull()
+    expectNoUuidOrEmoji()
   })
 
   it('no trip, single route: empty state names the route and "Iniciar Viagem" sits in the bar', async () => {
@@ -517,6 +548,7 @@ describe('TripScreen — redesign (story 6.5)', () => {
     expect(screen.getByText('Linha Centro - Universidade')).toBeTruthy()
     expect(screen.getByTestId('sticky-action-bar')).toBeTruthy()
     expect(screen.getByText('Iniciar Viagem')).toBeTruthy()
+    expectNoUuidOrEmoji()
   })
 
   it('multiple routes: options are radios that report the selection', async () => {
@@ -526,10 +558,81 @@ describe('TripScreen — redesign (story 6.5)', () => {
     renderScreen()
 
     const option = await screen.findByRole('radio', { name: ROUTE_B.name })
+    expectNoUuidOrEmoji()
     expect(option).not.toBeChecked()
     fireEvent.press(option)
     await waitFor(() => expect(screen.getByRole('radio', { name: ROUTE_B.name })).toBeChecked())
     expect(screen.getByRole('radio', { name: ROUTE_A.name })).not.toBeChecked()
+  })
+
+  it('completed return: card + route selector, still no UUID or emoji', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(
+      makeTrip({
+        id: 'trip-return-1',
+        type: 'RETURN',
+        status: 'COMPLETED',
+        relatedTripId: 'trip-outbound-1',
+        endedAt: '2026-09-06T12:00:00.000Z',
+      }),
+    )
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A, ROUTE_B])
+
+    renderScreen()
+
+    expect(await screen.findByText('Escolha a rota da viagem')).toBeTruthy()
+    expect(screen.getByText('Viagem de retorno')).toBeTruthy()
+    expect(screen.getByText('Concluída')).toBeTruthy()
+    expectNoUuidOrEmoji()
+  })
+
+  it('D-UX-7: "Encerrar Viagem" sits above "Escanear" in the bar, as a red secondary', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(makeTrip())
+
+    renderScreen()
+
+    await screen.findByText('Encerrar Viagem')
+    expect(orderOf('sticky-action-bar', ['end-trip-action', 'scan-action'])).toEqual([
+      'end-trip-action',
+      'scan-action',
+    ])
+    const endLabel = StyleSheet.flatten(screen.getByTestId('end-trip-action-text').props.style)
+    expect(endLabel.color).toBe(lightPalette.error)
+    const endContainer = StyleSheet.flatten(
+      screen.getByTestId('end-trip-action-container').props.style,
+    )
+    expect(endContainer.backgroundColor).toBe(lightPalette.canvas)
+  })
+
+  it('confirm in flight: a second tap does not end the trip twice', async () => {
+    let resolveEnd: (trip: Trip) => void = () => {}
+    const trip = makeTrip()
+    mockTrip.getActiveTrip.mockResolvedValue(trip)
+    mockTrip.endTrip.mockReturnValue(
+      new Promise<Trip>((resolve) => {
+        resolveEnd = resolve
+      }),
+    )
+
+    renderScreen()
+
+    await confirmEnd()
+    await waitFor(() => expect(mockTrip.endTrip).toHaveBeenCalledTimes(1))
+    // React Query publishes `isPending` on a later tick; the guard holds from
+    // the render that shows the confirm button's spinner.
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('end-trip-dialog-confirm')).getByRole('progressbar'),
+      ).toBeTruthy(),
+    )
+    fireEvent.press(screen.getByTestId('end-trip-dialog-confirm'))
+    // mutationFn runs on a later tick: flush before counting.
+    await act(async () => {})
+    expect(mockTrip.endTrip).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveEnd({ ...trip, status: 'COMPLETED', endedAt: '2026-09-06T10:00:00.000Z' })
+    })
+    expect(await screen.findByText('Iniciar Retorno')).toBeTruthy()
   })
 
   it('trip query error: error state with retry', async () => {
@@ -602,6 +705,54 @@ describe('TripScreen — permissão de localização (Story 5.1)', () => {
     expect(await screen.findByText('Permissão de localização')).toBeTruthy()
     expect(screen.getByText('Abrir configurações')).toBeTruthy()
     expect(screen.queryByText('Permitir acesso à localização')).toBeNull()
+  })
+
+  it('"Permitir acesso" asks for the permission and shows an error when that fails', async () => {
+    const requestPermission = jest.fn(() => Promise.reject(new Error('boom')))
+    mockPermissions.mockReturnValue([permission(false, true), requestPermission, () => request()])
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    fireEvent.press(await screen.findByTestId('location-permission-action'))
+    expect(requestPermission).toHaveBeenCalledTimes(1)
+    expect(
+      await screen.findByText(
+        'Não foi possível pedir a permissão. Libere a localização nas configurações do sistema.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('"Abrir configurações" opens the settings and shows an error when that fails', async () => {
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockRejectedValue(new Error('boom'))
+    setPermission(false, false)
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    fireEvent.press(await screen.findByTestId('location-permission-action'))
+    expect(openSettings).toHaveBeenCalledTimes(1)
+    expect(
+      await screen.findByText(
+        'Não foi possível abrir as configurações. Abra manualmente e libere a localização para o PureUrban.',
+      ),
+    ).toBeTruthy()
+    openSettings.mockRestore()
+  })
+
+  it('outbound completed without permission: the TripCard comes before the permission card', async () => {
+    setPermission(false, true)
+    mockTrip.getActiveTrip.mockResolvedValue(
+      makeTrip({ status: 'COMPLETED', endedAt: '2026-09-06T10:00:00.000Z' }),
+    )
+
+    renderScreen()
+
+    await screen.findByText('Iniciar Retorno')
+    expect(orderOf('trip-screen', ['trip-card', 'location-permission-card'])).toEqual([
+      'trip-card',
+      'location-permission-card',
+    ])
   })
 
   it('permissão concedida: nenhum card', async () => {
