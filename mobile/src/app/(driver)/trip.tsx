@@ -388,8 +388,7 @@ export default function TripScreen() {
   if (!activeTrip || activeTrip.status === 'COMPLETED') {
     const isReturn = activeTrip?.status === 'COMPLETED' && activeTrip.type === 'OUTBOUND'
     return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Gestão de Viagem</Text>
+      <ScrollView contentContainerStyle={styles.container} testID="trip-screen">
         {permissionCard}
         {activeTrip && activeTrip.status === 'COMPLETED' && (
           <Card style={styles.card}>
@@ -440,8 +439,7 @@ export default function TripScreen() {
 
   // Estado 2/4: Viagem ACTIVE (OUTBOUND ou RETURN)
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Gestão de Viagem</Text>
+    <ScrollView contentContainerStyle={styles.container} testID="trip-screen">
       {permissionCard}
       <Card style={styles.card}>
         <Card.Content>

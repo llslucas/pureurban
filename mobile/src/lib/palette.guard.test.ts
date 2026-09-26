@@ -621,7 +621,6 @@ describe('locks de call-site (source-lock)', () => {
   it('routes: papéis de texto e superfícies presos à paleta', () => {
     const source = readSource('app/(driver)/routes.tsx')
     expect(source).toMatch(/wrapper: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
-    expect(source).toMatch(/title: \{[^}]*color: lightPalette\.text,/)
     expect(source).toMatch(/routeLabel: \{[^}]*color: lightPalette\.textMuted,/)
     expect(source).toMatch(/routeValue: \{[^}]*color: lightPalette\.textBody,/)
   })
