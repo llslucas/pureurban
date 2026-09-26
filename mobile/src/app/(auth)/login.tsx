@@ -1,13 +1,61 @@
 import { router } from 'expo-router'
 import React, { useEffect, useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
-import { Button, HelperText, Text, TextInput } from 'react-native-paper'
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native'
+import { Text, TextInput } from 'react-native-paper'
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { tokenStorage } from '@/lib/storage'
+import { Banner } from '@/components/ui/banner'
+import { MdiIcon } from '@/components/ui/mdi-icon'
+import { PrimaryAction } from '@/components/ui/primary-action'
 import { consumeDiscardNotice } from '@/lib/offline-discard-notice'
+import { lightPalette } from '@/lib/palette'
+import { tokenStorage } from '@/lib/storage'
+import { elevation, motion, radius, spacing, typography } from '@/lib/tokens'
 import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { homeForRole } from '@/utils/role-routes'
+
+// iOS fires "will" events before the keyboard animates; Android only has "did".
+const SHOW_EVENT = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+const HIDE_EVENT = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+
+const HERO_SHARE = 0.38
+const HERO_ICON_SIZE = 56
+// Icon + wordmark only: the tagline is what gives way to the keyboard.
+const HERO_COMPACT_FIXED = HERO_ICON_SIZE + spacing[2] + spacing[5] * 2
+const TAGLINE_HEIGHT = spacing[1] + typography.body.lineHeight
+// A ceiling, not a height, so a scaled-up font isn't clipped when expanded.
+const TAGLINE_MAX_HEIGHT = TAGLINE_HEIGHT * 3
+
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(() => Keyboard.isVisible())
+
+  useEffect(() => {
+    const show = Keyboard.addListener(SHOW_EVENT, () => setOpen(true))
+    const hide = Keyboard.addListener(HIDE_EVENT, () => setOpen(false))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [])
+
+  return open
+}
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
@@ -37,6 +85,34 @@ export default function LoginScreen() {
 
   const { login } = useAuthStore()
 
+  const insets = useSafeAreaInsets()
+  const { height: windowHeight, fontScale } = useWindowDimensions()
+  const reducedMotion = useReducedMotion()
+  const keyboardOpen = useKeyboardOpen()
+  const compact = useSharedValue(keyboardOpen ? 1 : 0)
+
+  useEffect(() => {
+    compact.value = withTiming(keyboardOpen ? 1 : 0, {
+      duration: reducedMotion ? motion.reduced : motion.standard,
+    })
+  }, [compact, keyboardOpen, reducedMotion])
+
+  // Text grows with the system font scale; the hero clips, so its floor must too.
+  const compactHeight =
+    insets.top + HERO_COMPACT_FIXED + typography.headline.lineHeight * fontScale
+  const fullHeight = Math.max(
+    windowHeight * HERO_SHARE,
+    compactHeight + spacing[1] + typography.body.lineHeight * fontScale,
+  )
+
+  const heroStyle = useAnimatedStyle(() => ({
+    height: interpolate(compact.value, [0, 1], [fullHeight, compactHeight]),
+  }))
+  const taglineStyle = useAnimatedStyle(() => ({
+    opacity: 1 - compact.value,
+    maxHeight: interpolate(compact.value, [0, 1], [TAGLINE_MAX_HEIGHT, 0]),
+  }))
+
   const handleLogin = async () => {
     setErrorMessage(null)
 
@@ -47,10 +123,8 @@ export default function LoginScreen() {
 
     setIsLoading(true)
     try {
-      // Normalize email to lowercase before sending to backend
       const result = await authService.login(email.trim().toLowerCase(), password)
 
-      // Persistir tokens no MMKV
       tokenStorage.setAccessToken(result.accessToken)
       tokenStorage.setRefreshToken(result.refreshToken)
 
@@ -65,7 +139,6 @@ export default function LoginScreen() {
         return
       }
 
-      // Atualizar estado global de autenticação
       login(result.user)
       router.replace(destination)
     } catch (err: unknown) {
@@ -81,74 +154,71 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.inner}>
-          <Text variant="headlineMedium" style={styles.title}>
+        <Animated.View style={[styles.hero, { paddingTop: insets.top }, heroStyle]} testID="login-hero">
+          <MdiIcon name="bus-school" size={HERO_ICON_SIZE} color={lightPalette.onBrand} />
+          <Text style={styles.wordmark} accessibilityRole="header">
             PureUrban
           </Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>
-            Faça login para continuar
-          </Text>
+          <Animated.View style={[styles.taglineSlot, taglineStyle]}>
+            <Text style={styles.tagline}>Embarque sem carteirinha</Text>
+          </Animated.View>
+        </Animated.View>
 
-          {discardNotice ? (
-            <HelperText type="info" visible style={styles.discardNotice}>
-              {discardNotice}
-            </HelperText>
-          ) : null}
+        <View style={styles.cardSlot}>
+          <View style={styles.card}>
+            {discardNotice ? (
+              <Banner tone="warning" message={discardNotice} testID="login-discard-notice" />
+            ) : null}
 
-          <TextInput
-            id="login-email"
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            mode="outlined"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            disabled={isLoading}
-            style={styles.input}
-          />
+            <TextInput
+              id="login-email"
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              mode="outlined"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              disabled={isLoading}
+            />
 
-          <TextInput
-            id="login-password"
-            label="Senha"
-            value={password}
-            onChangeText={setPassword}
-            mode="outlined"
-            secureTextEntry={!passwordVisible}
-            disabled={isLoading}
-            style={styles.input}
-            right={
-              <TextInput.Icon
-                icon={passwordVisible ? 'eye-off' : 'eye'}
-                onPress={() => setPasswordVisible((v) => !v)}
-              />
-            }
-          />
+            <TextInput
+              id="login-password"
+              label="Senha"
+              value={password}
+              onChangeText={setPassword}
+              mode="outlined"
+              secureTextEntry={!passwordVisible}
+              disabled={isLoading}
+              right={
+                <TextInput.Icon
+                  icon={passwordVisible ? 'eye-off' : 'eye'}
+                  onPress={() => setPasswordVisible((v) => !v)}
+                  accessibilityLabel={passwordVisible ? 'Ocultar senha' : 'Mostrar senha'}
+                  disabled={isLoading}
+                />
+              }
+            />
 
-          {errorMessage ? (
-            <HelperText type="error" visible>
-              {errorMessage}
-            </HelperText>
-          ) : null}
+            {errorMessage ? (
+              <Banner tone="error" message={errorMessage} testID="login-error" />
+            ) : null}
 
-          <Button
-            id="login-submit"
-            mode="contained"
-            onPress={() => void handleLogin()}
-            loading={isLoading}
-            disabled={isLoading}
-            style={styles.button}
-            contentStyle={styles.buttonContent}
-          >
-            Entrar
-          </Button>
+            <PrimaryAction
+              id="login-submit"
+              label="Entrar"
+              onPress={() => void handleLogin()}
+              loading={isLoading}
+              testID="login-submit"
+            />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -156,40 +226,45 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+    backgroundColor: lightPalette.surfaceSoft,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: spacing.sectionGap,
   },
-  inner: {
-    flex: 1,
+  hero: {
+    backgroundColor: lightPalette.brand,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    gap: 8,
+    paddingHorizontal: spacing.gutter,
+    overflow: 'hidden',
   },
-  title: {
-    textAlign: 'center',
-    marginBottom: 4,
-    fontWeight: 'bold',
+  wordmark: {
+    ...typography.headline,
+    color: lightPalette.onBrand,
+    marginTop: spacing[2],
   },
-  subtitle: {
-    textAlign: 'center',
-    marginBottom: 16,
-    opacity: 0.7,
+  taglineSlot: {
+    overflow: 'hidden',
   },
-  discardNotice: {
-    textAlign: 'center',
+  tagline: {
+    ...typography.body,
+    color: lightPalette.onBrand,
+    marginTop: spacing[1],
   },
-  input: {
-    marginBottom: 4,
+  cardSlot: {
+    width: '100%',
+    maxWidth: spacing.contentMaxWidth,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.gutter,
+    paddingTop: spacing.sectionGap,
   },
-  button: {
-    marginTop: 16,
-    borderRadius: 8,
-  },
-  buttonContent: {
-    paddingVertical: 6,
+  card: {
+    ...elevation.level1,
+    borderRadius: radius.lg,
+    padding: spacing[4],
+    gap: spacing[3],
   },
 })

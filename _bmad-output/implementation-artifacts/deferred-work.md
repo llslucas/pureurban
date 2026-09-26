@@ -504,3 +504,15 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_plan: `_bmad-output/implementation-artifacts/plan-6-2-componentes-base-de-estado-e-acao.md`
   summary: O `StateView` não anuncia ao leitor de tela a troca de loading para erro/bloqueado (sem `accessibilityLiveRegion` nem `announceForAccessibility`).
   evidence: Os helpers `Loading`/`Centered`/`Blocked` substituídos também não anunciavam (pré-existente). Como o componente é a base das stories 6.3–6.11, o lugar natural para resolver é a 6.11 (polimento de estados).
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-4-redesign-login.md`
+  summary: (NÃO VERIFICADO, médio se real) no Android o hero do login só encolhe após o `keyboardDidShow` e soma com o `KeyboardAvoidingView behavior="height"`, podendo dar salto de layout ou cobrir "Entrar" por um instante.
+  evidence: Review da 6.4 (edge-case + blind). Resolve-se abrindo o login no dev build nos AVDs e focando a senha; se confirmado, testar `behavior={undefined}` no Android (confiando no `adjustResize`) ou dirigir o hero pela altura do teclado.
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-4-redesign-login.md`
+  summary: Os campos do login não têm `autoComplete`/`textContentType` nem `returnKeyType`/`onSubmitEditing` (sem autofill de gerenciador de senhas nem envio pelo teclado).
+  evidence: Review da 6.4 (blind). Ausente já antes da 6.4 e fora do restyle ("fluxos não mudam"); candidato à 6.11 (polimento).
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-4-redesign-login.md`
+  summary: O `PrimaryAction` em `loading` não expõe `accessibilityState` busy/disabled — o leitor de tela anuncia o botão como habilitado enquanto engole os toques.
+  evidence: Review da 6.4 (edge-case). Comportamento do componente da 6.2 (sem cinza durante o loading); corrigir no componente vale para todas as telas.
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-4-redesign-login.md`
+  summary: O encolhimento do hero não tem teste que observe a altura/tagline renderizadas — só o alvo do `withTiming`, porque o mock do Reanimated não reavalia estilos animados.
+  evidence: Review da 6.4 (verification-gap). Exige outro setup de teste do Reanimated (ou verificação em device); a duração com/sem reduced motion ficou coberta.

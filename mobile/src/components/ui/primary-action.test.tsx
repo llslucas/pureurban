@@ -91,6 +91,11 @@ describe('PrimaryAction', () => {
     expect(onPress).not.toHaveBeenCalled()
   })
 
+  it('forwards id to the button container (the DOM id on web)', async () => {
+    await renderAction({ id: 'login-submit' })
+    expect(screen.getByTestId('primary-action-container').props.id).toBe('login-submit')
+  })
+
   it('shows the MDI icon when idle', async () => {
     await renderAction({ icon: 'refresh' })
     expect(screen.getByTestId('primary-action-icon-container')).toBeTruthy()
