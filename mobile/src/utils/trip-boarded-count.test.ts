@@ -33,6 +33,10 @@ describe('tripBoardedCount', () => {
     expect(tripBoardedCount(roster(0, 4), ['ana', 'ana'])).toEqual({ boarded: 1, total: 4 })
   })
 
+  it('never exceeds the trip total', () => {
+    expect(tripBoardedCount(roster(38, 38), ['ana', 'ghost'])).toEqual({ boarded: 38, total: 38 })
+  })
+
   it('is the server summary alone with no session check-ins', () => {
     expect(tripBoardedCount(roster(3, 4), [])).toEqual({ boarded: 3, total: 4 })
   })

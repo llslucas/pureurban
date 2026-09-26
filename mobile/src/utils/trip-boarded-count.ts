@@ -23,5 +23,7 @@ export function tripBoardedCount(
   for (const id of new Set(sessionStudentIds)) {
     if (!checkedIn.has(id)) pending += 1
   }
-  return { boarded: roster.summary.boarded + pending, total: roster.summary.total }
+  // A queued check-in the server later rejects stays pending here; never show 39/38.
+  const total = roster.summary.total
+  return { boarded: Math.min(roster.summary.boarded + pending, total), total }
 }

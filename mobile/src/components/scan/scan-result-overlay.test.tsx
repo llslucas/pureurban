@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import React from 'react'
 import { Platform, StyleSheet } from 'react-native'
+import * as Reanimated from 'react-native-reanimated'
 
 import { ScanResultOverlay, type ScanResult } from '@/components/scan/scan-result-overlay'
 import { renderUi, type TestNode } from '@/components/ui/test-utils'
@@ -65,6 +66,7 @@ beforeEach(() => jest.clearAllMocks())
 
 afterEach(() => {
   Platform.OS = originalOS
+  jest.mocked(Reanimated.useReducedMotion).mockReturnValue(false)
 })
 
 describe('ScanResultOverlay', () => {
@@ -76,6 +78,7 @@ describe('ScanResultOverlay', () => {
   it('checking: ink background with "Verificando..." and no haptic', async () => {
     await renderOverlay({ kind: 'checking' })
     expect(screen.getByText('Verificando...')).toBeTruthy()
+    expect(styleOf(screen.getByTestId('scan-overlay')).backgroundColor).toBe(lightPalette.primary)
     expect(mockNotification).not.toHaveBeenCalled()
     expect(mockImpact).not.toHaveBeenCalled()
   })
@@ -135,6 +138,16 @@ describe('ScanResultOverlay', () => {
     expect(detail.fontWeight).toBe('700')
     expect(screen.queryByTestId('scan-overlay-countdown')).toBeNull()
     expect(screen.queryByTestId('scan-overlay-dismiss')).toBeNull()
+    expect(screen.getByTestId('scan-overlay-message').props.accessibilityLabel).toBe(
+      'Já embarcou: Ana Souza. Este aluno já fez check-in nesta viagem.',
+    )
+  })
+
+  it('a failure without a known student announces title and detail', async () => {
+    await renderOverlay(NOT_ALLOWED)
+    expect(screen.getByTestId('scan-overlay-message').props.accessibilityLabel).toBe(
+      'Aluno não autorizado. Este aluno não está vinculado à rota desta viagem.',
+    )
   })
 
   it.each([
@@ -181,6 +194,19 @@ describe('ScanResultOverlay', () => {
     screen.rerender(
       <ScanResultOverlay result={SUCCESS} onResume={jest.fn()} onRetry={jest.fn()} autoResumeMs={2500} />,
     )
+    await act(async () => {})
+    expect(mockNotification).toHaveBeenCalledTimes(1)
+  })
+
+  it('the haptic dedup survives the effect re-running for the same result', async () => {
+    const overlay = () => (
+      <ScanResultOverlay result={SUCCESS} onResume={jest.fn()} onRetry={jest.fn()} autoResumeMs={2500} />
+    )
+    render(overlay())
+    await act(async () => {})
+    // Flipping reduced motion re-runs the effect with the same result object.
+    jest.mocked(Reanimated.useReducedMotion).mockReturnValue(true)
+    screen.rerender(overlay())
     await act(async () => {})
     expect(mockNotification).toHaveBeenCalledTimes(1)
   })

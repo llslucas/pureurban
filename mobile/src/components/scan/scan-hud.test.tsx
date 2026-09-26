@@ -34,6 +34,11 @@ describe('ScanHud', () => {
     expect(screen.queryByLabelText(/\d+ de \d+ embarcados/)).toBeNull()
   })
 
+  it('uses the singular in the accessibility label for one boarded student', async () => {
+    await renderUi(<ScanHud count={{ boarded: 1, total: 38 }} sessionCount={1} />)
+    expect(screen.getByLabelText('1 embarcado de 38 na viagem')).toBeTruthy()
+  })
+
   it('shows "—" while the roster is unknown', async () => {
     await renderUi(<ScanHud count={undefined} sessionCount={0} />)
     expect(screen.getByText('—')).toBeTruthy()

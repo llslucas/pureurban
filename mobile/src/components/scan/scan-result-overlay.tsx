@@ -24,16 +24,16 @@ import {
   type Tone,
 } from '@/utils/scan-feedback'
 
-// Union discriminado em vez de booleanos soltos (architecture.md §6). Com
-// booleanos, `isChecking && isError` é representável e significa nada.
+// Discriminated union instead of loose booleans (architecture.md §6). With
+// booleans, `isChecking && isError` is representable and means nothing.
 export type ScanResult =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'success'; title: string; detail: string; studentName?: string }
   | {
       kind: 'failure'
-      // Campos de `ScanFeedback` (`@/utils/scan-feedback`), achatados no union
-      // para o render discriminar por `kind` sem desembrulhar um nível a mais.
+      // `ScanFeedback` fields (`@/utils/scan-feedback`), flattened into the union
+      // so the render discriminates on `kind` without unwrapping another level.
       code: string
       tone: Tone
       title: string
@@ -45,9 +45,9 @@ export type ScanResult =
 type SettledResult = Extract<ScanResult, { kind: 'success' | 'failure' }>
 
 const TONE_COLOR: Record<Tone, string> = {
-  // Verde/âmbar/vermelho/tinta (família ink/body para offline) sobre o preto da
-  // câmera — contraste alto, legível em movimento e sob sol direto (NFR18).
-  // Papéis da paleta única (`@/lib/palette`); o branco dos overlays é `onPrimary`.
+  // Green/amber/red/ink (ink/body family for offline) over the camera black —
+  // high contrast, readable in motion and in direct sun (NFR18). Roles from the
+  // single palette (`@/lib/palette`); the overlays' white is `onPrimary`.
   success: lightPalette.success,
   warn: lightPalette.warning,
   error: lightPalette.error,
@@ -105,7 +105,7 @@ export function ScanResultOverlay({ result, onResume, onRetry, autoResumeMs }: S
   if (result.kind === 'idle') return null
   if (result.kind === 'checking') {
     return (
-      <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]}>
+      <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]} testID="scan-overlay">
         <View style={styles.message}>
           <ActivityIndicator size="large" color={lightPalette.onPrimary} />
           <Text style={styles.title}>Verificando...</Text>
@@ -202,9 +202,9 @@ function SettledOverlay({ result, onResume, onRetry, autoResumeMs }: SettledOver
   const isFailure = result.kind === 'failure'
   const showRetry = isFailure && result.canRetry
   const showGoToTrip = isFailure && result.code === 'TRIP_NOT_ACTIVE'
-  // Com uma ação primária branca (retry ou "Ir para Viagem"), "Escanear
-  // próximo" vira secundária — dois botões brancos empilhados não teriam
-  // hierarquia nenhuma.
+  // With a white primary action (retry or "Ir para Viagem"), "Escanear
+  // próximo" becomes secondary — two stacked white buttons would have no
+  // hierarchy at all.
   const hasPrimaryAction = showRetry || showGoToTrip
 
   const content = (
@@ -245,9 +245,9 @@ function SettledOverlay({ result, onResume, onRetry, autoResumeMs }: SettledOver
             testID="scan-overlay-retry"
           />
         ) : null}
-        {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
-            afordância: sem ela o motorista lê "Inicie uma viagem antes de
-            registrar embarques" sem nenhum caminho até lá. */}
+        {/* State 12 is the only Truth Table row that calls for this
+            affordance: without it the driver reads "Inicie uma viagem antes de
+            registrar embarques" with no way to get there. */}
         {showGoToTrip ? (
           <PrimaryAction
             label="Ir para Viagem"
@@ -289,8 +289,8 @@ function SettledOverlay({ result, onResume, onRetry, autoResumeMs }: SettledOver
 }
 
 const styles = StyleSheet.create({
-  // Overlay de resultado cobrindo a tela inteira: em movimento, o motorista não
-  // tem tempo de procurar um snackbar no rodapé (NFR18).
+  // Full-screen result overlay: in motion, the driver has no time to look for a
+  // snackbar at the bottom (NFR18).
   overlay: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -310,9 +310,8 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: lightPalette.onPrimary,
   },
-  // Mensagem ocupa o espaço livre e fica centrada; as ações ficam na metade
-  // inferior, ao alcance do polegar de quem segura o aparelho com uma mão só
-  // (NFR18 / Task 7.10).
+  // The message fills the free space, centered; the actions sit in the lower
+  // half, within thumb reach for a one-handed grip (NFR18 / Task 7.10).
   message: {
     flex: 1,
     alignItems: 'center',

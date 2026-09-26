@@ -4,7 +4,7 @@ import { Linking } from 'react-native'
 
 import { StateView } from '@/components/ui/state-view'
 
-// Guarda de role: um aluno que chegue nesta rota não pode escanear ninguém.
+// Role guard: a student who lands on this route must not scan anyone.
 export function RoleGuardState({ logout }: { logout: () => void }) {
   return (
     <StateView
@@ -14,10 +14,10 @@ export function RoleGuardState({ logout }: { logout: () => void }) {
       action={{
         label: 'Entrar novamente',
         onPress: () => {
-          // `logout()` ANTES do replace, como em `(student)/qr-code.tsx`
-          // (Task 7.11). Só navegar deixaria `isAuthenticated` true: o aluno
-          // ficaria estacionado num formulário de login com a sessão viva, e o
-          // shell continuaria montado atrás.
+          // `logout()` BEFORE the replace, as in `(student)/qr-code.tsx`
+          // (Task 7.11). Navigating alone would leave `isAuthenticated` true: the
+          // student would sit on a login form with a live session, and the
+          // shell would stay mounted behind it.
           logout()
           router.replace('/(auth)/login')
         },
@@ -31,12 +31,12 @@ interface CameraPermissionStateProps {
   requestPermission: () => Promise<unknown>
 }
 
-// Estado 2 da Tabela de Verdade. Um único componente para os dois ramos: o
-// `actionError` sobrevive à troca de "pedir" para "bloqueada".
+// Truth Table state 2. One component for both branches, so `actionError`
+// survives the switch from "ask" to "blocked".
 export function CameraPermissionState({ canAskAgain, requestPermission }: CameraPermissionStateProps) {
-  // Falha ao abrir o pedido de permissão ou as configurações do sistema. Antes
-  // as duas promises eram descartadas com `void`: a rejeição ficava sem
-  // tratamento e o botão simplesmente parecia morto.
+  // Failure to open the permission prompt or the system settings. Both promises
+  // used to be discarded with `void`: the rejection went unhandled and the
+  // button just looked dead.
   const [actionError, setActionError] = useState<string | null>(null)
 
   return canAskAgain ? (
@@ -80,7 +80,7 @@ export function CameraPermissionState({ canAskAgain, requestPermission }: Camera
   )
 }
 
-// Estado 4.
+// Truth Table state 4.
 export function NoActiveTripState() {
   return (
     <StateView

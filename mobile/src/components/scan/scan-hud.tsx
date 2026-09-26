@@ -22,12 +22,12 @@ export function ScanHud({ count, sessionCount }: ScanHudProps) {
   // embarcados": the trip and list screens stay mounted in the same stack with
   // those exact strings, and Playwright's strict mode would match both.
   const a11yLabel = count
-    ? `${count.boarded} embarcados de ${count.total} na viagem`
+    ? `${count.boarded} ${count.boarded === 1 ? 'embarcado' : 'embarcados'} de ${count.total} na viagem`
     : 'Contagem de embarque indisponível'
 
   return (
-    // `box-none`: a barra não intercepta toques (a câmera continua atrás), mas
-    // o botão "Ver lista" dentro dela sim.
+    // `box-none`: the bar lets touches through to the camera behind it, but the
+    // "Ver lista" button inside it still takes them.
     <View style={styles.bar} pointerEvents="box-none" testID="scan-hud">
       <View style={styles.counter}>
         <View style={styles.countRow} accessible accessibilityLabel={a11yLabel} testID="scan-hud-count">
@@ -49,8 +49,8 @@ export function ScanHud({ count, sessionCount }: ScanHudProps) {
           {sessionCount === 1 ? '1 embarque nesta sessão' : `${sessionCount} embarques nesta sessão`}
         </Text>
       </View>
-      {/* `navigate`, nunca `push`: dois toques rápidos empilhavam duas telas
-          (finding da 3.2b). */}
+      {/* `navigate`, never `push`: two quick taps used to stack two screens
+          (3.2b finding). */}
       <Button
         mode="contained"
         buttonColor={withAlpha(lightPalette.onPrimary, 0.16)}
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     gap: spacing[3],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing.gutter,
-    // Scrim sobre a câmera: chrome de câmera (allowlist da guarda).
+    // Scrim over the camera: camera chrome (palette guard allowlist).
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   counter: {

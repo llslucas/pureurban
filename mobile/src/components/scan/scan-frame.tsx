@@ -19,9 +19,9 @@ interface ScanFrameProps {
   isPaused: boolean
 }
 
-// Proporção da menor dimensão da tela ocupada pela janela de escaneamento.
-// Proporção, não pixel fixo: uma medida absoluta estoura em devices ≤ 368dp
-// (iPhone SE e toda a classe 360dp de Android) — foi finding de review na 3.2b.
+// Share of the screen's smaller dimension taken by the scan window. A ratio,
+// not fixed pixels: an absolute size overflows on devices ≤ 368dp (iPhone SE
+// and the whole 360dp Android class) — a 3.2b review finding.
 const WINDOW_RATIO = 0.7
 const CORNER = 36
 const CORNER_WIDTH = 5
@@ -52,11 +52,10 @@ function ScanLine({ travel }: { travel: number }) {
 }
 
 /**
- * Máscara escura com a janela recortada: dá ao motorista um alvo óbvio para
- * onde apontar, em vez de uma imagem de câmera sem referência (AC #1). Quatro
- * painéis explícitos em vez do truque de `borderWidth: 9999` — o truque zera o
- * raio interno e se comporta diferente entre iOS e Android; quatro Views são
- * previsíveis nos dois.
+ * Dark mask with the window cut out: gives the driver an obvious target to aim
+ * at instead of a camera image with no reference (AC #1). Four explicit panels
+ * instead of the `borderWidth: 9999` trick — the trick zeroes the inner radius
+ * and behaves differently on iOS and Android; four Views are predictable on both.
  */
 export function ScanFrame({ isPaused }: ScanFrameProps) {
   const { width, height } = useWindowDimensions()
@@ -92,25 +91,25 @@ export function ScanFrame({ isPaused }: ScanFrameProps) {
 }
 
 const styles = StyleSheet.create({
-  // Allowlist da guarda de paleta: máscara escura ao redor da janela — chrome
-  // de câmera, não cor de UI.
+  // Palette guard allowlist: dark mask around the window — camera chrome, not a
+  // UI color.
   maskPanel: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   maskMiddleRow: {
     flexDirection: 'row',
-    // SEM `alignItems: 'center'`: com `center`, os dois painéis que ladeiam a
-    // janela não têm altura própria (só `flex: 1`, que aqui governa a largura)
-    // e calculam 0dp — as laterais da faixa central ficavam sem escurecer, e a
-    // "moldura" virava uma fenda horizontal de ponta a ponta. O `stretch`
-    // padrão faz os painéis acompanharem a altura da janela.
+    // NO `alignItems: 'center'`: with `center`, the two panels beside the
+    // window have no height of their own (only `flex: 1`, which governs width
+    // here) and compute to 0dp — the sides of the middle band stayed undimmed
+    // and the "frame" became an edge-to-edge horizontal slit. The default
+    // `stretch` makes the panels follow the window's height.
     justifyContent: 'center',
     // Same overhang, below: keeps the bottom corners above the hint panel.
     zIndex: 1,
   },
   window: {
-    // Sem fundo: é o recorte por onde a câmera aparece.
+    // No background: it is the cutout the camera shows through.
     backgroundColor: 'transparent',
     // The corners overhang the window by their stroke; without this the right
     // mask panel, painted later, covers that overhang.
@@ -124,8 +123,8 @@ const styles = StyleSheet.create({
     height: LINE_HEIGHT,
     backgroundColor: withAlpha(lightPalette.onPrimary, 0.6),
   },
-  // Cantos brancos sobre a máscara escura: contraste máximo, legível sob sol
-  // direto e com o ônibus em movimento (NFR18).
+  // White corners on the dark mask: maximum contrast, readable in direct sun
+  // and with the bus moving (NFR18).
   corner: {
     position: 'absolute',
     width: CORNER,

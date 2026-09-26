@@ -50,7 +50,8 @@ interface Attempt {
   owner: QueueOwner
 }
 
-// Read from the cached roster, never fetched: the name must show offline too.
+// Synchronous cache read (the screen's roster query keeps it filled), so the
+// name still shows offline when the check-in itself can't reach the server.
 function cachedStudentName(queryClient: QueryClient, attempt: Attempt): string | undefined {
   return queryClient
     .getQueryData(tripStudentsOptions(attempt.tripId).queryKey)
