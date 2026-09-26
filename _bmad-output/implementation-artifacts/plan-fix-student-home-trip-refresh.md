@@ -3,7 +3,7 @@ title: 'Fix: home do aluno não reflete o estado do servidor (viagem de retorno 
 type: 'bugfix'
 ticket: ''
 created: '2026-09-26'
-status: 'in-review'
+status: 'built'
 route: 'full'
 route_source: 'auto'
 review: 'thorough'
@@ -179,8 +179,15 @@ primeiro plano só por causa do `focusManager`.
   `nest build` limpo; `openapi:export` 2x com arquivo idêntico; mobile `npm test` 364/364,
   `npm run lint` sem erros, `npx tsc --noEmit` só com os 3 erros já conhecidos (scan.tsx,
   use-trip-gps-capture.test, tracking-stream.service.test).
-- **Não executado:** o check manual nos emuladores (motorista17/aluno17, API :3001) — o 4º
-  critério de aceite fica pendente de verificação humana.
+- **Check nos emuladores (2026-09-26, após os patches da revisão):** com o app do aluno17
+  aberto no retorno `d5e1e932`: abriu em "Embarque confirmado" (o servidor dizia CHECKED_IN,
+  o cache antigo dizia ausência); linhas de check-in/ausência do aluno17 apagadas no banco de
+  dev → "Não vou voltar" habilitou em ~15s sem reabrir; 2 toques → "Ausência registrada" com
+  countdown 1:59; motorista17 abriu o scan (a cena virtual mostra o QR do aluno17) → a home do
+  aluno virou "Embarque confirmado" no ciclo seguinte. 4º critério de aceite aprovado.
+- **Armadilha do Metro:** o watcher do Metro que já estava rodando não viu o arquivo novo
+  `lib/app-focus.ts` (`Unable to resolve module`), e o app continuou com o bundle antigo.
+  Resolvido reiniciando com `--clear`.
 
 ## Plan Change Log
 
