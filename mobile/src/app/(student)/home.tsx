@@ -21,14 +21,18 @@ import { useAuthStore } from '@/stores/auth.store'
 // scanning the student. Paused in background by the focusManager (app-focus).
 const HOME_POLL_MS = 15_000
 
-// Outcomes that mean "the local state is behind the server": the screen
-// refetches the status instead of guessing.
-const STATUS_RACE_CODES = new Set([
-  'ALREADY_NOT_RETURNING',
-  'ALREADY_CHECKED_IN',
-  'CANCELLATION_PERIOD_EXPIRED',
-  'ABSENCE_NOT_FOUND',
-])
+// Outcomes that mean "the local state is behind the server". Each one already
+// tells the student's state, written before the refetch so a failed refetch
+// never leaves the screen stale. `absence: null` = consolidated, no countdown.
+const RACE_OUTCOMES: Record<
+  string,
+  Pick<StudentBoardingStatusResponse, 'status' | 'absence'>
+> = {
+  ALREADY_NOT_RETURNING: { status: 'NOT_RETURNING', absence: null },
+  CANCELLATION_PERIOD_EXPIRED: { status: 'NOT_RETURNING', absence: null },
+  ABSENCE_NOT_FOUND: { status: 'NOT_CHECKED_IN', absence: null },
+  ALREADY_CHECKED_IN: { status: 'CHECKED_IN', absence: null },
+}
 
 // Every typed contract error has a clear pt-BR message. ALREADY_NOT_RETURNING
 // is not here: on this screen it is not an error, the status shows the absence.
@@ -61,6 +65,19 @@ export default function StudentHomeScreen() {
   })
 
   const tripId = activeTrip?.status === 'ACTIVE' ? activeTrip.id : null
+
+  const applyRaceOutcome = async (error: unknown, raceTripId: string) => {
+    if (!(error instanceof ApiClientError)) return
+    const outcome = RACE_OUTCOMES[error.code]
+    if (!outcome) return
+    const key = studentBoardingStatusKey(raceTripId)
+    await queryClient.cancelQueries({ queryKey: key })
+    queryClient.setQueryData<StudentBoardingStatusResponse>(key, {
+      tripId: raceTripId,
+      ...outcome,
+    })
+    void queryClient.invalidateQueries({ queryKey: key })
+  }
 
   // The server is the source of truth for check-in/absence on the return.
   // A failed GET keeps the last known state and retries on the next cycle.
@@ -125,15 +142,11 @@ export default function StudentHomeScreen() {
       attemptKeyRef.current = null
       setDialogVisible(false)
     },
-    onError: (error, currentTripId) => {
+    onError: async (error, currentTripId) => {
       attemptKeyRef.current = null
       setDialogVisible(false)
 
-      if (error instanceof ApiClientError && STATUS_RACE_CODES.has(error.code)) {
-        void queryClient.invalidateQueries({
-          queryKey: studentBoardingStatusKey(currentTripId),
-        })
-      }
+      await applyRaceOutcome(error, currentTripId)
 
       // The absence already exists on the server: for the student it is a
       // success — the refetched status shows the card with the real window.
@@ -181,16 +194,11 @@ export default function StudentHomeScreen() {
       })
       cancelAttemptKeyRef.current = null
     },
-    onError: (error, currentTripId) => {
+    onError: async (error, currentTripId) => {
       cancelAttemptKeyRef.current = null
 
-      // Window closed mid-flight (absence kept) or no absence to cancel: the
-      // screen takes whatever the server says instead of guessing.
-      if (error instanceof ApiClientError && STATUS_RACE_CODES.has(error.code)) {
-        void queryClient.invalidateQueries({
-          queryKey: studentBoardingStatusKey(currentTripId),
-        })
-      }
+      // Window closed mid-flight (absence kept) or no absence to cancel.
+      await applyRaceOutcome(error, currentTripId)
 
       setSnackbarMessage(
         error instanceof ApiClientError

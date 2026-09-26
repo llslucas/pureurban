@@ -288,6 +288,32 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     ).toBeNull()
   })
 
+  it('ALREADY_NOT_RETURNING with a failing refetch: the card still shows, consolidated', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus
+      .mockResolvedValueOnce(STATUS_PENDING)
+      .mockRejectedValue(new Error('Network down'))
+    mockBoarding.notifyNotReturning.mockRejectedValue(
+      new ApiClientError('ALREADY_NOT_RETURNING', 'já registrada', 409),
+    )
+
+    renderScreen()
+
+    fireEvent.press(await openDialog())
+
+    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    await waitFor(() =>
+      expect(queryClient.getQueryState(statusKey)?.status).toBe('error'),
+    )
+    expect(screen.getByText('Ausência registrada')).toBeTruthy()
+    expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
+    expect(queryClient.getQueryData(statusKey)).toEqual({
+      tripId: RETURN_TRIP.id,
+      status: 'NOT_RETURNING',
+      absence: null,
+    })
+  })
+
   it('ALREADY_CHECKED_IN orienta falar com o motorista', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
     mockBoarding.notifyNotReturning.mockRejectedValue(
