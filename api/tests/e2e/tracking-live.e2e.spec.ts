@@ -434,8 +434,8 @@ test.describe('Épico 5 — acompanhamento do ônibus em tempo real', () => {
           response.url().endsWith('/end'),
         { timeout: 15_000 },
       );
-      // Encerrar pede confirmação (D-UX-7, story 6.5); o PATCH sai do "Encerrar"
-      // do dialog, não do botão da barra.
+      // Ending asks for confirmation (D-UX-7, story 6.5): the PATCH comes from
+      // the dialog's "Encerrar", not from the bar button.
       await driverPage.getByRole('button', { name: 'Encerrar Viagem' }).click();
       await driverPage.getByTestId('end-trip-dialog-confirm').click();
       const end = await endResponse;
