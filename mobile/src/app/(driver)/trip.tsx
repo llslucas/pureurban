@@ -247,7 +247,6 @@ export default function TripScreen() {
     return (
       <Screen variant="scroll" footer={footer} testID="trip-screen">
         <View style={styles.stack}>
-          {permissionCard}
           {activeTrip && activeTrip.status === 'COMPLETED' && (
             <TripCard
               type={activeTrip.type}
@@ -257,6 +256,7 @@ export default function TripScreen() {
               startedAt={activeTrip.startedAt}
             />
           )}
+          {permissionCard}
           {isReturn ? null : (
             <StartOutboundSection
               phase={phase}
