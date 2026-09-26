@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, act, waitFor } from '@testing-library/react-native'
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Provider as PaperProvider } from 'react-native-paper'
 
@@ -10,6 +10,8 @@ import {
 } from '@/services/boarding-events.service'
 import { tripService, type Trip, type TripStudents } from '@/services/trip.service'
 import { useAuthStore } from '@/stores/auth.store'
+import { router } from 'expo-router'
+import { ApiClientError } from '@/services/api-error'
 
 // Lives at src/ root, not src/app/: Expo Router turns every file under src/app/
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap and
@@ -372,5 +374,33 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
     act(() => registeredHandlers().onOpen?.())
 
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('StudentListScreen — estados de bloqueio e erro (StateView)', () => {
+  it('roster rejeitado sem cache: "Não foi possível carregar a lista" e "Tentar novamente" busca de novo', async () => {
+    mockTrip.getTripStudents.mockRejectedValue(new Error('500'))
+
+    renderScreen()
+    expect(await screen.findByText('Não foi possível carregar a lista')).toBeTruthy()
+    const callsBefore = mockTrip.getTripStudents.mock.calls.length
+
+    fireEvent.press(screen.getByText('Tentar novamente'))
+
+    await waitFor(() =>
+      expect(mockTrip.getTripStudents.mock.calls.length).toBeGreaterThan(callsBefore),
+    )
+  })
+
+  it('403 DRIVER_NOT_ASSIGNED: "Viagem de outro motorista" e "Ir para Viagem" navega para a viagem', async () => {
+    mockTrip.getTripStudents.mockRejectedValue(
+      new ApiClientError('DRIVER_NOT_ASSIGNED', 'Motorista não atribuído', 403),
+    )
+
+    renderScreen()
+    expect(await screen.findByText('Viagem de outro motorista')).toBeTruthy()
+
+    fireEvent.press(screen.getByText('Ir para Viagem'))
+    expect(jest.mocked(router).navigate).toHaveBeenCalledWith('/(driver)/trip')
   })
 })

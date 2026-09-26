@@ -2,27 +2,12 @@ import React from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
-import { lightPalette, statusTints } from '@/lib/palette'
-import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
+import { STATUS_PRESENTATION } from '@/lib/boarding-status'
+import { lightPalette } from '@/lib/palette'
+import type { TripStudentItem } from '@/services/trip.service'
 
-interface StatusPresentation {
-  label: string
-  /** Cor do texto do chip. */
-  color: string
-  /** Fundo do chip. */
-  background: string
-  /** Glifo textual — nunca a única pista (Task 2.4): o rótulo carrega o sentido. */
-  icon: string
-}
-
-// Constante de módulo, não `switch` inline no JSX (Task 2.3). `Record` sobre o
-// union: um `status` novo no contrato quebra o typecheck aqui, não a tela.
-// Cores = papéis da paleta única (`@/lib/palette`) — nova cor entra lá primeiro.
-export const STATUS_PRESENTATION: Record<BoardingStatus, StatusPresentation> = {
-  CHECKED_IN: { label: 'Embarcou', color: lightPalette.success, background: statusTints.success, icon: '✓' },
-  NOT_CHECKED_IN: { label: 'Não embarcou', color: lightPalette.textBody, background: statusTints.neutral, icon: '—' },
-  NOT_RETURNING: { label: 'Não vai voltar', color: lightPalette.warning, background: statusTints.warning, icon: '!' },
-}
+// Re-exported: the palette guard probes import the map from here.
+export { STATUS_PRESENTATION }
 
 function formatCheckedInAt(iso: string): string {
   // Architecture §6: ISO 8601 UTC na API, conversão para o timezone local só

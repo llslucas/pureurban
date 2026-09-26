@@ -501,3 +501,6 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_plan: `_bmad-output/implementation-artifacts/plan-6-1-tokens-tema-paper-e-dependencias-de-marca.md`
   summary: RESOLVIDO — o maybe-false do negrito dobrado no Android (família por peso + `fontWeight`) não se confirmou: títulos e botões renderizam em Inter bold normal no APK da 6.1.
   evidence: Capturas do dev build `f70e35da` nos AVDs (login, trip do motorista, home do aluno), 26/09/2026.
+- source_plan: `_bmad-output/implementation-artifacts/plan-6-2-componentes-base-de-estado-e-acao.md`
+  summary: O `StateView` não anuncia ao leitor de tela a troca de loading para erro/bloqueado (sem `accessibilityLiveRegion` nem `announceForAccessibility`).
+  evidence: Os helpers `Loading`/`Centered`/`Blocked` substituídos também não anunciavam (pré-existente). Como o componente é a base das stories 6.3–6.11, o lugar natural para resolver é a 6.11 (polimento de estados).

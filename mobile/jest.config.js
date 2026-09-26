@@ -8,5 +8,6 @@ module.exports = {
     '<rootDir>/src/**/*.{test,spec}.{ts,tsx,js,jsx}',
     '<rootDir>/src/**/__tests__/**/*.{test,spec}.{ts,tsx,js,jsx}',
   ],
+  setupFiles: ['<rootDir>/jest.setup.js'],
   collectCoverage: false,
 };
