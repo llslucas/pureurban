@@ -1,11 +1,14 @@
 import { router } from 'expo-router'
 import React, { useMemo } from 'react'
-import { ScrollView, RefreshControl, StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Button, Card, Divider, Snackbar, Text } from 'react-native-paper'
+import { RefreshControl, StyleSheet, View } from 'react-native'
+import { Snackbar } from 'react-native-paper'
 import { useQuery } from '@tanstack/react-query'
 
-import { StudentQrCode } from '@/components/student-qr-code'
+import { QrPass, QrPassRouteLine } from '@/components/student-qr/qr-pass'
+import { Screen } from '@/components/ui/screen'
+import { StateView } from '@/components/ui/state-view'
 import { qrSessionStorage } from '@/lib/storage'
+import { lightPalette } from '@/lib/palette'
 import { routesService } from '@/services/routes.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { buildQrPayload, encodeQrPayload } from '@/utils/qr-payload'
@@ -17,7 +20,7 @@ export default function QrCodeScreen() {
   const qrValue = useMemo(() => {
     if (!user || !sessionId) return null
     return encodeQrPayload(buildQrPayload(user.id, sessionId))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só studentId e sessionId formam o payload
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only studentId and sessionId make up the payload
   }, [user?.id, sessionId])
 
   const [snackbarVisible, setSnackbarVisible] = React.useState(false)
@@ -36,112 +39,85 @@ export default function QrCodeScreen() {
     retry: 2,
   })
 
-  // Reabre o snackbar a cada nova falha (errorUpdatedAt muda por tentativa).
-  // A visibilidade final ainda passa por `showErrorState`: com rota vinda do
-  // cache a tela renderiza o dado normalmente e um aviso de erro por cima seria
-  // a tela se contradizendo.
+  // Reopens the snackbar on every new failure (errorUpdatedAt changes per
+  // attempt). Visibility still goes through `showErrorState`: with a cached
+  // route the screen shows the data, and an error toast on top would contradict it.
   React.useEffect(() => {
     if (isError) setSnackbarVisible(true)
   }, [isError, errorUpdatedAt])
 
-  // Sessão corrompida: sessionId ausente com (ou sem) user presente. Com a
-  // hidratação da Task 2, isAuthenticated já cai e o _layout.tsx redireciona
-  // antes desta tela montar — mas um app instalado por cima de build antigo
-  // pode chegar aqui mesmo assim. Nunca renderizar QR vazio/placeholder: um QR
-  // que decodifica para lixo vira INVALID_QR_CODE no ônibus.
+  // Corrupted session: sessionId missing, with or without a user. Session
+  // hydration already drops isAuthenticated and _layout.tsx redirects before
+  // this screen mounts, but an app installed over an old build can still land
+  // here. Never render an empty/placeholder QR: a QR that decodes to garbage
+  // becomes INVALID_QR_CODE on the bus.
   if (!qrValue || !user || user.role !== 'STUDENT') {
     return (
-      <View style={styles.centered}>
-        <Text variant="titleMedium" style={styles.corruptedTitle}>
-          Sua sessão precisa ser renovada
-        </Text>
-        <Text variant="bodyMedium" style={styles.corruptedHint}>
-          Não foi possível carregar seus dados. Entre novamente para ver seu QR code.
-        </Text>
-        <Button
-          mode="contained"
-          style={styles.corruptedButton}
-          onPress={() => {
+      <StateView
+        kind="blocked"
+        title="Sua sessão precisa ser renovada"
+        detail="Não foi possível carregar seus dados. Entre novamente para ver seu QR code."
+        action={{
+          label: 'Entrar novamente',
+          onPress: () => {
+            // logout() first: navigating alone would leave isAuthenticated true
+            // and the login form sitting on a live session.
             logout()
             router.replace('/(auth)/login')
-          }}
-        >
-          Entrar novamente
-        </Button>
-      </View>
+          },
+        }}
+        testID="qr-session-blocked"
+      />
     )
   }
 
-  // A resposta é normalizada antes de qualquer decisão: um payload que não seja
-  // array (proxy devolvendo HTML, contrato mudando) faria `routes.length` virar
-  // undefined, escapar dos dois estados abaixo e estourar em `routes[0].name` —
-  // derrubando a tela inteira, QR junto.
+  // Normalized before any decision: a non-array payload (a proxy returning
+  // HTML, a changed contract) would make `routes.length` undefined, slip past
+  // both states below and crash on `routes[0].name`, taking the QR down with it.
   const routeList = Array.isArray(routes) ? routes.filter((r) => Boolean(r?.name)) : []
   const hasRoutes = routeList.length > 0
 
   const showErrorState = isError && !hasRoutes
-  // `status === 'pending'` cobre também a query pausada (offline): `isLoading`
-  // fica false nesse caso e a tela afirmaria "Nenhuma rota vinculada" sem nunca
-  // ter buscado nada.
+  // `status === 'pending'` also covers the paused (offline) query: `isLoading`
+  // is false then, and the screen would claim "Nenhuma rota vinculada" without
+  // ever having fetched.
   const showLoadingState = status === 'pending'
   const showEmptyState = status === 'success' && !hasRoutes
 
+  const routeLine = showLoadingState ? (
+    <QrPassRouteLine loading text="Carregando rota..." testID="qr-route-loading" />
+  ) : showErrorState ? (
+    <QrPassRouteLine icon="cloud-alert" text="Não foi possível carregar sua rota." testID="qr-route-error" />
+  ) : showEmptyState ? (
+    <QrPassRouteLine icon="map-marker-off" text="Nenhuma rota vinculada" testID="qr-route-empty" />
+  ) : (
+    <>
+      <QrPassRouteLine icon="map-marker-path" text={routeList[0].name} testID="qr-route-name" />
+      {routeList.length > 1 ? (
+        <QrPassRouteLine secondary text={`+${routeList.length - 1} rotas`} testID="qr-route-more" />
+      ) : null}
+      {isError ? (
+        <QrPassRouteLine
+          secondary
+          icon="clock-alert-outline"
+          text="Rota possivelmente desatualizada"
+          testID="qr-route-stale"
+        />
+      ) : null}
+    </>
+  )
+
   return (
-    <View style={styles.wrapper}>
-      <ScrollView
-        contentContainerStyle={styles.container}
+    <View style={styles.root}>
+      <Screen
+        variant="scroll"
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+        testID="student-qr"
       >
-        <Text variant="headlineSmall" style={styles.name}>
-          {user.name}
-        </Text>
-        <Text variant="bodyMedium" style={styles.hint}>
-          Mostre este código ao motorista
-        </Text>
-
-        <Card style={styles.qrCard} mode="elevated">
-          <Card.Content style={styles.qrCardContent}>
-            <StudentQrCode value={qrValue} />
-          </Card.Content>
-        </Card>
-
-        <Divider style={styles.divider} />
-
-        <Text variant="titleSmall" style={styles.routeLabel}>
-          Rota
-        </Text>
-
-        {showLoadingState ? (
-          <View style={styles.routeStatus}>
-            <ActivityIndicator size="small" />
-            <Text variant="bodyMedium">Carregando rota...</Text>
-          </View>
-        ) : showErrorState ? (
-          <View style={styles.routeStatus}>
-            <Text variant="bodyMedium">Não foi possível carregar sua rota.</Text>
-          </View>
-        ) : showEmptyState ? (
-          <View style={styles.routeStatus}>
-            <Text variant="bodyMedium">Nenhuma rota vinculada</Text>
-          </View>
-        ) : (
-          <View style={styles.routeStatus}>
-            <Text variant="bodyLarge" style={styles.routeName}>
-              🚌 {routeList[0].name}
-            </Text>
-            {routeList.length > 1 ? (
-              <Text variant="bodySmall" style={styles.moreRoutes}>
-                +{routeList.length - 1} rotas
-              </Text>
-            ) : null}
-            {isError ? (
-              <Text variant="bodySmall" style={styles.moreRoutes}>
-                Rota possivelmente desatualizada
-              </Text>
-            ) : null}
-          </View>
-        )}
-      </ScrollView>
+        <View style={styles.center}>
+          <QrPass name={user.name} route={routeLine} qrValue={qrValue} />
+        </View>
+      </Screen>
 
       <Snackbar
         visible={snackbarVisible && showErrorState}
@@ -156,64 +132,12 @@ export default function QrCodeScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  root: {
     flex: 1,
+    backgroundColor: lightPalette.surfaceSoft,
   },
-  container: {
+  center: {
     flexGrow: 1,
-    padding: 24,
-    alignItems: 'center',
-  },
-  centered: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    padding: 24,
-  },
-  corruptedTitle: {
-    textAlign: 'center',
-  },
-  corruptedHint: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  corruptedButton: {
-    marginTop: 12,
-  },
-  name: {
-    textAlign: 'center',
-  },
-  hint: {
-    textAlign: 'center',
-    opacity: 0.7,
-    marginBottom: 20,
-  },
-  qrCard: {
-    borderRadius: 16,
-  },
-  qrCardContent: {
-    alignItems: 'center',
-    padding: 16,
-  },
-  divider: {
-    alignSelf: 'stretch',
-    marginVertical: 24,
-  },
-  routeLabel: {
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  routeStatus: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-  },
-  routeName: {
-    fontWeight: '600',
-  },
-  moreRoutes: {
-    opacity: 0.6,
   },
 })
