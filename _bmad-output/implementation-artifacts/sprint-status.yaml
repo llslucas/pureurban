@@ -259,7 +259,7 @@ development_status:
   # confirmação de Encerrar viagem). Marco = 6.12, antes da defesa; 6.13/6.14 opcionais.
   epic-6: in-progress
   6-1-tokens-tema-paper-e-dependencias-de-marca: done # FECHADO em 26/09/2026 (PR #56); plan-6-1 done, dev build validado nos AVDs
-  6-2-componentes-base-de-estado-e-acao: review # plan-6-2 built em 26/09/2026; aguarda PR
+  6-2-componentes-base-de-estado-e-acao: done # FECHADO em 26/09/2026 (PR #57); plan-6-2 done
   6-3-cabecalho-padrao-e-saida-da-conta: backlog
   6-4-redesign-login: backlog
   6-5-redesign-viagem-do-motorista: backlog
