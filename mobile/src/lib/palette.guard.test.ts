@@ -16,7 +16,8 @@ import {
   STATUS_TINT_ALPHA,
   statusTints,
 } from '@/lib/palette'
-import { darkTheme, lightTheme } from '@/lib/theme'
+import { darkTheme, lightTheme, navigationTheme } from '@/lib/theme'
+import { fontFamily, typography } from '@/lib/tokens'
 import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 
 // Tranca a paleta única da Story 1.11 por quatro camadas:
@@ -28,8 +29,8 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
-//     `elevation`, 1.11b) e o provider travado em lightTheme no _layout, o
-//     mapa de status do StudentCard, as faixas do OfflineBanner e os
+//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
+//     provider travado em lightTheme no _layout, o mapa de status do StudentCard, as faixas do OfflineBanner e os
 //     call-sites das telas presos aos papéis da paleta (a migração manual não
 //     pode trocar tokens silenciosamente).
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
@@ -236,6 +237,7 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × overlay de erro', fg: lightPalette.onPrimary, bg: lightPalette.error, min: 4.5 },
   { desc: 'onPrimary × overlay Verificando (tinta)', fg: lightPalette.onPrimary, bg: lightPalette.primary, min: 4.5 },
   { desc: 'onPrimary × faixa offline (body)', fg: lightPalette.onPrimary, bg: lightPalette.textBody, min: 4.5 },
+  { desc: 'onBrand × brand (superfície full-bleed, D-UX-1)', fg: lightPalette.onBrand, bg: lightPalette.brand, min: 4.5 },
 ]
 
 const DARK_PAIRS: ColorPair[] = [
@@ -246,6 +248,7 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × botão primário branco em dark', fg: darkPalette.onPrimary, bg: darkPalette.primary, min: 4.5 },
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
+  { desc: 'onBrand × brand em dark', fg: darkPalette.onBrand, bg: darkPalette.brand, min: 4.5 },
 ]
 
 // ---- Helpers dos render-probes ----
@@ -383,6 +386,13 @@ describe('contraste AA dos pares dos temas', () => {
 })
 
 describe('lock de binding dos temas Paper', () => {
+  it('brand é o amarelo-escolar com texto tinta, igual nos dois temas (D-UX-1)', () => {
+    for (const palette of [lightPalette, darkPalette]) {
+      expect(palette.brand).toBe(designTokens.signatureYellow)
+      expect(palette.onBrand).toBe(designTokens.ink)
+    }
+  })
+
   it('lightTheme mapeia cada papel sobrescrito ao papel da paleta (secondary é SUPERFÍCIE, não texto)', () => {
     expect(lightTheme.colors.primary).toBe(lightPalette.primary)
     expect(lightTheme.colors.onPrimary).toBe(lightPalette.onPrimary)
@@ -392,6 +402,7 @@ describe('lock de binding dos temas Paper', () => {
     expect(lightTheme.colors.onSecondaryContainer).toBe(lightPalette.text)
     expect(lightTheme.colors.surface).toBe(lightPalette.surface)
     expect(lightTheme.colors.onSurface).toBe(lightPalette.text)
+    expect(lightTheme.colors.background).toBe(lightPalette.surfaceSoft)
     expect(lightTheme.colors.onBackground).toBe(lightPalette.text)
     expect(lightTheme.colors.surfaceVariant).toBe(lightPalette.surfaceStrong)
     expect(lightTheme.colors.onSurfaceVariant).toBe(lightPalette.textMuted)
@@ -442,6 +453,47 @@ describe('lock de binding dos temas Paper', () => {
     })
   })
 
+  it('fonts: variantes do DESIGN.md em Inter por peso; o resto do MD3 só troca a família (6.1)', () => {
+    const mapped = {
+      displaySmall: typography.displayCount,
+      headlineMedium: typography.headline,
+      titleLarge: typography.titleLg,
+      titleMedium: typography.title,
+      bodyLarge: typography.bodyLg,
+      bodyMedium: typography.body,
+      labelLarge: typography.label,
+      bodySmall: typography.caption,
+    }
+    for (const [variant, token] of Object.entries(mapped)) {
+      expect(lightTheme.fonts[variant as keyof typeof mapped]).toMatchObject(token)
+    }
+    for (const [variant, md3] of Object.entries(MD3LightTheme.fonts)) {
+      if (variant in mapped) continue
+      const actual = lightTheme.fonts[variant as keyof typeof lightTheme.fonts]
+      const expectedFamily = md3.fontWeight === '500' ? fontFamily.medium : fontFamily.regular
+      expect(actual).toEqual({ ...md3, fontFamily: expectedFamily })
+    }
+    expect(darkTheme.fonts).toBe(lightTheme.fonts)
+    expect(darkTheme.custom).toBe(lightTheme.custom)
+  })
+
+  it('navigationTheme: fundo do React Navigation unificado no surface-soft, header canvas, Inter (6.1)', () => {
+    expect(navigationTheme.dark).toBe(false)
+    expect(navigationTheme.colors).toMatchObject({
+      primary: lightPalette.primary,
+      background: lightPalette.surfaceSoft,
+      card: lightPalette.canvas,
+      text: lightPalette.text,
+      border: lightPalette.hairline,
+    })
+    expect(Object.values(navigationTheme.fonts).map((f) => f.fontFamily)).toEqual([
+      fontFamily.regular,
+      fontFamily.medium,
+      fontFamily.semiBold,
+      fontFamily.bold,
+    ])
+  })
+
   it('_layout: PaperProvider travado em lightTheme, sem flip por esquema do SO (trava da trava, 1.11b)', () => {
     const source = readSource('app/_layout.tsx')
     expect(source).not.toContain('useColorScheme')
@@ -449,7 +501,15 @@ describe('lock de binding dos temas Paper', () => {
     expect(source.match(/<PaperProvider theme=\{lightTheme\}>/g)).toHaveLength(2)
   })
 
-  it('app.json: chrome nativo (userInterfaceStyle/splash/ícone) também travado em light (1.11b)', () => {
+  it('_layout: navegador envolto no navigationTheme e Inter no gate de boot (6.1)', () => {
+    const source = readSource('app/_layout.tsx')
+    expect(source.match(/<ThemeProvider value=\{navigationTheme\}>/g)).toHaveLength(1)
+    expect(source).toMatch(/useFonts\(\{[^}]*Inter_400Regular,[^}]*Inter_500Medium,[^}]*Inter_600SemiBold,[^}]*Inter_700Bold,/)
+    expect(source).toMatch(/const isFontReady = isFontGateOpen\(fontsLoaded, fontError\)/)
+    expect(source).toMatch(/const isBooting = [^\n]*!isFontReady/)
+  })
+
+  it('app.json: chrome nativo travado em light, splash e ícone no amarelo de marca (1.11b, D-UX-1)', () => {
     // A varredura de hex cobre só src/: o chrome nativo (headers, status bar,
     // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, a
     // metade nativa da trava light reverteria em silêncio (era o azul #208AEF
@@ -458,15 +518,24 @@ describe('lock de binding dos temas Paper', () => {
       readFileSync(join(SRC_ROOT, '..', 'app.json'), 'utf8'),
     ) as {
       expo: {
+        name: string
+        slug: string
+        scheme: string
         userInterfaceStyle: string
-        android: { adaptiveIcon: { backgroundColor: string } }
+        android: { package: string; adaptiveIcon: { backgroundColor: string } }
         plugins: [string, Record<string, unknown>][]
       }
     }
     expect(appConfig.expo.userInterfaceStyle).toBe('light')
-    expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe('#ffffff')
+    expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(designTokens.signatureYellow)
     const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
-    expect(splash?.[1].backgroundColor).toBe('#ffffff')
+    expect(splash?.[1].backgroundColor).toBe(designTokens.signatureYellow)
+    // D-UX-11: only the display name changes. slug/scheme/package tie the EAS
+    // project, the deep link and the installed APK.
+    expect(appConfig.expo.name).toBe('PureUrban')
+    expect(appConfig.expo.slug).toBe('mobile')
+    expect(appConfig.expo.scheme).toBe('mobile')
+    expect(appConfig.expo.android.package).toBe('com.pureurban.mobile')
     // Varredura negativa no config inteiro: os scalars acima não cobrem outras
     // chaves nativas (ícone, imagens, plugins futuros) onde o azul da paleta
     // antiga poderia voltar em silêncio.

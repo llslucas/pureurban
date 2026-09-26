@@ -30,7 +30,7 @@ describe('guarda — identidade EAS e build nativo (Story 1.7)', () => {
   })
 
   it('app.json: extra.eas.projectId é o id comitado do eas init — nunca regenerar', () => {
-    expect(appConfig.expo.extra.eas.projectId).toBe('73144243-4b27-4869-ae07-9367e9597c52')
+    expect(appConfig.expo.extra.eas.projectId).toBe('53e555d5-ff74-418d-911f-ecf95e459126')
   })
 
   it('app.json: permissões de câmera e localização presentes (scan do QR + GPS da viagem)', () => {

@@ -1,3 +1,11 @@
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts,
+} from '@expo-google-fonts/inter'
+import { ThemeProvider } from '@react-navigation/native'
 import { Stack } from 'expo-router'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import React, { useEffect, useState } from 'react'
@@ -6,10 +14,11 @@ import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
 import { setupAppFocus } from '@/lib/app-focus'
 import { initializeDatabase } from '@/lib/database'
+import { isFontGateOpen } from '@/lib/font-gate'
 import { registerOfflineQueueLifecycle } from '@/lib/offline-queue-lifecycle'
 import { mmkvPersister } from '@/lib/mmkv-persister'
 import { queryClient } from '@/lib/query-client'
-import { lightTheme } from '@/lib/theme'
+import { lightTheme, navigationTheme } from '@/lib/theme'
 import { enableMocking, MOCKS_ENABLED } from '@/mocks'
 import { useAuthStore } from '@/stores/auth.store'
 import { ROLE_ROUTES, ROLES } from '@/utils/role-routes'
@@ -23,6 +32,12 @@ export default function RootLayout() {
   const [isMockReady, setIsMockReady] = useState(!MOCKS_ENABLED)
   const [mockError, setMockError] = useState<string | null>(null)
   const { user, isAuthenticated } = useAuthStore()
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  })
 
   useEffect(() => {
     // Inicializa banco SQLite e cria tabela offline_queue na inicialização do app.
@@ -43,6 +58,10 @@ export default function RootLayout() {
   useEffect(() => setupAppFocus(), [])
 
   useEffect(() => {
+    if (fontError) console.error('[fonts] failed to load Inter:', fontError)
+  }, [fontError])
+
+  useEffect(() => {
     if (!MOCKS_ENABLED) return
 
     // Falha aqui NÃO abre o portão: seguir em frente mandaria o app para a API
@@ -61,7 +80,15 @@ export default function RootLayout() {
   if (mockError) {
     return (
       <PaperProvider theme={lightTheme}>
-        <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 8 }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            padding: 24,
+            gap: 8,
+            backgroundColor: lightTheme.colors.background,
+          }}
+        >
           <Text variant="titleMedium">Falha ao inicializar os mocks (MSW)</Text>
           <Text variant="bodySmall">{mockError}</Text>
           <Text variant="bodySmall">
@@ -74,7 +101,8 @@ export default function RootLayout() {
     )
   }
 
-  const isBooting = !isDbReady || !isMockReady
+  const isFontReady = isFontGateOpen(fontsLoaded, fontError)
+  const isBooting = !isDbReady || !isMockReady || !isFontReady
 
   return (
     <PersistQueryClientProvider
@@ -92,7 +120,14 @@ export default function RootLayout() {
         {isBooting ? (
           // Nunca null enquanto os portões de boot não abrem: um layout raiz sem
           // saída de router é exatamente a tela em branco que esta tela evita.
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: lightTheme.colors.background,
+            }}
+          >
             <ActivityIndicator />
           </View>
         ) : (
@@ -100,23 +135,25 @@ export default function RootLayout() {
           // decide o próprio header; sem isso o app empilha dois. Vale para os
           // quatro grupos: (driver) e (student) dão títulos por tela, (admin) dá
           // um título, e (auth) desliga o header (ver o layout do grupo).
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Protected guard={!isAuthenticated}>
-              <Stack.Screen name="(auth)" />
-            </Stack.Protected>
-            {/* Derivado de ROLE_ROUTES: um papel novo entra no mapa e ganha
-                guard e destino de uma vez. Guards escritos à mão aqui podiam
-                divergir do mapa, e a divergência não dá erro — dá loop entre
-                este navegador e o `+not-found`. */}
-            {ROLES.map((role) => (
-              <Stack.Protected
-                key={role}
-                guard={isAuthenticated && user?.role === role}
-              >
-                <Stack.Screen name={ROLE_ROUTES[role].group} />
+          <ThemeProvider value={navigationTheme}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Protected guard={!isAuthenticated}>
+                <Stack.Screen name="(auth)" />
               </Stack.Protected>
-            ))}
-          </Stack>
+              {/* Derivado de ROLE_ROUTES: um papel novo entra no mapa e ganha
+                  guard e destino de uma vez. Guards escritos à mão aqui podiam
+                  divergir do mapa, e a divergência não dá erro — dá loop entre
+                  este navegador e o `+not-found`. */}
+              {ROLES.map((role) => (
+                <Stack.Protected
+                  key={role}
+                  guard={isAuthenticated && user?.role === role}
+                >
+                  <Stack.Screen name={ROLE_ROUTES[role].group} />
+                </Stack.Protected>
+              ))}
+            </Stack>
+          </ThemeProvider>
         )}
       </PaperProvider>
     </PersistQueryClientProvider>

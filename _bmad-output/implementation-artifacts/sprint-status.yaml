@@ -257,8 +257,8 @@ development_status:
   # planning-artifacts/ux-designs/ux-pureurban-2026-09-26/ (DESIGN.md + EXPERIENCE.md,
   # decisões D-UX-1..13). Visual + microinterações, fluxos intactos (exceções: Sair e
   # confirmação de Encerrar viagem). Marco = 6.12, antes da defesa; 6.13/6.14 opcionais.
-  epic-6: backlog
-  6-1-tokens-tema-paper-e-dependencias-de-marca: backlog
+  epic-6: in-progress
+  6-1-tokens-tema-paper-e-dependencias-de-marca: review # código, review e dev build validados (plan-6-1, built); aguarda PR
   6-2-componentes-base-de-estado-e-acao: backlog
   6-3-cabecalho-padrao-e-saida-da-conta: backlog
   6-4-redesign-login: backlog
