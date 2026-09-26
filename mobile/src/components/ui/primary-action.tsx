@@ -26,6 +26,8 @@ export interface PrimaryActionProps {
   impact?: boolean
   /** Label color for `on-color` (the overlay tone) and `quiet` (e.g. on a solid banner). */
   color?: string
+  /** Becomes the DOM `id` on web; e2e selectors rely on it. */
+  id?: string
   testID?: string
 }
 
@@ -63,6 +65,7 @@ export function PrimaryAction({
   disabled = false,
   impact = false,
   color,
+  id,
   testID = 'primary-action',
 }: PrimaryActionProps) {
   const reducedMotion = useReducedMotion()
@@ -107,6 +110,7 @@ export function PrimaryAction({
         disabled={disabled}
         loading={loading}
         icon={icon ? ({ color: iconColor }) => <MdiIcon name={icon} size={ICON_SIZE} color={iconColor} /> : undefined}
+        id={id}
         testID={testID}
         style={[styles.button, variant === 'secondary' && styles.secondary]}
         contentStyle={{ minHeight: look.height }}
