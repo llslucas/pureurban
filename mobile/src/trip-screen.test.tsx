@@ -400,7 +400,7 @@ describe('TripScreen — permissão de localização (Story 5.1)', () => {
 
     renderScreen()
 
-    await screen.findByText('Gestão de Viagem')
+    await screen.findByTestId('trip-screen')
     expect(screen.queryByText('Permissão de localização')).toBeNull()
   })
 })

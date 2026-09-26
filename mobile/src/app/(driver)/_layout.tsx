@@ -2,8 +2,10 @@ import { Stack } from 'expo-router'
 import { StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AccountMenu } from '@/components/account-menu'
 import { OfflineBanner } from '@/components/offline-banner'
 import { useOfflineSync } from '@/hooks/use-offline-sync'
+import { appHeaderOptions } from '@/lib/app-header'
 
 export default function DriverLayout() {
   // Montado no LAYOUT, não na tela de scan: o dreno precisa continuar enquanto o
@@ -13,7 +15,13 @@ export default function DriverLayout() {
 
   return (
     <View style={styles.container}>
-      <Stack initialRouteName="trip">
+      <Stack
+        initialRouteName="trip"
+        screenOptions={{
+          ...appHeaderOptions,
+          headerRight: () => <AccountMenu pendingCount={pendingCount} />,
+        }}
+      >
         <Stack.Screen name="trip" options={{ title: 'Viagem' }} />
         <Stack.Screen name="scan" options={{ title: 'Escanear QR Code' }} />
         <Stack.Screen name="student-list" options={{ title: 'Alunos da viagem' }} />

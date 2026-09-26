@@ -79,7 +79,6 @@ export default function DriverRoutesScreen() {
           <RefreshControl refreshing={isFetching} onRefresh={() => refetch()} />
         }
       >
-        <Text style={styles.title}>Minhas Rotas</Text>
         <Text style={styles.subtitle}>
           {routes && routes.length > 0
             ? `${routes.length} rota${routes.length > 1 ? 's' : ''} atribuída${routes.length > 1 ? 's' : ''}`
@@ -155,12 +154,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: lightPalette.textMuted,
     fontSize: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: lightPalette.text,
-    marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,

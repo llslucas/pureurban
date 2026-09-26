@@ -27,7 +27,7 @@ export async function loginAsDriver(
   await page.locator('#login-email').fill(creds.email);
   await page.locator('#login-password').fill(creds.password);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByText('Gestão de Viagem')).toBeVisible({
+  await expect(page.getByTestId('trip-screen')).toBeVisible({
     timeout: 30_000,
   });
 }
