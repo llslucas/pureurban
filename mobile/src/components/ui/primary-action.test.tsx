@@ -81,6 +81,20 @@ describe('PrimaryAction', () => {
     expect(label.color).toBe(lightPalette.success)
   })
 
+  it('secondary takes `color` for the label and keeps the canvas fill and strong border', async () => {
+    await renderAction({ variant: 'secondary', color: lightPalette.error })
+    const label = StyleSheet.flatten(screen.getByTestId('primary-action-text').props.style)
+    expect(label.color).toBe(lightPalette.error)
+    expect(containerStyle().backgroundColor).toBe(lightPalette.canvas)
+    expect(containerStyle().borderColor).toBe(lightPalette.borderStrong)
+  })
+
+  it('secondary label defaults to ink', async () => {
+    await renderAction({ variant: 'secondary' })
+    const label = StyleSheet.flatten(screen.getByTestId('primary-action-text').props.style)
+    expect(label.color).toBe(lightPalette.text)
+  })
+
   it('loading swaps the icon for a spinner, keeps the label and swallows presses', async () => {
     const onPress = await renderAction({ loading: true, icon: 'refresh' })
     expect(screen.getByText('Tentar novamente')).toBeTruthy()
