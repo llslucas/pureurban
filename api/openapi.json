@@ -1666,6 +1666,76 @@
         ]
       }
     },
+    "/api/v1/boarding/status": {
+      "get": {
+        "description": "Fonte da verdade do estado do aluno autenticado (studentId do JWT) na viagem de retorno ativa da rota dele: CHECKED_IN se o motorista registrou o embarque (prevalece sobre ausência ativa), NOT_RETURNING com a janela de cancelamento se há ausência ativa, senão NOT_CHECKED_IN. 200 sempre — data null significa \"sem viagem de retorno ativa\".",
+        "operationId": "BoardingController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Envelope { data, meta } com data null ou { tripId, status, absence }. A viagem ativa é resolvida pelo domínio trip ANTES do boarding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/StudentBoardingStatusResponseDto"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN — role STUDENT exigida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado do aluno na viagem de retorno ativa",
+        "tags": [
+          "boarding"
+        ]
+      }
+    },
     "/api/v1/boarding/events": {
       "get": {
         "description": "Canal em tempo real do motorista para a viagem ativa. Cada mensagem do stream traz a linha `event:` com o tipo (boarding.not_returning | boarding.absence_cancelled | boarding.checkin_reminder) e a linha `data:` com o payload JSON. A conexão é encerrada elegantemente quando a viagem termina; a reconexão após queda de rede é responsabilidade do cliente (EventSource), sem duplicar entradas na lista.",
@@ -2477,6 +2547,67 @@
         "required": [
           "tripId",
           "remindedAt"
+        ]
+      },
+      "StudentAbsenceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID do registro de ausência ativa",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440004"
+          },
+          "notifiedAt": {
+            "type": "string",
+            "description": "Momento do registro da ausência (ISO 8601 UTC)",
+            "example": "2026-09-07T21:10:00.000Z"
+          },
+          "cancellableUntil": {
+            "type": "string",
+            "description": "Fim da janela de cancelamento (ISO 8601 UTC), calculado pelo servidor. O cliente só exibe o countdown.",
+            "example": "2026-09-07T21:12:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "notifiedAt",
+          "cancellableUntil"
+        ]
+      },
+      "StudentBoardingStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "tripId": {
+            "type": "string",
+            "description": "ID da viagem de retorno ativa do aluno",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "status": {
+            "type": "string",
+            "description": "Estado do aluno na viagem. CHECKED_IN prevalece sobre ausência ativa (mesma regra do roster).",
+            "enum": [
+              "CHECKED_IN",
+              "NOT_RETURNING",
+              "NOT_CHECKED_IN"
+            ],
+            "example": "NOT_RETURNING"
+          },
+          "absence": {
+            "nullable": true,
+            "description": "Ausência ativa — presente somente quando status é NOT_RETURNING",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StudentAbsenceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "tripId",
+          "status",
+          "absence"
         ]
       },
       "BoardingNotReturningEventDto": {

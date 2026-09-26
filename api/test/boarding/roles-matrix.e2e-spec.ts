@@ -86,6 +86,12 @@ describe('BoardingController (e2e) — matriz de roles dos endpoints 4.x (Story 
       return req;
     };
 
+    const status = (token: string | null) => {
+      const req = http(app).get('/api/v1/boarding/status');
+      if (token !== null) req.set('Authorization', `Bearer ${token}`);
+      return req;
+    };
+
     it('STUDENT: POST /not-returning registra a ausência com 201', async () => {
       const tripId = await seedActiveTrip('RETURN');
       const response = await notReturning(studentToken, tripId).expect(201);
@@ -125,6 +131,10 @@ describe('BoardingController (e2e) — matriz de roles dos endpoints 4.x (Story 
       await reminder(driverToken).expect(403);
     });
 
+    it('DRIVER no GET /status deve dar 403 — o estado é consultado pelo aluno (mesmo override)', async () => {
+      await status(driverToken).expect(403);
+    });
+
     it('STUDENT em /events deve dar 403 — o stream é do motorista', async () => {
       await events(studentToken).expect(403);
     });
@@ -132,7 +142,7 @@ describe('BoardingController (e2e) — matriz de roles dos endpoints 4.x (Story 
     // ADMIN nunca foi exercitado nos endpoints novos (RV8): a matriz original
     // pinou DRIVER/STUDENT/anônimo — um typo de @Roles que concedesse ADMIN
     // passaria com a suíte toda verde.
-    it('ADMIN nos 4 endpoints novos deve dar 403 — nenhum deles é dele (RV8)', async () => {
+    it('ADMIN nos endpoints novos deve dar 403 — nenhum deles é dele (RV8)', async () => {
       const forbidden = (response: { body: ApiResponse }) =>
         expect(response.body.error?.code).toBe('FORBIDDEN');
 
@@ -140,6 +150,7 @@ describe('BoardingController (e2e) — matriz de roles dos endpoints 4.x (Story 
       forbidden(await cancelAbsence(adminToken).expect(403));
       forbidden(await reminder(adminToken).expect(403));
       forbidden(await events(adminToken).expect(403));
+      forbidden(await status(adminToken).expect(403));
     });
 
     it('sem token, as rotas novas devem dar 401', async () => {
@@ -147,6 +158,7 @@ describe('BoardingController (e2e) — matriz de roles dos endpoints 4.x (Story 
       await cancelAbsence(null).expect(401);
       await events(null).expect(401);
       await reminder(null).expect(401);
+      await status(null).expect(401);
     });
   });
 });

@@ -42,6 +42,7 @@ import {
   CancelAbsenceResponseDto,
 } from './dtos/cancel-absence.dto.js';
 import { PendingReminderResponseDto } from './dtos/pending-reminder.dto.js';
+import { StudentBoardingStatusResponseDto } from './dtos/student-boarding-status.dto.js';
 import {
   BoardingNotReturningEventDto,
   BoardingAbsenceCancelledEventDto,
@@ -333,6 +334,66 @@ export class BoardingController {
     // The student comes from the token, never from the query — same pattern
     // as the absence POSTs.
     return this.boardingService.getPendingReminder({
+      studentId: req.user.userId,
+      tripId: trip.id,
+      companyId,
+    });
+  }
+
+  @Get('status')
+  @Roles(['STUDENT'])
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Estado do aluno na viagem de retorno ativa',
+    description:
+      'Fonte da verdade do estado do aluno autenticado (studentId do JWT) na viagem de retorno ativa ' +
+      'da rota dele: CHECKED_IN se o motorista registrou o embarque (prevalece sobre ausência ativa), ' +
+      'NOT_RETURNING com a janela de cancelamento se há ausência ativa, senão NOT_CHECKED_IN. ' +
+      '200 sempre — data null significa "sem viagem de retorno ativa".',
+  })
+  @ApiExtraModels(StudentBoardingStatusResponseDto)
+  @ApiResponse({
+    status: 200,
+    description:
+      'Envelope { data, meta } com data null ou { tripId, status, absence }. A viagem ativa é resolvida ' +
+      'pelo domínio trip ANTES do boarding.',
+    schema: {
+      properties: {
+        data: {
+          allOf: [{ $ref: getSchemaPath(StudentBoardingStatusResponseDto) }],
+          nullable: true,
+        },
+        meta: {
+          type: 'object',
+          properties: { timestamp: { type: 'string', format: 'date-time' } },
+        },
+      },
+      required: ['data', 'meta'],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN — role STUDENT exigida.',
+    type: ErrorResponseDto,
+  })
+  async status(
+    @TenantId() companyId: string,
+    @Req() req: Request & { user: { userId: string } },
+  ) {
+    const trip = await this.tripService.getActiveStudentTrip(
+      req.user.userId,
+      companyId,
+    );
+    if (!trip) {
+      return null;
+    }
+
+    return this.boardingService.getStudentStatus({
       studentId: req.user.userId,
       tripId: trip.id,
       companyId,

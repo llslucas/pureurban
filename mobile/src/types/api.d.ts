@@ -436,6 +436,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boarding/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado do aluno na viagem de retorno ativa
+         * @description Fonte da verdade do estado do aluno autenticado (studentId do JWT) na viagem de retorno ativa da rota dele: CHECKED_IN se o motorista registrou o embarque (prevalece sobre ausência ativa), NOT_RETURNING com a janela de cancelamento se há ausência ativa, senão NOT_CHECKED_IN. 200 sempre — data null significa "sem viagem de retorno ativa".
+         */
+        get: operations["BoardingController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boarding/events": {
         parameters: {
             query?: never;
@@ -771,6 +791,40 @@ export interface components {
              * @example 2026-09-07T22:15:00.000Z
              */
             remindedAt: string;
+        };
+        StudentAbsenceDto: {
+            /**
+             * Format: uuid
+             * @description ID do registro de ausência ativa
+             * @example 550e8400-e29b-41d4-a716-446655440004
+             */
+            id: string;
+            /**
+             * @description Momento do registro da ausência (ISO 8601 UTC)
+             * @example 2026-09-07T21:10:00.000Z
+             */
+            notifiedAt: string;
+            /**
+             * @description Fim da janela de cancelamento (ISO 8601 UTC), calculado pelo servidor. O cliente só exibe o countdown.
+             * @example 2026-09-07T21:12:00.000Z
+             */
+            cancellableUntil: string;
+        };
+        StudentBoardingStatusResponseDto: {
+            /**
+             * Format: uuid
+             * @description ID da viagem de retorno ativa do aluno
+             * @example 550e8400-e29b-41d4-a716-446655440001
+             */
+            tripId: string;
+            /**
+             * @description Estado do aluno na viagem. CHECKED_IN prevalece sobre ausência ativa (mesma regra do roster).
+             * @example NOT_RETURNING
+             * @enum {string}
+             */
+            status: "CHECKED_IN" | "NOT_RETURNING" | "NOT_CHECKED_IN";
+            /** @description Ausência ativa — presente somente quando status é NOT_RETURNING */
+            absence: components["schemas"]["StudentAbsenceDto"] | null;
         };
         /** @description Evento SSE `boarding.not_returning`: a linha `event:` do stream carrega este nome e a linha `data:` o payload JSON abaixo. Emitido ao motorista da viagem quando um aluno registra ausência (POST /not-returning, Story 4.1) — o status na lista muda para "NÃO VAI VOLTAR" e a contagem resumida se ajusta. O nome do aluno é resolvido pelo cliente a partir do roster. */
         BoardingNotReturningEventDto: {
@@ -2561,6 +2615,50 @@ export interface operations {
                 };
             };
             /** @description FORBIDDEN — role STUDENT exigida (o lembrete é do aluno). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    BoardingController_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Envelope { data, meta } com data null ou { tripId, status, absence }. A viagem ativa é resolvida pelo domínio trip ANTES do boarding. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["StudentBoardingStatusResponseDto"] | null;
+                        meta: {
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Não autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+            /** @description FORBIDDEN — role STUDENT exigida. */
             403: {
                 headers: {
                     [name: string]: unknown;

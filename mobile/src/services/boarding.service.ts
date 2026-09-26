@@ -13,6 +13,8 @@ export type CancelAbsenceRequest = components['schemas']['CancelAbsenceRequestDt
 export type CancelAbsenceResponse = components['schemas']['CancelAbsenceResponseDto']
 export type PendingReminderResponse =
   components['schemas']['PendingReminderResponseDto']
+export type StudentBoardingStatusResponse =
+  components['schemas']['StudentBoardingStatusResponseDto']
 
 export const boardingService = {
   // A chave de idempotência é RECEBIDA, não gerada aqui. Ela pertence à
@@ -53,4 +55,9 @@ export const boardingService = {
   // { data } envelope is handled by the apiClient.
   getPendingReminder: () =>
     apiClient.get<PendingReminderResponse | null>('/api/v1/boarding/reminder'),
+
+  // Student's state on the active return trip, as the server sees it
+  // (check-in wins over absence). null = no active return trip.
+  getMyStatus: () =>
+    apiClient.get<StudentBoardingStatusResponse | null>('/api/v1/boarding/status'),
 }

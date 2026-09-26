@@ -8,21 +8,34 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '@/services/api-error'
 import {
   boardingService,
-  type NotReturningResponse,
+  type StudentBoardingStatusResponse,
 } from '@/services/boarding.service'
-import { activeTripOptions } from '@/lib/trip-queries'
+import {
+  activeTripOptions,
+  studentBoardingStatusKey,
+  studentBoardingStatusOptions,
+} from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 
-// Valor do cache ['studentAbsence', tripId]. `absence: null` significa "o
-// servidor confirmou ausência ativa, mas a janela é desconhecida" (resposta de
-// um 409 ALREADY_NOT_RETURNING reidratado) — o estado já nasce consolidado.
-interface StudentAbsenceCache {
-  registered: true
-  absence: NotReturningResponse | null
+// While the home is open it must notice the driver starting the return and
+// scanning the student. Paused in background by the focusManager (app-focus).
+const HOME_POLL_MS = 15_000
+
+// Outcomes that mean "the local state is behind the server". Each one already
+// tells the student's state, written before the refetch so a failed refetch
+// never leaves the screen stale. `absence: null` = consolidated, no countdown.
+const RACE_OUTCOMES: Record<
+  string,
+  Pick<StudentBoardingStatusResponse, 'status' | 'absence'>
+> = {
+  ALREADY_NOT_RETURNING: { status: 'NOT_RETURNING', absence: null },
+  CANCELLATION_PERIOD_EXPIRED: { status: 'NOT_RETURNING', absence: null },
+  ABSENCE_NOT_FOUND: { status: 'NOT_CHECKED_IN', absence: null },
+  ALREADY_CHECKED_IN: { status: 'CHECKED_IN', absence: null },
 }
 
-// Cada erro tipado do contrato tem mensagem clara em pt-BR. ALREADY_NOT_RETURNING
-// não está aqui: não é erro nesta tela, vira estado registrado (onError).
+// Every typed contract error has a clear pt-BR message. ALREADY_NOT_RETURNING
+// is not here: on this screen it is not an error, the status shows the absence.
 const ERROR_MESSAGES: Record<string, string> = {
   STUDENT_NOT_ON_TRIP: 'Você não pertence à rota desta viagem.',
   TRIP_NOT_ACTIVE: 'A viagem não está mais ativa.',
@@ -43,35 +56,46 @@ export default function StudentHomeScreen() {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  // Mesma entrada de cache do motorista (factory `activeTripOptions`): para o
-  // aluno a API devolve a viagem de retorno ativa na rota dele (ou null) — a
-  // decisão de qual viagem é do backend, a tela só consome.
-  const { data: activeTrip, status: tripStatus } = useQuery(activeTripOptions())
+  // Same cache entry as the driver (`activeTripOptions` factory): for a
+  // student the API returns the active return trip on their route (or null).
+  // Polling is this screen's only — the driver uses the factory without it.
+  const { data: activeTrip, status: tripStatus } = useQuery({
+    ...activeTripOptions(),
+    refetchInterval: HOME_POLL_MS,
+  })
 
   const tripId = activeTrip?.status === 'ACTIVE' ? activeTrip.id : null
 
-  // Sem queryFn real: a ausência não tem GET — o cache é escrito pela mutation
-  // (setQueryData) e reidratado do MMKV (persistido 24h). Depois disso, o
-  // re-registro cai no 409 ALREADY_NOT_RETURNING e volta a este estado.
-  const { data: absenceCache } = useQuery<StudentAbsenceCache | null>({
-    queryKey: ['studentAbsence', tripId ?? 'none'],
-    queryFn: () => null,
-    enabled: Boolean(tripId),
-    staleTime: 24 * 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
+  const applyRaceOutcome = async (error: unknown, raceTripId: string) => {
+    if (!(error instanceof ApiClientError)) return
+    const outcome = RACE_OUTCOMES[error.code]
+    if (!outcome) return
+    const key = studentBoardingStatusKey(raceTripId)
+    await queryClient.cancelQueries({ queryKey: key })
+    queryClient.setQueryData<StudentBoardingStatusResponse>(key, {
+      tripId: raceTripId,
+      ...outcome,
+    })
+    void queryClient.invalidateQueries({ queryKey: key })
+  }
+
+  // The server is the source of truth for check-in/absence on the return.
+  // A failed GET keeps the last known state and retries on the next cycle.
+  const { data: serverStatus } = useQuery({
+    ...studentBoardingStatusOptions(tripId),
+    refetchInterval: HOME_POLL_MS,
   })
+  const boardingStatus: StudentBoardingStatusResponse | null =
+    serverStatus && serverStatus.tripId === tripId ? serverStatus : null
 
   // Pending check-in reminder (Story 4.4): the server derives it at read
-  // time — the same outcome the driver sees on the stream. No polling: the
-  // banner is read on mount/remount (after staleTime) and refreshed by the
-  // explicit cache removals after each action — React Native has no window
-  // focus, so while the screen sits open it does not live-refresh (push is
-  // Fase 2). A GET failure only hides the banner — the screen never depends
-  // on it.
+  // time — the same outcome the driver sees on the stream. A GET failure
+  // only hides the banner — the screen never depends on it.
   const { data: pendingReminder } = useQuery({
     queryKey: ['studentReminder', tripId ?? 'none'],
     queryFn: () => boardingService.getPendingReminder(),
     enabled: Boolean(tripId),
+    refetchInterval: HOME_POLL_MS,
   })
 
   const [dialogVisible, setDialogVisible] = React.useState(false)
@@ -92,32 +116,41 @@ export default function StudentHomeScreen() {
         attemptKeyRef.current,
       )
     },
-    onSuccess: (absence, currentTripId) => {
+    onSuccess: async (absence, currentTripId) => {
       // Cache sob o tripId que a mutation recebeu, não o do render: o escopo
       // pode ter mudado (viagem encerrada/aberta) enquanto o envio voava.
-      queryClient.setQueryData<StudentAbsenceCache>(
-        ['studentAbsence', currentTripId],
-        { registered: true, absence },
+      // A poll GET started before the POST would land afterwards with the old
+      // state — cancel it before writing the known outcome.
+      await queryClient.cancelQueries({
+        queryKey: studentBoardingStatusKey(currentTripId),
+      })
+      queryClient.setQueryData<StudentBoardingStatusResponse>(
+        studentBoardingStatusKey(currentTripId),
+        {
+          tripId: currentTripId,
+          status: 'NOT_RETURNING',
+          absence: {
+            id: absence.id,
+            notifiedAt: absence.notifiedAt,
+            cancellableUntil: absence.cancellableUntil,
+          },
+        },
       )
-      // The reminder (4.4) converges to the same outcome as the absence:
-      // without the removal the banner would survive the success — the GET
-      // refetch brings null, but the stale cache would answer first.
-      queryClient.removeQueries({ queryKey: ['studentReminder', currentTripId] })
+      void queryClient.invalidateQueries({
+        queryKey: ['studentReminder', currentTripId],
+      })
       attemptKeyRef.current = null
       setDialogVisible(false)
     },
-    onError: (error, currentTripId) => {
+    onError: async (error, currentTripId) => {
       attemptKeyRef.current = null
       setDialogVisible(false)
 
+      await applyRaceOutcome(error, currentTripId)
+
+      // The absence already exists on the server: for the student it is a
+      // success — the refetched status shows the card with the real window.
       if (error instanceof ApiClientError && error.code === 'ALREADY_NOT_RETURNING') {
-        // Reinstalação com cache >24h: a ausência existe no servidor, então
-        // registrar de novo "falhou" — mas para o aluno é sucesso consolidado,
-        // sem countdown (a janela de 2 min certamente expirou).
-        queryClient.setQueryData<StudentAbsenceCache>(
-          ['studentAbsence', currentTripId],
-          { registered: true, absence: null },
-        )
         return
       }
 
@@ -144,41 +177,28 @@ export default function StudentHomeScreen() {
         cancelAttemptKeyRef.current,
       )
     },
-    onSuccess: (_cancellation, currentTripId) => {
-      // Sucesso = voltar ao ramo normal: "Não vou voltar" volta a ficar
-      // disponível e não existe estado "retorno confirmado" — o próprio ramo
-      // normal é o estado confirmado do cancelamento.
-      // removeQueries e não setQueryData(key, undefined): no TanStack v5 um
-      // resultado undefined é NO-OP — o cache só sai da key com remoção.
-      queryClient.removeQueries({ queryKey: ['studentAbsence', currentTripId] })
-      // Cancelar reabre a pendência no servidor (ausência anulada, linha do
-      // lembrete intacta): sem a remoção o cache null responderia primeiro e
-      // o banner só voltaria no próximo remount.
-      queryClient.removeQueries({ queryKey: ['studentReminder', currentTripId] })
+    onSuccess: async (_cancellation, currentTripId) => {
+      // Success = back to the normal branch: "Não vou voltar" is available
+      // again — that branch is the confirmed state of the cancellation. Same
+      // in-flight poll guard as the notify mutation.
+      await queryClient.cancelQueries({
+        queryKey: studentBoardingStatusKey(currentTripId),
+      })
+      queryClient.setQueryData<StudentBoardingStatusResponse>(
+        studentBoardingStatusKey(currentTripId),
+        { tripId: currentTripId, status: 'NOT_CHECKED_IN', absence: null },
+      )
+      // Cancelling reopens the reminder's pending state on the server.
+      void queryClient.invalidateQueries({
+        queryKey: ['studentReminder', currentTripId],
+      })
       cancelAttemptKeyRef.current = null
     },
-    onError: (error, currentTripId) => {
+    onError: async (error, currentTripId) => {
       cancelAttemptKeyRef.current = null
 
-      // As duas corridas conhecidas reescrevem o cache antes da mensagem —
-      // a tela nunca trava num estado que o servidor já não confirma.
-      if (error instanceof ApiClientError) {
-        if (error.code === 'CANCELLATION_PERIOD_EXPIRED') {
-          // A janela fechou no meio do envio: o servidor MANTÉM a ausência —
-          // cache consolidado (sem countdown), como se tivesse expirado em paz.
-          queryClient.setQueryData<StudentAbsenceCache>(
-            ['studentAbsence', currentTripId],
-            { registered: true, absence: null },
-          )
-        } else if (error.code === 'ABSENCE_NOT_FOUND') {
-          // Estado local velho (cache mais novo que o servidor): nada a
-          // cancelar — limpa e volta ao ramo normal (removeQueries: v5 trata
-          // setQueryData(key, undefined) como no-op, ver onSuccess).
-          queryClient.removeQueries({
-            queryKey: ['studentAbsence', currentTripId],
-          })
-        }
-      }
+      // Window closed mid-flight (absence kept) or no absence to cancel.
+      await applyRaceOutcome(error, currentTripId)
 
       setSnackbarMessage(
         error instanceof ApiClientError
@@ -192,10 +212,8 @@ export default function StudentHomeScreen() {
   // Ticking local de 1s derivado de cancellableUntil — o cliente NUNCA
   // recalcula a janela, só exibe o countdown com o valor do servidor.
   const [nowMs, setNowMs] = React.useState(() => Date.now())
-  const expiryMs =
-    absenceCache?.absence !== null && absenceCache?.absence !== undefined
-      ? Date.parse(absenceCache.absence.cancellableUntil)
-      : null
+  const absence = boardingStatus?.absence ?? null
+  const expiryMs = absence ? Date.parse(absence.cancellableUntil) : null
   const isCounting = expiryMs !== null && nowMs < expiryMs
 
   React.useEffect(() => {
@@ -204,8 +222,15 @@ export default function StudentHomeScreen() {
     return () => clearInterval(id)
   }, [isCounting])
 
-  const registered = Boolean(absenceCache)
+  const registered = boardingStatus?.status === 'NOT_RETURNING'
+  const checkedIn = boardingStatus?.status === 'CHECKED_IN'
   const windowExpired = !isCounting
+
+  // A poll can resolve the student's state while the dialog is open; confirming
+  // then could only 409.
+  React.useEffect(() => {
+    if (checkedIn || registered) setDialogVisible(false)
+  }, [checkedIn, registered])
 
   const handleConfirm = () => {
     if (!tripId) return
@@ -269,7 +294,7 @@ export default function StudentHomeScreen() {
             with the EXACT 4.1 mutation — the banner only opens the existing
             dialog. It disappears when the absence is registered or the GET
             returns null (pending state resolved). */}
-        {pendingReminder && !registered ? (
+        {pendingReminder && !registered && !checkedIn ? (
           <Card mode="outlined" style={styles.reminderBanner}>
             <Card.Content style={styles.reminderContent}>
               <Text variant="titleSmall">E a volta?</Text>
@@ -289,7 +314,16 @@ export default function StudentHomeScreen() {
           </Card>
         ) : null}
 
-        {registered ? (
+        {checkedIn ? (
+          <Card mode="elevated" style={styles.absenceCard}>
+            <Card.Content style={styles.absenceContent}>
+              <Text variant="titleMedium">Embarque confirmado</Text>
+              <Text variant="bodyMedium" style={styles.absenceHint}>
+                O motorista registrou seu embarque na volta.
+              </Text>
+            </Card.Content>
+          </Card>
+        ) : registered ? (
           <Card mode="elevated" style={styles.absenceCard}>
             <Card.Content style={styles.absenceContent}>
               <Text variant="titleMedium">Ausência registrada</Text>

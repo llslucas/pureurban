@@ -6,6 +6,7 @@ import { registerNotReturning } from '../core/use-cases/register-not-returning.u
 import { cancelAbsence } from '../core/use-cases/cancel-absence.use-case.js';
 import { scanCheckinReminders } from '../core/use-cases/scan-checkin-reminders.use-case.js';
 import { getPendingReminder } from '../core/use-cases/get-pending-reminder.use-case.js';
+import { getStudentBoardingStatus } from '../core/use-cases/get-student-boarding-status.use-case.js';
 import { BoardingRepository } from '../core/ports/boarding-repository.port.js';
 import { AbsenceRepository } from '../core/ports/absence-repository.port.js';
 import { TripAccess } from '../core/ports/trip-access.port.js';
@@ -115,6 +116,30 @@ export class BoardingService {
 
     return pending
       ? { tripId: pending.tripId, remindedAt: pending.remindedAt.toISOString() }
+      : null;
+  }
+
+  async getStudentStatus(input: {
+    studentId: string;
+    tripId: string;
+    companyId: string;
+  }) {
+    const [view] = await this.runtime.runPromise(
+      getStudentBoardingStatus(input),
+    );
+
+    return view
+      ? {
+          tripId: view.tripId,
+          status: view.status,
+          absence: view.absence
+            ? {
+                id: view.absence.id,
+                notifiedAt: view.absence.notifiedAt.toISOString(),
+                cancellableUntil: view.absence.cancellableUntil.toISOString(),
+              }
+            : null,
+        }
       : null;
   }
 }

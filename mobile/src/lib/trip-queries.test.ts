@@ -3,6 +3,8 @@ import { ApiClientError } from '@/services/api-error'
 import {
   activeTripKey,
   activeTripOptions,
+  studentBoardingStatusKey,
+  studentBoardingStatusOptions,
   tripStudentsKey,
   tripStudentsOptions,
 } from '@/lib/trip-queries'
@@ -59,5 +61,29 @@ describe('tripStudentsOptions', () => {
 describe('activeTripOptions', () => {
   it('usa a key compartilhada', () => {
     expect(activeTripOptions().queryKey).toEqual(['activeTrip'])
+  })
+})
+
+describe('studentBoardingStatusOptions', () => {
+  it('sem tripId, a query fica desabilitada', () => {
+    const options = studentBoardingStatusOptions(null)
+    expect(options.enabled).toBe(false)
+    expect(options.queryKey).toEqual(['studentBoardingStatus', 'none'])
+  })
+
+  it('com tripId, habilita e segmenta a key pela viagem', () => {
+    const options = studentBoardingStatusOptions('trip-1')
+    expect(options.enabled).toBe(true)
+    expect(options.queryKey).toEqual(studentBoardingStatusKey('trip-1'))
+    expect(options.queryKey).toEqual(['studentBoardingStatus', 'trip-1'])
+  })
+
+  it('retry NÃO retenta 4xx', () => {
+    const { retry } = studentBoardingStatusOptions('trip-1')
+    if (typeof retry !== 'function') throw new Error('retry deveria ser função')
+
+    expect(retry(0, new ApiClientError('FORBIDDEN', 'role', 403))).toBe(false)
+    expect(retry(0, new ApiClientError('INVALID_RESPONSE', 'x', 500))).toBe(true)
+    expect(retry(2, new TypeError('Failed to fetch'))).toBe(false)
   })
 })

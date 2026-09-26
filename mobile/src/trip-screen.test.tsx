@@ -38,6 +38,12 @@ jest.mock('@/services/routes.service', () => ({
   routesService: { getMyRoutes: jest.fn() },
 }))
 
+// trip-queries also hosts the student status factory, which imports
+// boarding.service → api-client → MMKV (native, absent under jest-expo).
+jest.mock('@/services/boarding.service', () => ({
+  boardingService: { getMyStatus: jest.fn() },
+}))
+
 // A captura de GPS (Story 5.1) é mockada inteira: o comportamento de cadência
 // e gating vive nos testes de utils/gps-capture; aqui a tela só renderiza — e
 // sem o mock a cadeia tracking.service → api-client → MMKV carregaria nativos
