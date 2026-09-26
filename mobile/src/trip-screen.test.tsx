@@ -157,7 +157,11 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
 
     // Settle the promise so it does not dangle past the test.
     resolveRoutes([ROUTE_A])
-    await waitFor(() => expect(screen.queryByText('Carregando rotas...')).toBeNull())
+    // The first render after the routes resolve is heavy; under parallel suite
+    // load it overran waitFor's 1s default and made this test flaky.
+    await waitFor(() => expect(screen.queryByText('Carregando rotas...')).toBeNull(), {
+      timeout: 3000,
+    })
   })
 
   it('single route: auto-selects and POST /trips goes out with the real UUID', async () => {

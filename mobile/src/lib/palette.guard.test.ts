@@ -29,9 +29,8 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
-//     `elevation`, 1.11b; background, fonts, brand and navigation theme, 6.1) e o
-//     provider travado em lightTheme no _layout, o
-//     mapa de status do StudentCard, as faixas do OfflineBanner e os
+//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
+//     provider travado em lightTheme no _layout, o mapa de status do StudentCard, as faixas do OfflineBanner e os
 //     call-sites das telas presos aos papéis da paleta (a migração manual não
 //     pode trocar tokens silenciosamente).
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
