@@ -34,6 +34,7 @@ describe('ShortcutCard', () => {
     const card = StyleSheet.flatten(screen.getByTestId('shortcut-card').props.style)
     expect(card).toMatchObject({
       minHeight: SHORTCUT_HEIGHT,
+      flexGrow: 1,
       borderRadius: radius.lg,
       backgroundColor: lightPalette.canvas,
       borderColor: lightPalette.hairline,

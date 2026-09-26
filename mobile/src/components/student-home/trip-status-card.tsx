@@ -56,7 +56,7 @@ export function TripStatusCard({
       <Text style={styles.overline}>Viagem de volta</Text>
       {chip ? <StatusChip {...chip} testID={`${testID}-chip`} /> : null}
       {title ? (
-        <Text style={styles.title} accessibilityRole="header">
+        <Text style={styles.title} accessibilityRole="header" testID={`${testID}-title-${stateKey}`}>
           {title}
         </Text>
       ) : null}

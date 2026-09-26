@@ -190,8 +190,8 @@ export default function StudentHomeScreen() {
     },
     onSuccess: async (_cancellation, currentTripId) => {
       // Success = back to the waiting state: "Não vou voltar" is available
-      // again — that state confirms the cancellation. Same
-      // in-flight poll guard as the notify mutation.
+      // again — that state confirms the cancellation. Same in-flight poll
+      // guard as the notify mutation.
       await queryClient.cancelQueries({
         queryKey: studentBoardingStatusKey(currentTripId),
       })
@@ -255,8 +255,8 @@ export default function StudentHomeScreen() {
   }
 
   const handleDismissDialog = () => {
-    // While the request is in flight the attempt stays alive: dismissing the
-    // dialog doesn't drop the mutation, and keeping the SAME key makes a
+    // Defensive: ConfirmDialog already blocks dismissing while the request is
+    // in flight. Should it ever get through, keeping the SAME key makes a
     // re-confirm resend what already left instead of registering twice.
     if (!notifyMutation.isPending) {
       attemptKeyRef.current = null
@@ -279,6 +279,7 @@ export default function StudentHomeScreen() {
           chip: { status: 'CHECKED_IN' },
           title: 'Embarque confirmado',
           detail: 'O motorista registrou seu embarque na volta.',
+          caption: activeTrip ? `Iniciada às ${formatTime(activeTrip.startedAt)}` : undefined,
         }
       : registered
         ? {
