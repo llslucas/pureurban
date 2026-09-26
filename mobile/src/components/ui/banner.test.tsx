@@ -7,7 +7,7 @@ import { useReducedMotion } from 'react-native-reanimated'
 import { Banner, BANNER_TONES, type BannerTone } from '@/components/ui/banner'
 import { contrastRatio, renderUi, type TestNode } from '@/components/ui/test-utils'
 import { lightPalette } from '@/lib/palette'
-import { motion, spacing } from '@/lib/tokens'
+import { motion, spacing, typography } from '@/lib/tokens'
 
 const TONES = Object.keys(BANNER_TONES) as BannerTone[]
 const hidden = { includeHiddenElements: true }
@@ -31,6 +31,23 @@ describe('Banner', () => {
       .getByTestId('banner', hidden)
       .findAll((node: TestNode) => node.props.name === look.icon && node.props.importantForAccessibility === 'no-hide-descendants')
     expect(hiddenGlyphs.length).toBeGreaterThan(0)
+  })
+
+  it('optional title: its own text node in label type, above the message', async () => {
+    await renderUi(<Banner tone="warning" title="E a volta?" message="Você ainda não confirmou o retorno." />)
+    const title = screen.getByText('E a volta?')
+    const style = StyleSheet.flatten(title.props.style)
+    expect(style.fontSize).toBe(typography.label.fontSize)
+    expect(style.fontFamily).toBe(typography.label.fontFamily)
+    expect(style.color).toBe(BANNER_TONES.warning.textColor)
+    const texts = screen.getByTestId('banner').findAll((node: TestNode) => typeof node.props.children === 'string')
+    const order = texts.map((node: TestNode) => node.props.children)
+    expect(order.indexOf('E a volta?')).toBeLessThan(order.indexOf('Você ainda não confirmou o retorno.'))
+  })
+
+  it('without title only the message renders', async () => {
+    await renderUi(<Banner tone="warning" message="m" />)
+    expect(screen.queryByText('E a volta?')).toBeNull()
   })
 
   it('announces politely', async () => {

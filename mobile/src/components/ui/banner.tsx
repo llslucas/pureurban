@@ -17,6 +17,7 @@ export type BannerTone = 'warning' | 'info' | 'error'
 
 export interface BannerProps {
   tone: BannerTone
+  title?: string
   message: string
   action?: { label: string; onPress: () => void }
   testID?: string
@@ -54,7 +55,7 @@ export const BANNER_TONES: Record<BannerTone, BannerLook> = {
 const ICON_SIZE = 22
 const SLIDE_DISTANCE = spacing[3]
 
-export function Banner({ tone, message, action, testID = 'banner' }: BannerProps) {
+export function Banner({ tone, title, message, action, testID = 'banner' }: BannerProps) {
   const reducedMotion = useReducedMotion()
   const look = BANNER_TONES[tone]
   const progress = useSharedValue(0)
@@ -78,7 +79,10 @@ export function Banner({ tone, message, action, testID = 'banner' }: BannerProps
     >
       <View style={styles.row}>
         <MdiIcon name={look.icon} size={ICON_SIZE} color={look.iconColor} testID={`${testID}-icon`} />
-        <Text style={[styles.message, { color: look.textColor }]}>{message}</Text>
+        <View style={styles.texts}>
+          {title ? <Text style={[styles.title, { color: look.textColor }]}>{title}</Text> : null}
+          <Text style={[styles.message, { color: look.textColor }]}>{message}</Text>
+        </View>
       </View>
       {action ? (
         <View style={styles.action}>
@@ -108,9 +112,15 @@ const styles = StyleSheet.create({
     gap: spacing[3],
     paddingBottom: spacing[2],
   },
+  texts: {
+    flex: 1,
+    gap: spacing[1],
+  },
+  title: {
+    ...typography.label,
+  },
   message: {
     ...typography.body,
-    flex: 1,
   },
   action: {
     alignSelf: 'flex-end',
