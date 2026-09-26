@@ -83,11 +83,13 @@ const ALLOWLIST: Record<string, { value: string; why: string }[]> = {
     { value: '#ffffff', why: 'quiet zone do QR (leitura óptica), não cor de UI' },
     { value: '#000000', why: 'módulos do QR (leitura óptica), não cor de UI' },
   ],
-  // Chrome da câmera do scanner: viewfinder, máscara e cantos de alto contraste.
+  // Chrome da câmera do scanner: fundo do viewfinder e máscara escura. Os cantos
+  // e a linha de varredura usam `onPrimary`; a paleta não tem preto puro.
   'components/qr-scanner.tsx': [
     { value: '#000000', why: 'fundo do viewfinder — chrome de câmera' },
+  ],
+  'components/scan/scan-frame.tsx': [
     { value: 'rgba(0,0,0,0.6)', why: 'máscara escura ao redor da janela de leitura — chrome de câmera' },
-    { value: '#ffffff', why: 'cantos da moldura sob sol direto (NFR18) — chrome de câmera' },
   ],
   // Chrome da câmera na tela de scan: fundos preto puro da câmera/tela fora de
   // foco, scrim do contador e botão translúcido sobre o viewfinder. A paleta do
