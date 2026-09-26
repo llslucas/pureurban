@@ -16,7 +16,8 @@ import {
   STATUS_TINT_ALPHA,
   statusTints,
 } from '@/lib/palette'
-import { darkTheme, lightTheme } from '@/lib/theme'
+import { darkTheme, lightTheme, navigationTheme } from '@/lib/theme'
+import { fontFamily, typography } from '@/lib/tokens'
 import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 
 // Tranca a paleta única da Story 1.11 por quatro camadas:
@@ -28,7 +29,8 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
-//     `elevation`, 1.11b) e o provider travado em lightTheme no _layout, o
+//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
+//     provider travado em lightTheme no _layout, o
 //     mapa de status do StudentCard, as faixas do OfflineBanner e os
 //     call-sites das telas presos aos papéis da paleta (a migração manual não
 //     pode trocar tokens silenciosamente).
@@ -401,6 +403,7 @@ describe('lock de binding dos temas Paper', () => {
     expect(lightTheme.colors.onSecondaryContainer).toBe(lightPalette.text)
     expect(lightTheme.colors.surface).toBe(lightPalette.surface)
     expect(lightTheme.colors.onSurface).toBe(lightPalette.text)
+    expect(lightTheme.colors.background).toBe(lightPalette.surfaceSoft)
     expect(lightTheme.colors.onBackground).toBe(lightPalette.text)
     expect(lightTheme.colors.surfaceVariant).toBe(lightPalette.surfaceStrong)
     expect(lightTheme.colors.onSurfaceVariant).toBe(lightPalette.textMuted)
@@ -449,6 +452,47 @@ describe('lock de binding dos temas Paper', () => {
       level4: darkMapping.hairline,
       level5: darkMapping.hairline,
     })
+  })
+
+  it('fonts: variantes do DESIGN.md em Inter por peso; o resto do MD3 só troca a família (6.1)', () => {
+    const mapped = {
+      displaySmall: typography.displayCount,
+      headlineMedium: typography.headline,
+      titleLarge: typography.titleLg,
+      titleMedium: typography.title,
+      bodyLarge: typography.bodyLg,
+      bodyMedium: typography.body,
+      labelLarge: typography.label,
+      bodySmall: typography.caption,
+    }
+    for (const [variant, token] of Object.entries(mapped)) {
+      expect(lightTheme.fonts[variant as keyof typeof mapped]).toMatchObject(token)
+    }
+    for (const [variant, md3] of Object.entries(MD3LightTheme.fonts)) {
+      if (variant in mapped) continue
+      const actual = lightTheme.fonts[variant as keyof typeof lightTheme.fonts]
+      const expectedFamily = md3.fontWeight === '500' ? fontFamily.medium : fontFamily.regular
+      expect(actual).toEqual({ ...md3, fontFamily: expectedFamily })
+    }
+    expect(darkTheme.fonts).toBe(lightTheme.fonts)
+    expect(darkTheme.custom).toBe(lightTheme.custom)
+  })
+
+  it('navigationTheme: fundo do React Navigation unificado no surface-soft, header canvas, Inter (6.1)', () => {
+    expect(navigationTheme.dark).toBe(false)
+    expect(navigationTheme.colors).toMatchObject({
+      primary: lightPalette.primary,
+      background: lightPalette.surfaceSoft,
+      card: lightPalette.canvas,
+      text: lightPalette.text,
+      border: lightPalette.hairline,
+    })
+    expect(Object.values(navigationTheme.fonts).map((f) => f.fontFamily)).toEqual([
+      fontFamily.regular,
+      fontFamily.medium,
+      fontFamily.semiBold,
+      fontFamily.bold,
+    ])
   })
 
   it('_layout: PaperProvider travado em lightTheme, sem flip por esquema do SO (trava da trava, 1.11b)', () => {
