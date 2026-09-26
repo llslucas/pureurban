@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 import Animated, {
@@ -34,13 +34,21 @@ function ratioOf(summary: BoardingSummary | undefined): number {
 export function BoardingCounter({ summary, testID = 'boarding-counter' }: BoardingCounterProps) {
   const reducedMotion = useReducedMotion()
   const ratio = ratioOf(summary)
-  // Starts at the current value: opening the screen shows the count, it
-  // doesn't replay the growth from zero.
+  const hasSummary = summary !== undefined
+  // The first known count is shown as is, even when it arrives after mount:
+  // opening the screen must not replay the growth from zero. Only later changes animate.
+  const seeded = useRef(hasSummary)
   const progress = useSharedValue(ratio)
 
   useEffect(() => {
+    if (!seeded.current) {
+      if (!hasSummary) return
+      seeded.current = true
+      progress.value = ratio
+      return
+    }
     progress.value = reducedMotion ? ratio : withTiming(ratio, { duration: motion.progress })
-  }, [progress, ratio, reducedMotion])
+  }, [hasSummary, progress, ratio, reducedMotion])
 
   const fillStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` }))
 
