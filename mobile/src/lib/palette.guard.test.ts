@@ -509,7 +509,7 @@ describe('lock de binding dos temas Paper', () => {
     expect(source).toMatch(/const isBooting = [^\n]*!isFontReady/)
   })
 
-  it('app.json: chrome nativo (userInterfaceStyle/splash/ícone) também travado em light (1.11b)', () => {
+  it('app.json: chrome nativo travado em light, splash e ícone no amarelo de marca (1.11b, D-UX-1)', () => {
     // A varredura de hex cobre só src/: o chrome nativo (headers, status bar,
     // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, a
     // metade nativa da trava light reverteria em silêncio (era o azul #208AEF
@@ -518,15 +518,24 @@ describe('lock de binding dos temas Paper', () => {
       readFileSync(join(SRC_ROOT, '..', 'app.json'), 'utf8'),
     ) as {
       expo: {
+        name: string
+        slug: string
+        scheme: string
         userInterfaceStyle: string
-        android: { adaptiveIcon: { backgroundColor: string } }
+        android: { package: string; adaptiveIcon: { backgroundColor: string } }
         plugins: [string, Record<string, unknown>][]
       }
     }
     expect(appConfig.expo.userInterfaceStyle).toBe('light')
-    expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe('#ffffff')
+    expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(designTokens.signatureYellow)
     const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
-    expect(splash?.[1].backgroundColor).toBe('#ffffff')
+    expect(splash?.[1].backgroundColor).toBe(designTokens.signatureYellow)
+    // D-UX-11: só o nome de exibição muda. slug/scheme/package ligam o projeto
+    // EAS, o deep link e o APK instalado.
+    expect(appConfig.expo.name).toBe('PureUrban')
+    expect(appConfig.expo.slug).toBe('mobile')
+    expect(appConfig.expo.scheme).toBe('mobile')
+    expect(appConfig.expo.android.package).toBe('com.pureurban.mobile')
     // Varredura negativa no config inteiro: os scalars acima não cobrem outras
     // chaves nativas (ícone, imagens, plugins futuros) onde o azul da paleta
     // antiga poderia voltar em silêncio.
