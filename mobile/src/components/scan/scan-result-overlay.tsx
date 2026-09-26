@@ -1,17 +1,35 @@
+import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
-import React from 'react'
-import { StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Button, Text } from 'react-native-paper'
+import React, { useEffect, useRef } from 'react'
+import { Platform, Pressable, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Text } from 'react-native-paper'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 
-import { lightPalette } from '@/lib/palette'
-import { feedbackIcon, type Tone } from '@/utils/scan-feedback'
+import { MdiIcon } from '@/components/ui/mdi-icon'
+import { PrimaryAction } from '@/components/ui/primary-action'
+import { lightPalette, withAlpha } from '@/lib/palette'
+import { fontFamily, motion, spacing, typography } from '@/lib/tokens'
+import {
+  feedbackHaptic,
+  feedbackIcon,
+  QUEUED_FEEDBACK,
+  type FeedbackHaptic,
+  type Tone,
+} from '@/utils/scan-feedback'
 
 // Union discriminado em vez de booleanos soltos (architecture.md §6). Com
 // booleanos, `isChecking && isError` é representável e significa nada.
 export type ScanResult =
   | { kind: 'idle' }
   | { kind: 'checking' }
-  | { kind: 'success'; title: string; detail: string }
+  | { kind: 'success'; title: string; detail: string; studentName?: string }
   | {
       kind: 'failure'
       // Campos de `ScanFeedback` (`@/utils/scan-feedback`), achatados no union
@@ -21,7 +39,10 @@ export type ScanResult =
       title: string
       detail: string
       canRetry: boolean
+      studentName?: string
     }
+
+type SettledResult = Extract<ScanResult, { kind: 'success' | 'failure' }>
 
 const TONE_COLOR: Record<Tone, string> = {
   // Verde/âmbar/vermelho/tinta (família ink/body para offline) sobre o preto da
@@ -33,110 +54,238 @@ const TONE_COLOR: Record<Tone, string> = {
   offline: lightPalette.textBody,
 }
 
+const ICON_SIZE = 96
+const ICON_CIRCLE = 144
+const COUNTDOWN_HEIGHT = 4
+const ENTER_SCALE = 0.96
+const SHAKE_DP = 8
+const SWAY_DEG = 6
+
+const NOTIFICATION: Record<Exclude<FeedbackHaptic, 'light'>, Haptics.NotificationFeedbackType> = {
+  success: Haptics.NotificationFeedbackType.Success,
+  warning: Haptics.NotificationFeedbackType.Warning,
+  error: Haptics.NotificationFeedbackType.Error,
+}
+
+function playHaptic(kind: FeedbackHaptic) {
+  if (Platform.OS === 'web') return
+  const pending =
+    kind === 'light'
+      ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+      : Haptics.notificationAsync(NOTIFICATION[kind])
+  pending.catch(() => {})
+}
+
+function colorOf(result: SettledResult): string {
+  return result.kind === 'success' ? TONE_COLOR.success : TONE_COLOR[result.tone]
+}
+
+function autoResumes(result: SettledResult): boolean {
+  return result.kind === 'success' || result.code === QUEUED_FEEDBACK.code
+}
+
+function announcementOf(result: SettledResult): string {
+  if (result.kind === 'success') {
+    return result.studentName ? `${result.studentName} embarcou` : result.title
+  }
+  return result.studentName
+    ? `${result.title}: ${result.studentName}. ${result.detail}`
+    : `${result.title}. ${result.detail}`
+}
+
 interface ScanResultOverlayProps {
   result: ScanResult
   onResume: () => void
   onRetry: () => void
+  /** Same duration as the screen's auto-resume timer; drives the countdown bar. */
+  autoResumeMs: number
 }
 
-export function ScanResultOverlay({ result, onResume, onRetry }: ScanResultOverlayProps) {
-  // Quando existe uma ação primária branca no overlay (retry ou "Ir para
-  // Viagem"), "Escanear próximo" vira secundária — dois botões brancos
-  // contained empilhados não teriam hierarquia nenhuma.
-  const hasPrimaryAction =
-    result.kind === 'failure' && (result.canRetry || result.code === 'TRIP_NOT_ACTIVE')
+export function ScanResultOverlay({ result, onResume, onRetry, autoResumeMs }: ScanResultOverlayProps) {
+  if (result.kind === 'idle') return null
+  if (result.kind === 'checking') {
+    return (
+      <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]}>
+        <View style={styles.message}>
+          <ActivityIndicator size="large" color={lightPalette.onPrimary} />
+          <Text style={styles.title}>Verificando...</Text>
+        </View>
+      </View>
+    )
+  }
+  return (
+    <SettledOverlay result={result} onResume={onResume} onRetry={onRetry} autoResumeMs={autoResumeMs} />
+  )
+}
 
-  return result.kind === 'checking' ? (
-    <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]}>
-      <View style={styles.overlayMessage}>
-        <ActivityIndicator size="large" color={lightPalette.onPrimary} />
-        <Text variant="headlineSmall" style={styles.overlayTitle}>
-          Verificando...
-        </Text>
-      </View>
-    </View>
-  ) : result.kind === 'success' ? (
-    <View style={[styles.overlay, { backgroundColor: TONE_COLOR.success }]}>
-      <View style={styles.overlayMessage}>
-        <Text style={styles.icon}>✓</Text>
-        <Text variant="headlineSmall" style={styles.overlayTitle}>
-          {result.title}
-        </Text>
-        <Text variant="titleMedium" style={styles.overlayDetail}>
-          {result.detail}
-        </Text>
-      </View>
-      <View style={styles.overlayActions}>
-        <Button
-          mode="contained"
-          buttonColor={lightPalette.onPrimary}
-          textColor={TONE_COLOR.success}
-          onPress={onResume}
-          style={styles.action}
-          contentStyle={styles.actionContent}
-          labelStyle={styles.actionLabel}
-        >
-          Escanear próximo
-        </Button>
-      </View>
-    </View>
-  ) : result.kind === 'failure' ? (
-    <View style={[styles.overlay, { backgroundColor: TONE_COLOR[result.tone] }]}>
-      <View style={styles.overlayMessage}>
-        <Text style={styles.icon}>{feedbackIcon(result)}</Text>
-        <Text variant="headlineSmall" style={styles.overlayTitle}>
-          {result.title}
-        </Text>
-        <Text variant="titleMedium" style={styles.overlayDetail}>
-          {result.detail}
-        </Text>
-      </View>
-      <View style={styles.overlayActions}>
-        {result.canRetry ? (
-          <Button
-            mode="contained"
-            buttonColor={lightPalette.onPrimary}
-            textColor={TONE_COLOR[result.tone]}
+interface SettledOverlayProps {
+  result: SettledResult
+  onResume: () => void
+  onRetry: () => void
+  autoResumeMs: number
+}
+
+function SettledOverlay({ result, onResume, onRetry, autoResumeMs }: SettledOverlayProps) {
+  const reducedMotion = useReducedMotion()
+  const color = colorOf(result)
+  const resumesAlone = autoResumes(result)
+
+  const opacity = useSharedValue(0)
+  const scale = useSharedValue(reducedMotion ? 1 : ENTER_SCALE)
+  const shakeX = useSharedValue(0)
+  const swayDeg = useSharedValue(0)
+  const countdown = useSharedValue(1)
+  // StrictMode replays effects with refs intact: without this guard the phone
+  // would buzz twice for one check-in in development.
+  const hapticFor = useRef<SettledResult | null>(null)
+
+  useEffect(() => {
+    if (hapticFor.current !== result) {
+      hapticFor.current = result
+      playHaptic(feedbackHaptic(result))
+    }
+
+    if (reducedMotion) {
+      scale.value = 1
+      opacity.value = 0
+      opacity.value = withTiming(1, { duration: motion.reduced })
+    } else {
+      scale.value = ENTER_SCALE
+      opacity.value = 0
+      opacity.value = withTiming(1, { duration: motion.enter })
+      scale.value = withTiming(1, { duration: motion.enter })
+    }
+
+    const isError = result.kind === 'failure' && result.tone === 'error'
+    const isWarn = result.kind === 'failure' && result.tone === 'warn'
+    shakeX.value = 0
+    swayDeg.value = 0
+    if (!reducedMotion && isError) {
+      // ±8dp, 3 cycles in 240ms.
+      const step = { duration: 40 }
+      shakeX.value = withSequence(
+        withTiming(-SHAKE_DP, step),
+        withTiming(SHAKE_DP, step),
+        withTiming(-SHAKE_DP, step),
+        withTiming(SHAKE_DP, step),
+        withTiming(-SHAKE_DP, step),
+        withTiming(0, step),
+      )
+    }
+    if (!reducedMotion && isWarn) {
+      // ±6°, 2 cycles in 300ms.
+      const step = { duration: 60 }
+      swayDeg.value = withSequence(
+        withTiming(-SWAY_DEG, step),
+        withTiming(SWAY_DEG, step),
+        withTiming(-SWAY_DEG, step),
+        withTiming(SWAY_DEG, step),
+        withTiming(0, step),
+      )
+    }
+
+    // The countdown is information, not decoration: it stays with reduced motion.
+    countdown.value = 1
+    if (resumesAlone) {
+      countdown.value = withTiming(0, { duration: autoResumeMs, easing: Easing.linear })
+    }
+  }, [autoResumeMs, countdown, opacity, reducedMotion, result, resumesAlone, scale, shakeX, swayDeg])
+
+  const enterStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }))
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }))
+  const swayStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${swayDeg.value}deg` }] }))
+  const countdownStyle = useAnimatedStyle(() => ({ width: `${countdown.value * 100}%` }))
+
+  const isFailure = result.kind === 'failure'
+  const showRetry = isFailure && result.canRetry
+  const showGoToTrip = isFailure && result.code === 'TRIP_NOT_ACTIVE'
+  // Com uma ação primária branca (retry ou "Ir para Viagem"), "Escanear
+  // próximo" vira secundária — dois botões brancos empilhados não teriam
+  // hierarquia nenhuma.
+  const hasPrimaryAction = showRetry || showGoToTrip
+
+  const content = (
+    <>
+      {resumesAlone ? (
+        <View style={styles.countdownTrack} testID="scan-overlay-countdown">
+          <Animated.View style={[styles.countdownFill, countdownStyle]} testID="scan-overlay-countdown-fill" />
+        </View>
+      ) : null}
+      <Animated.View
+        style={[styles.message, shakeStyle]}
+        accessible
+        accessibilityLabel={announcementOf(result)}
+        accessibilityLiveRegion="assertive"
+        testID="scan-overlay-message"
+      >
+        <View style={styles.iconCircle}>
+          <Animated.View style={swayStyle}>
+            <MdiIcon
+              name={feedbackIcon(result)}
+              size={ICON_SIZE}
+              color={lightPalette.onPrimary}
+              testID="scan-overlay-icon"
+            />
+          </Animated.View>
+        </View>
+        <Text style={styles.title}>{result.title}</Text>
+        {result.studentName ? <Text style={styles.name}>{result.studentName}</Text> : null}
+        <Text style={styles.detail}>{result.detail}</Text>
+      </Animated.View>
+      <View style={styles.actions}>
+        {showRetry ? (
+          <PrimaryAction
+            label="Tentar novamente"
+            variant="on-color"
+            color={color}
             onPress={onRetry}
-            style={styles.action}
-            contentStyle={styles.actionContent}
-            labelStyle={styles.actionLabel}
-          >
-            Tentar novamente
-          </Button>
+            testID="scan-overlay-retry"
+          />
         ) : null}
         {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
             afordância: sem ela o motorista lê "Inicie uma viagem antes de
             registrar embarques" sem nenhum caminho até lá. */}
-        {result.code === 'TRIP_NOT_ACTIVE' ? (
-          <Button
-            mode="contained"
-            buttonColor={lightPalette.onPrimary}
-            textColor={TONE_COLOR[result.tone]}
+        {showGoToTrip ? (
+          <PrimaryAction
+            label="Ir para Viagem"
+            variant="on-color"
+            color={color}
             onPress={() => router.navigate('/(driver)/trip')}
-            style={styles.action}
-            contentStyle={styles.actionContent}
-            labelStyle={styles.actionLabel}
-          >
-            Ir para Viagem
-          </Button>
+            testID="scan-overlay-go-to-trip"
+          />
         ) : null}
-        {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema e
-            ficam ilegíveis sobre vermelho ou âmbar. */}
-        <Button
-          mode={hasPrimaryAction ? 'text' : 'contained'}
-          buttonColor={hasPrimaryAction ? undefined : lightPalette.onPrimary}
-          textColor={hasPrimaryAction ? lightPalette.onPrimary : TONE_COLOR[result.tone]}
+        <PrimaryAction
+          label="Escanear próximo"
+          variant={hasPrimaryAction ? 'quiet' : 'on-color'}
+          color={hasPrimaryAction ? lightPalette.onPrimary : color}
           onPress={onResume}
-          style={styles.action}
-          contentStyle={styles.actionContent}
-          labelStyle={styles.actionLabel}
-        >
-          Escanear próximo
-        </Button>
+          testID="scan-overlay-resume"
+        />
       </View>
-    </View>
-  ) : null
+    </>
+  )
+
+  return (
+    <Animated.View style={[styles.overlay, { backgroundColor: color }, enterStyle]} testID="scan-overlay">
+      {resumesAlone ? (
+        // Touch shortcut only: the "Escanear próximo" button stays the
+        // accessible way to resume, so this isn't a second a11y button.
+        <Pressable
+          style={styles.fill}
+          onPress={onResume}
+          accessible={false}
+          testID="scan-overlay-dismiss"
+        >
+          {content}
+        </Pressable>
+      ) : (
+        <View style={styles.fill}>{content}</View>
+      )}
+    </Animated.View>
+  )
 }
 
 const styles = StyleSheet.create({
@@ -144,55 +293,65 @@ const styles = StyleSheet.create({
   // tem tempo de procurar um snackbar no rodapé (NFR18).
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    paddingHorizontal: 24,
   },
-  // Mensagem ocupa o espaço livre e fica centrada; as ações são empurradas para
-  // a metade inferior. Com tudo numa pilha `justifyContent: 'center'`, os botões
-  // caíam no meio da tela, fora do alcance do polegar de quem segura o aparelho
-  // com uma mão só (NFR18 / Task 7.10).
-  overlayMessage: {
+  fill: {
+    flex: 1,
+    paddingHorizontal: spacing[5],
+  },
+  countdownTrack: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: COUNTDOWN_HEIGHT,
+    backgroundColor: withAlpha(lightPalette.onPrimary, 0.2),
+  },
+  countdownFill: {
+    height: '100%',
+    backgroundColor: lightPalette.onPrimary,
+  },
+  // Mensagem ocupa o espaço livre e fica centrada; as ações ficam na metade
+  // inferior, ao alcance do polegar de quem segura o aparelho com uma mão só
+  // (NFR18 / Task 7.10).
+  message: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: spacing[3],
   },
-  overlayActions: {
-    alignSelf: 'stretch',
-    gap: 12,
-    paddingBottom: 32,
+  iconCircle: {
+    width: ICON_CIRCLE,
+    height: ICON_CIRCLE,
+    borderRadius: ICON_CIRCLE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[2],
+    backgroundColor: withAlpha(lightPalette.onPrimary, 0.2),
   },
-  icon: {
-    fontSize: 72,
-    lineHeight: 80,
+  title: {
+    ...typography.headline,
     color: lightPalette.onPrimary,
-    fontWeight: 'bold',
-  },
-  overlayTitle: {
-    color: lightPalette.onPrimary,
-    fontWeight: 'bold',
     textAlign: 'center',
   },
-  // NFR18 / Task 7.10: >= 18sp e em negrito. `titleMedium` do MD3 resolve para
-  // 16sp com peso 500, e a opacidade reduzida piorava ainda mais a leitura em
-  // movimento — é esta linha que carrega o "por quê" do resultado.
-  overlayDetail: {
+  name: {
+    ...typography.titleLg,
     color: lightPalette.onPrimary,
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: 'bold',
     textAlign: 'center',
   },
-  // NFR18: alvo de toque de 56dp, alinhado ao precedente de `(driver)/trip.tsx`.
-  action: {
-    marginTop: 12,
-    borderRadius: 12,
+  // D-UX-9: the amber overlay only reaches contrast with bold text >= 20px, so
+  // the detail sits above the `title` token's 18px for every tone.
+  detail: {
+    ...typography.title,
+    fontFamily: fontFamily.bold,
+    fontWeight: '700',
+    fontSize: 20,
+    lineHeight: 27,
+    color: lightPalette.onPrimary,
+    textAlign: 'center',
+  },
+  actions: {
     alignSelf: 'stretch',
-  },
-  actionContent: {
-    height: 56,
-  },
-  actionLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    gap: spacing[3],
+    paddingBottom: spacing[6],
   },
 })

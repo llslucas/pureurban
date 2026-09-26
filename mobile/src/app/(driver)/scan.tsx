@@ -416,7 +416,12 @@ export default function ScanScreen() {
         </Button>
       </View>
 
-      <ScanResultOverlay result={result} onResume={resume} onRetry={handleRetry} />
+      <ScanResultOverlay
+        result={result}
+        onResume={resume}
+        onRetry={handleRetry}
+        autoResumeMs={SUCCESS_RESUME_MS}
+      />
     </View>
   )
 }

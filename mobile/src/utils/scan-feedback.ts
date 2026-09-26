@@ -1,3 +1,4 @@
+import type { MdiIconName } from '@/components/ui/mdi-icon'
 import { ApiClientError } from '@/services/api-error'
 import { MAX_QUEUE_SIZE } from '@/utils/offline-queue'
 
@@ -163,11 +164,32 @@ export const QUEUE_FULL_FEEDBACK: ScanFeedback = {
   canRetry: false,
 }
 
+// Success isn't a `ScanFeedback` (it never goes through `describeFailure`), but
+// the overlay reads its icon and haptic from the same table as the failures.
+export type FeedbackSubject = { kind: 'success' } | (ScanFeedback & { kind?: 'failure' })
+
+export type FeedbackHaptic = 'success' | 'warning' | 'error' | 'light'
+
 /**
- * Glifo do overlay de resultado. O estado enfileirado é um SUCESSO local — o ✕
- * do caminho de falha diria ao motorista que o embarque se perdeu.
+ * MDI icon of the result overlay. The queued state is a LOCAL success — the
+ * failure cross would tell the driver the boarding was lost.
  */
-export function feedbackIcon(feedback: ScanFeedback): string {
-  if (feedback.code === QUEUED_FEEDBACK.code) return '✓'
-  return feedback.tone === 'warn' ? '!' : '✕'
+export function feedbackIcon(subject: FeedbackSubject): MdiIconName {
+  if (subject.kind === 'success') return 'check-bold'
+  if (subject.code === QUEUED_FEEDBACK.code) return 'cloud-upload-outline'
+  switch (subject.tone) {
+    case 'warn':
+      return 'alert'
+    case 'offline':
+      return 'cloud-off-outline'
+    default:
+      return 'close-thick'
+  }
+}
+
+/** Haptic pattern per result, so the driver knows the outcome without looking. */
+export function feedbackHaptic(subject: FeedbackSubject): FeedbackHaptic {
+  if (subject.kind === 'success') return 'success'
+  if (subject.code === QUEUED_FEEDBACK.code) return 'light'
+  return subject.tone === 'warn' ? 'warning' : 'error'
 }
