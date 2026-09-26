@@ -506,6 +506,7 @@ describe('lock de binding dos temas Paper', () => {
     const source = readSource('app/_layout.tsx')
     expect(source.match(/<ThemeProvider value=\{navigationTheme\}>/g)).toHaveLength(1)
     expect(source).toMatch(/useFonts\(\{[^}]*Inter_400Regular,[^}]*Inter_500Medium,[^}]*Inter_600SemiBold,[^}]*Inter_700Bold,/)
+    expect(source).toMatch(/const isFontReady = isFontGateOpen\(fontsLoaded, fontError\)/)
     expect(source).toMatch(/const isBooting = [^\n]*!isFontReady/)
   })
 

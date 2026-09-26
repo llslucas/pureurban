@@ -14,6 +14,7 @@ import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
 import { setupAppFocus } from '@/lib/app-focus'
 import { initializeDatabase } from '@/lib/database'
+import { isFontGateOpen } from '@/lib/font-gate'
 import { registerOfflineQueueLifecycle } from '@/lib/offline-queue-lifecycle'
 import { mmkvPersister } from '@/lib/mmkv-persister'
 import { queryClient } from '@/lib/query-client'
@@ -57,7 +58,6 @@ export default function RootLayout() {
   useEffect(() => setupAppFocus(), [])
 
   useEffect(() => {
-    // Falha de fonte não trava o boot: o gate abre e o texto cai no fallback do sistema.
     if (fontError) console.error('[fonts] falha ao carregar Inter:', fontError)
   }, [fontError])
 
@@ -93,7 +93,7 @@ export default function RootLayout() {
     )
   }
 
-  const isFontReady = fontsLoaded || fontError != null
+  const isFontReady = isFontGateOpen(fontsLoaded, fontError)
   const isBooting = !isDbReady || !isMockReady || !isFontReady
 
   return (
