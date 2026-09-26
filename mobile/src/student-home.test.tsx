@@ -20,7 +20,7 @@ import { useAuthStore } from '@/stores/auth.store'
 //
 // The screen renders a Paper Dialog (Portal), which REQUIRES a PortalHost —
 // hence the PaperProvider here, unlike trip-screen.test.tsx (that screen has no
-// Portal). Default MD3 theme, same choice as student-card.test.tsx.
+// Portal). Default MD3 theme, same choice as student-row.test.tsx.
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn(), push: jest.fn(), replace: jest.fn() },

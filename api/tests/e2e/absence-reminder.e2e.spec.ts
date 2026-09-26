@@ -30,18 +30,33 @@ const NFR3_BUDGET_MS = 3000;
 const REMINDER_POLL_TIMEOUT_MS = 90_000;
 const REMINDER_POLL_INTERVAL_MS = 2_000;
 
-const NOT_RETURNING_BADGE = '! Não vai voltar';
+// `exact`: the roster legend ("1 não vai voltar") and the Snackbar ("… não vai
+// voltar no ônibus") also contain the phrase.
+const NOT_RETURNING_BADGE = 'Não vai voltar';
+
+// Trip stays mounted under the list with a counter of the same label, so the
+// roster counter is always scoped by its testID, never by a bare getByLabel.
+async function expectRosterCount(
+  page: Page,
+  boarded: number,
+  total: number,
+): Promise<void> {
+  await expect(page.getByTestId('roster-counter')).toHaveAttribute(
+    'aria-label',
+    `${boarded} de ${total} embarcados`,
+  );
+}
 
 async function openDriverRoster(
   page: Page,
   driver: Epic3Credentials,
-  countText: string,
+  count: { boarded: number; total: number },
 ): Promise<void> {
   await loginAsDriver(page, driver);
   // "Ver lista" da Code Map: o botão da tela de Viagem que abre a lista
   // (trip.tsx — label "Alunos da Viagem").
   await page.getByRole('button', { name: 'Alunos da Viagem' }).click();
-  await expect(page.getByText(countText)).toBeVisible();
+  await expectRosterCount(page, count.boarded, count.total);
 }
 
 /**
@@ -135,7 +150,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       // O motorista JÁ está na lista quando o aluno age: o canal sob teste é o
       // stream SSE (Story 4.2) — o badge em <3s só é possível com o evento
       // entregue, e a contagem vem do cache aplicado pelo próprio handler.
-      await openDriverRoster(driverPage, epic4.driver, `0/${total} embarcados`);
+      await openDriverRoster(driverPage, epic4.driver, { boarded: 0, total });
 
       await loginAsStudent(page, student);
       const notReturning = page.getByRole('button', { name: 'Não vou voltar' });
@@ -157,7 +172,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       const response = await absenceResponse;
       expect(response.status()).toBe(201);
 
-      const badge = driverPage.getByText(NOT_RETURNING_BADGE);
+      const badge = driverPage.getByText(NOT_RETURNING_BADGE, { exact: true });
       await expect(badge).toBeVisible({ timeout: NFR3_BUDGET_MS });
       const nfr3Ms = Date.now() - t0;
 
@@ -167,9 +182,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       expect(nfr3Ms).toBeLessThan(NFR3_BUDGET_MS);
 
       // Contagem ajustada (total exclui o ausente) e toast contextual.
-      await expect(
-        driverPage.getByText(`0/${total - 1} embarcados`),
-      ).toBeVisible();
+      await expectRosterCount(driverPage, 0, total - 1);
       await expect(
         driverPage.getByText(`${student.name} não vai voltar no ônibus`),
       ).toBeVisible();
@@ -184,7 +197,7 @@ test.describe('Épico 4 — ausência e lembrete', () => {
       await page.getByRole('button', { name: 'Cancelar' }).click();
       await expect(notReturning).toBeVisible();
       await expect(badge).toHaveCount(0);
-      await expect(driverPage.getByText(`0/${total} embarcados`)).toBeVisible();
+      await expectRosterCount(driverPage, 0, total);
     } finally {
       await driverContext.close();
     }
@@ -355,12 +368,13 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     const driverPage = await driverContext.newPage();
     driverPage.setDefaultNavigationTimeout(120_000);
     try {
-      await openDriverRoster(
-        driverPage,
-        epic4.driver,
-        `0/${total - 1} embarcados`,
-      );
-      await expect(driverPage.getByText(NOT_RETURNING_BADGE)).toBeVisible();
+      await openDriverRoster(driverPage, epic4.driver, {
+        boarded: 0,
+        total: total - 1,
+      });
+      await expect(
+        driverPage.getByText(NOT_RETURNING_BADGE, { exact: true }),
+      ).toBeVisible();
     } finally {
       await driverContext.close();
     }

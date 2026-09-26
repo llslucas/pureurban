@@ -12,6 +12,7 @@ import { tripService, type Trip, type TripStudents } from '@/services/trip.servi
 import { useAuthStore } from '@/stores/auth.store'
 import { router } from 'expo-router'
 import { ApiClientError } from '@/services/api-error'
+import { tripStudentsKey } from '@/lib/trip-queries'
 
 // Lives at src/ root, not src/app/: Expo Router turns every file under src/app/
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap and
@@ -169,15 +170,15 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(depoisDaAusencia)
 
     renderScreen()
-    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
 
     act(() => registeredHandlers().onNotReturning(NOT_RETURNING_EVENT))
 
     // Status do aluno virou o badge âmbar (STATUS_PRESENTATION de NOT_RETURNING).
-    expect(await screen.findByText('! Não vai voltar')).toBeTruthy()
-    expect(screen.queryByText('— Não embarcou')).toBeNull()
+    expect(await screen.findByText('Não vai voltar')).toBeTruthy()
+    expect(screen.queryByText('Não embarcou')).toBeNull()
     // Contagem ajustada no próprio cache (o total do servidor exclui o ausente).
-    expect(await screen.findByText('1/1 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 1 embarcados')).toBeTruthy()
     // Toast não bloqueante, com o nome resolvido do roster (o evento só traz IDs).
     expect(screen.getByText('Ana não vai voltar no ônibus')).toBeTruthy()
   })
@@ -194,17 +195,17 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(antes)
 
     renderScreen()
-    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
 
     const handlers = registeredHandlers()
     act(() => handlers.onNotReturning(NOT_RETURNING_EVENT))
-    expect(await screen.findByText('1/1 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 1 embarcados')).toBeTruthy()
 
     act(() => handlers.onAbsenceCancelled(ABSENCE_CANCELLED_EVENT))
 
-    expect(await screen.findByText('— Não embarcou')).toBeTruthy()
-    expect(screen.queryByText('! Não vai voltar')).toBeNull()
-    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(await screen.findByText('Não embarcou')).toBeTruthy()
+    expect(screen.queryByText('Não vai voltar')).toBeNull()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
   })
 
   it('not_returning para aluno CHECKED_IN no cache: sem badge, sem toast, só refetch', async () => {
@@ -219,15 +220,15 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(ambosEmbarcados)
 
     renderScreen()
-    expect(await screen.findByText('2/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('2 de 2 embarcados')).toBeTruthy()
     expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(1)
 
     act(() => registeredHandlers().onNotReturning(NOT_RETURNING_EVENT))
 
     // Check-in prevalece (last-write-wins do épico): badge e contagem intactos,
     // sem toast — o refetch de reconciliação corrige o resto.
-    expect(screen.getAllByText('✓ Embarcou')).toHaveLength(2)
-    expect(screen.getByText('2/2 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('Embarcou')).toHaveLength(2)
+    expect(screen.getByLabelText('2 de 2 embarcados')).toBeTruthy()
     expect(screen.queryByText(/não vai voltar no ônibus/)).toBeNull()
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
   })
@@ -244,15 +245,15 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(ambosEmbarcados)
 
     renderScreen()
-    expect(await screen.findByText('2/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('2 de 2 embarcados')).toBeTruthy()
     expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(1)
 
     act(() => registeredHandlers().onAbsenceCancelled(ABSENCE_CANCELLED_EVENT))
 
     // Check-in prevalece: badge e contagem intactos, mas a invalidação
     // dispara o refetch que reconcilia com o servidor.
-    expect(screen.getAllByText('✓ Embarcou')).toHaveLength(2)
-    expect(screen.getByText('2/2 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('Embarcou')).toHaveLength(2)
+    expect(screen.getByLabelText('2 de 2 embarcados')).toBeTruthy()
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
   })
 
@@ -267,14 +268,14 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(depoisDaAusencia)
 
     renderScreen()
-    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
 
     const handlers = registeredHandlers()
     act(() => handlers.onNotReturning(NOT_RETURNING_EVENT))
     act(() => handlers.onNotReturning({ ...NOT_RETURNING_EVENT }))
 
-    expect(await screen.findByText('1/1 embarcados')).toBeTruthy()
-    expect(screen.getAllByText('! Não vai voltar')).toHaveLength(1)
+    expect(await screen.findByLabelText('1 de 1 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('Não vai voltar')).toHaveLength(1)
     // Ana continua na lista (o status muda; o aluno nunca é removido).
     expect(screen.getByText('Ana')).toBeTruthy()
   })
@@ -300,12 +301,12 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(NENHUM)
 
     renderScreen()
-    expect(await screen.findByText('0/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('0 de 2 embarcados')).toBeTruthy()
 
     const handlers = registeredHandlers()
     act(() => handlers.onNotReturning(NOT_RETURNING_EVENT))
-    expect(await screen.findByText('0/1 embarcados')).toBeTruthy()
-    expect(screen.getAllByText('! Não vai voltar')).toHaveLength(1)
+    expect(await screen.findByLabelText('0 de 1 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('Não vai voltar')).toHaveLength(1)
     // Snackbar único: o toast do 1º evento só é observável aqui — o 2º o substitui.
     expect(screen.getByText('Ana não vai voltar no ônibus')).toBeTruthy()
 
@@ -317,8 +318,8 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
         studentId: STUDENT_B.studentId,
       }),
     )
-    expect(await screen.findByText('0/0 embarcados')).toBeTruthy()
-    expect(screen.getAllByText('! Não vai voltar')).toHaveLength(2)
+    expect(await screen.findByLabelText('0 de 0 embarcados')).toBeTruthy()
+    expect(screen.getAllByText('Não vai voltar')).toHaveLength(2)
     expect(screen.getByText('Bruno não vai voltar no ônibus')).toBeTruthy()
   })
 
@@ -329,7 +330,7 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
       .mockResolvedValue(soBruno)
 
     renderScreen()
-    expect(await screen.findByText('1/1 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 1 embarcados')).toBeTruthy()
     expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(1)
 
     act(() =>
@@ -342,7 +343,7 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
     // Nenhum card novo na lista e nenhum toast sem nome.
     expect(screen.queryByText(/não vai voltar no ônibus/)).toBeNull()
-    expect(screen.queryByText('! Não vai voltar')).toBeNull()
+    expect(screen.queryByText('Não vai voltar')).toBeNull()
   })
 
   it('uma conexão por tripId, fechada ao desmontar a tela', async () => {
@@ -350,7 +351,7 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
     mockTrip.getTripStudents.mockResolvedValue(antes)
 
     const { unmount } = renderScreen()
-    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
 
     expect(mockConnect).toHaveBeenCalledTimes(1)
     expect(mockConnect).toHaveBeenCalledWith(RETURN_TRIP.id, expect.any(Object))
@@ -368,12 +369,140 @@ describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {
     mockTrip.getTripStudents.mockResolvedValue(antes)
 
     renderScreen()
-    expect(await screen.findByText('1/2 embarcados')).toBeTruthy()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
     expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(1)
 
     act(() => registeredHandlers().onOpen?.())
 
     await waitFor(() => expect(mockTrip.getTripStudents).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('StudentListScreen — redesign da lista (story 6.7)', () => {
+  it('fixed header: BoardingCounter + legend, updated by not_returning and absence_cancelled', async () => {
+    const antes = rosterWith(STUDENT_A, STUDENT_B)
+    const comAusencia = rosterWith({ ...STUDENT_A, status: 'NOT_RETURNING' }, STUDENT_B)
+    mockTrip.getTripStudents
+      .mockResolvedValueOnce(antes)
+      .mockResolvedValueOnce(comAusencia)
+      .mockResolvedValue(antes)
+
+    renderScreen()
+    expect(await screen.findByTestId('roster-counter')).toHaveProp('accessibilityLabel', '1 de 2 embarcados')
+    expect(screen.getByTestId('roster-legend')).toHaveTextContent('1 embarcou · 0 não vão voltar · 1 aguardando')
+
+    const handlers = registeredHandlers()
+    act(() => handlers.onNotReturning(NOT_RETURNING_EVENT))
+    await waitFor(() =>
+      expect(screen.getByTestId('roster-legend')).toHaveTextContent('1 embarcou · 1 não vai voltar · 0 aguardando'),
+    )
+    expect(screen.getByTestId('roster-counter')).toHaveProp('accessibilityLabel', '1 de 1 embarcados')
+
+    act(() => handlers.onAbsenceCancelled(ABSENCE_CANCELLED_EVENT))
+    await waitFor(() =>
+      expect(screen.getByTestId('roster-legend')).toHaveTextContent('1 embarcou · 0 não vão voltar · 1 aguardando'),
+    )
+    expect(screen.getByTestId('roster-counter')).toHaveProp('accessibilityLabel', '1 de 2 embarcados')
+  })
+
+  it('rows show initials and icon chips, never the old glyphs or the "X/Y embarcados" sentence', async () => {
+    mockTrip.getTripStudents.mockResolvedValue(rosterWith(STUDENT_A, STUDENT_B))
+
+    renderScreen()
+    expect(await screen.findByText('Ana')).toBeTruthy()
+    expect(screen.getByText('A')).toBeTruthy()
+    expect(screen.getByText('B')).toBeTruthy()
+    expect(screen.getByText('Não embarcou')).toBeTruthy()
+    expect(screen.getByText('Embarcou')).toBeTruthy()
+    expect(screen.queryByText(/[✓!]|— /)).toBeNull()
+    expect(screen.queryByText(/\d+\/\d+ embarcados/)).toBeNull()
+  })
+
+  it('stale banner: absent while live, shown once the stream dies, and "Atualizar" refetches the roster', async () => {
+    mockTrip.getTripStudents.mockResolvedValue(rosterWith(STUDENT_A, STUDENT_B))
+
+    renderScreen()
+    expect(await screen.findByTestId('roster-counter')).toBeTruthy()
+    expect(screen.queryByTestId('stale-banner')).toBeNull()
+
+    act(() => registeredHandlers().onUnrecoverable?.())
+
+    expect(await screen.findByTestId('stale-banner')).toBeTruthy()
+    expect(
+      screen.getByText('Dados podem estar desatualizados — sem atualização em tempo real'),
+    ).toBeTruthy()
+    const callsBefore = mockTrip.getTripStudents.mock.calls.length
+
+    fireEvent.press(screen.getByText('Atualizar'))
+
+    await waitFor(() =>
+      expect(mockTrip.getTripStudents.mock.calls.length).toBeGreaterThan(callsBefore),
+    )
+  })
+
+  it('stale banner: a failed refetch over cached data shows it (isError && data)', async () => {
+    mockTrip.getTripStudents
+      .mockResolvedValueOnce(rosterWith(STUDENT_A, STUDENT_B))
+      .mockRejectedValue(new Error('500'))
+
+    renderScreen()
+    expect(await screen.findByTestId('roster-counter')).toBeTruthy()
+    expect(screen.queryByTestId('stale-banner')).toBeNull()
+
+    act(() => registeredHandlers().onOpen?.())
+
+    expect(await screen.findByTestId('stale-banner')).toBeTruthy()
+    // The cached list stays readable under the banner.
+    expect(screen.getByText('Ana')).toBeTruthy()
+    expect(screen.getByLabelText('1 de 2 embarcados')).toBeTruthy()
+  })
+
+  it('empty roster: StateView in place of the list, header at 0 of 0', async () => {
+    mockTrip.getTripStudents.mockResolvedValue(rosterWith())
+
+    renderScreen()
+    expect(await screen.findByTestId('roster-empty')).toBeTruthy()
+    expect(screen.getByText('Nenhum aluno vinculado a esta rota')).toBeTruthy()
+    expect(screen.getByTestId('roster-counter')).toHaveProp('accessibilityLabel', '0 de 0 embarcados')
+  })
+
+  it('a 60-student roster renders the header and the first row (NFR4)', async () => {
+    const sixty = Array.from({ length: 60 }, (_, i) => ({
+      studentId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      name: `Aluno ${String(i + 1).padStart(2, '0')}`,
+      status: 'NOT_CHECKED_IN' as const,
+      checkedInAt: null,
+    }))
+    mockTrip.getTripStudents.mockResolvedValue(rosterWith(...sixty))
+
+    renderScreen()
+    expect(await screen.findByLabelText('0 de 60 embarcados')).toBeTruthy()
+    expect(screen.getByText('Aluno 01')).toBeTruthy()
+    // FlatList windowing keeps the first render bounded.
+    expect(screen.queryByText('Aluno 60')).toBeNull()
+    expect(screen.getByTestId('roster-legend')).toHaveTextContent('0 embarcaram · 0 não vão voltar · 60 aguardando')
+  })
+
+  it('an SSE event gives a new object only to the affected student', async () => {
+    const antes = rosterWith(STUDENT_A, STUDENT_B)
+    mockTrip.getTripStudents.mockResolvedValue(antes)
+
+    renderScreen()
+    expect(await screen.findByLabelText('1 de 2 embarcados')).toBeTruthy()
+    const key = tripStudentsKey(RETURN_TRIP.id)
+    const before = queryClient.getQueryData<TripStudents>(key)!
+
+    let after: TripStudents | undefined
+    act(() => {
+      registeredHandlers().onNotReturning(NOT_RETURNING_EVENT)
+      // Read before the reconciling refetch replaces the whole roster.
+      after = queryClient.getQueryData<TripStudents>(key)
+    })
+
+    expect(after).not.toBe(before)
+    expect(after!.students[0]).not.toBe(before.students[0])
+    expect(after!.students[0].status).toBe('NOT_RETURNING')
+    expect(after!.students[1]).toBe(before.students[1])
   })
 })
 

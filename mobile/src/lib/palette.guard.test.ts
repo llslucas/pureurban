@@ -6,7 +6,8 @@ import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper'
 import { render, screen, cleanup } from '@testing-library/react-native'
 
 import { OfflineBanner } from '@/components/offline-banner'
-import { STATUS_PRESENTATION, StudentCard } from '@/components/student-card'
+import { StudentRow } from '@/components/student-row'
+import { STATUS_PRESENTATION } from '@/lib/boarding-status'
 import {
   appExtensions,
   darkMapping,
@@ -30,7 +31,7 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
 //     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
-//     provider travado em lightTheme no _layout, o mapa de status do StudentCard, as faixas do OfflineBanner e os
+//     provider travado em lightTheme no _layout, o mapa de status do StudentRow, as faixas do OfflineBanner e os
 //     call-sites das telas presos aos papéis da paleta (a migração manual não
 //     pode trocar tokens silenciosamente).
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
@@ -267,7 +268,7 @@ interface ChipColors {
 function chipColorsFor(status: BoardingStatus): ChipColors {
   // createElement em vez de JSX: o arquivo é `.ts` (nome registrado na story),
   // e JSX exigiria a extensão `.tsx`.
-  const utils = render(createElement(StudentCard, { student: makeStudent(status) }))
+  const utils = render(createElement(StudentRow, { student: makeStudent(status) }))
   const label = utils.getByText(new RegExp(STATUS_PRESENTATION[status].label))
   const labelStyle = StyleSheet.flatten(label.props.style)
   // Sobe na árvore até o ancestral com backgroundColor (o chip): o pai direto
@@ -561,7 +562,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
     ['CHECKED_IN', 'Embarcou'],
     ['NOT_CHECKED_IN', 'Não embarcou'],
     ['NOT_RETURNING', 'Não vai voltar'],
-  ] as [BoardingStatus, string][])('render-probe do StudentCard: chip de %s', (status) => {
+  ] as [BoardingStatus, string][])('render-probe do StudentRow: chip de %s', (status) => {
     // Um probe por teste: o cleanup automático entre testes desmonta a árvore —
     // cleanup manual + render no mesmo tick quebra o renderer do RNTL.
     const colors = chipColorsFor(status)
@@ -634,17 +635,26 @@ describe('locks de call-site (source-lock)', () => {
     expect(source).toMatch(/background: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
   })
 
-  it('student-list: papéis de texto, header e divisória presos à paleta', () => {
+  it('student-list: fundo da tela preso à paleta', () => {
     const source = readSource('app/(driver)/student-list.tsx')
     expect(source).toMatch(/container: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
-    expect(source).toMatch(/header: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/header: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
-    expect(source).toMatch(/count: \{[^}]*color: lightPalette\.text,/)
   })
 
-  it('student-card: nome e divisória presos à paleta (chip é coberto pelo render-probe)', () => {
-    const source = readSource('components/student-card.tsx')
+  it('roster-header: fundo, divisória e legenda presos à paleta', () => {
+    const source = readSource('components/student-list/roster-header.tsx')
+    expect(source).toMatch(/header: \{[^}]*backgroundColor: lightPalette\.surface,/)
+    expect(source).toMatch(/header: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
+    expect(source).toMatch(/legend: \{[^}]*color: lightPalette\.textMuted,/)
+  })
+
+  it('student-row: linha, avatar, nome, hora e divisória presos à paleta (chip é coberto pelo render-probe)', () => {
+    const source = readSource('components/student-row.tsx')
+    expect(source).toMatch(/row: \{[^}]*backgroundColor: lightPalette\.surface,/)
+    expect(source).toMatch(/avatar: \{[^}]*backgroundColor: lightPalette\.surfaceStrong,/)
+    expect(source).toMatch(/initials: \{[^}]*color: lightPalette\.text,/)
     expect(source).toMatch(/name: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/borderBottomColor: lightPalette\.hairline,/)
+    expect(source).toMatch(/time: \{[^}]*color: lightPalette\.textMuted,/)
+    expect(source).toMatch(/body: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
+    expect(source).toMatch(/backgroundColor: presentation\.background \}, pulseStyle/)
   })
 })
