@@ -1,53 +1,36 @@
 import * as Crypto from 'expo-crypto'
-import { router, useFocusEffect } from 'expo-router'
+import { useFocusEffect } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { AppState, Linking, StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Button, Text } from 'react-native-paper'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AppState, StyleSheet, View } from 'react-native'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useIsFocused } from '@react-navigation/native'
 import { useCameraPermissions } from 'expo-camera'
 
 import { QrScanner } from '@/components/qr-scanner'
+import {
+  CameraPermissionState,
+  NoActiveTripState,
+  RoleGuardState,
+} from '@/components/scan/scan-blocked-states'
+import { ScanHud } from '@/components/scan/scan-hud'
+import { ScanResultOverlay, type ScanResult } from '@/components/scan/scan-result-overlay'
 import { StateView } from '@/components/ui/state-view'
 import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
-import { lightPalette } from '@/lib/palette'
 import { boardingService } from '@/services/boarding.service'
 import { ApiClientError } from '@/services/api-client'
-import { activeTripOptions, tripStudentsKey } from '@/lib/trip-queries'
+import { activeTripOptions, tripStudentsKey, tripStudentsOptions } from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 import { enqueueCheckIn, isTransportFailure, type QueueOwner } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
 import { registerE2eScanHook } from '@/utils/e2e-scan-hook'
-import {
-  describeFailure,
-  feedbackIcon,
-  QUEUE_FULL_FEEDBACK,
-  QUEUED_FEEDBACK,
-  type Tone,
-} from '@/utils/scan-feedback'
+import { describeFailure, QUEUE_FULL_FEEDBACK, QUEUED_FEEDBACK } from '@/utils/scan-feedback'
+import { tripBoardedCount } from '@/utils/trip-boarded-count'
 
 // Quanto tempo o resultado de SUCESSO fica na tela antes de a câmera voltar
 // sozinha. Só o sucesso auto-retoma: nos estados de erro o motorista precisa ler
 // o que aconteceu antes de continuar.
 const SUCCESS_RESUME_MS = 2500
-
-// Union discriminado em vez de booleanos soltos (architecture.md §6). Com
-// booleanos, `isChecking && isError` é representável e significa nada.
-type ScanResult =
-  | { kind: 'idle' }
-  | { kind: 'checking' }
-  | { kind: 'success'; title: string; detail: string }
-  | {
-      kind: 'failure'
-      // Campos de `ScanFeedback` (`@/utils/scan-feedback`), achatados no union
-      // para o render discriminar por `kind` sem desembrulhar um nível a mais.
-      code: string
-      tone: Tone
-      title: string
-      detail: string
-      canRetry: boolean
-    }
 
 // A última tentativa, guardada para o botão "Tentar novamente" reenviar com a
 // MESMA chave de idempotência. Chave nova para o mesmo aluno faria o servidor
@@ -67,14 +50,12 @@ interface Attempt {
   owner: QueueOwner
 }
 
-const TONE_COLOR: Record<Tone, string> = {
-  // Verde/âmbar/vermelho/tinta (família ink/body para offline) sobre o preto da
-  // câmera — contraste alto, legível em movimento e sob sol direto (NFR18).
-  // Papéis da paleta única (`@/lib/palette`); o branco dos overlays é `onPrimary`.
-  success: lightPalette.success,
-  warn: lightPalette.warning,
-  error: lightPalette.error,
-  offline: lightPalette.textBody,
+// Synchronous cache read (the screen's roster query keeps it filled), so the
+// name still shows offline when the check-in itself can't reach the server.
+function cachedStudentName(queryClient: QueryClient, attempt: Attempt): string | undefined {
+  return queryClient
+    .getQueryData(tripStudentsOptions(attempt.tripId).queryKey)
+    ?.students.find((student) => student.studentId === attempt.studentId)?.name
 }
 
 export default function ScanScreen() {
@@ -87,12 +68,10 @@ export default function ScanScreen() {
   const isFocused = useIsFocused()
   const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
-  const [boardedCount, setBoardedCount] = useState(0)
+  // Students accepted on this screen (server or queue), one entry per check-in:
+  // its length is the session line, and the ids feed the optimistic trip count.
+  const [sessionStudentIds, setSessionStudentIds] = useState<string[]>([])
   const [cameraError, setCameraError] = useState<string | null>(null)
-  // Falha ao abrir o pedido de permissão ou as configurações do sistema. Antes
-  // as duas promises eram descartadas com `void`: a rejeição ficava sem
-  // tratamento e o botão simplesmente parecia morto.
-  const [actionError, setActionError] = useState<string | null>(null)
   const lastAttempt = useRef<Attempt | null>(null)
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Segunda metade do gate do Bloqueador 3. O `isPaused` passado ao QrScanner é
@@ -118,6 +97,9 @@ export default function ScanScreen() {
     status: tripStatus,
     refetch: refetchTrip,
   } = useQuery(activeTripOptions())
+  const { data: roster } = useQuery(
+    tripStudentsOptions(activeTrip?.status === 'ACTIVE' ? activeTrip.id : undefined),
+  )
 
   // O estado 2 manda o motorista às configurações do sistema, mas
   // `useCameraPermissions` não reavalia sozinho quando o app volta ao primeiro
@@ -199,11 +181,12 @@ export default function ScanScreen() {
       // `summary` é agregado do servidor (AC #2). `void`: a tela de scan não
       // aguarda o roster; a rede trabalha enquanto o overlay de sucesso aparece.
       void queryClient.invalidateQueries({ queryKey: tripStudentsKey(attempt.tripId) })
-      setBoardedCount((n) => n + 1)
+      setSessionStudentIds((ids) => [...ids, attempt.studentId])
       setResult({
         kind: 'success',
         title: 'Embarque confirmado',
         detail: 'Aluno registrado nesta viagem.',
+        studentName: cachedStudentName(queryClient, attempt),
       })
       resumeTimer.current = setTimeout(() => {
         resumeTimer.current = null
@@ -234,8 +217,12 @@ export default function ScanScreen() {
           // nasceria com chave NOVA — duas linhas na fila, e um
           // DUPLICATE_CHECK_IN garantido no dreno.
           lastSuccessStudentId.current = attempt.studentId
-          setBoardedCount((n) => n + 1)
-          setResult({ kind: 'failure', ...described })
+          setSessionStudentIds((ids) => [...ids, attempt.studentId])
+          setResult({
+            kind: 'failure',
+            ...described,
+            studentName: cachedStudentName(queryClient, attempt),
+          })
           resumeTimer.current = setTimeout(() => {
             resumeTimer.current = null
             lastAttempt.current = null
@@ -244,12 +231,20 @@ export default function ScanScreen() {
           }, SUCCESS_RESUME_MS)
           return
         }
-        setResult({ kind: 'failure', ...described })
+        setResult({
+          kind: 'failure',
+          ...described,
+          studentName: cachedStudentName(queryClient, attempt),
+        })
         return
       }
 
       const described = describeFailure(error)
-      setResult({ kind: 'failure', ...described })
+      setResult({
+        kind: 'failure',
+        ...described,
+        studentName: cachedStudentName(queryClient, attempt),
+      })
     } finally {
       isSubmitting.current = false
     }
@@ -342,26 +337,8 @@ export default function ScanScreen() {
 
   // ---- Estados que não mostram a câmera ----
 
-  // Guarda de role: um aluno que chegue nesta rota não pode escanear ninguém.
   if (!user || user.role !== 'DRIVER') {
-    return (
-      <StateView
-        kind="blocked"
-        title="Acesso restrito"
-        detail="Apenas motoristas podem registrar embarques."
-        action={{
-          label: 'Entrar novamente',
-          onPress: () => {
-            // `logout()` ANTES do replace, como em `(student)/qr-code.tsx`
-            // (Task 7.11). Só navegar deixaria `isAuthenticated` true: o aluno
-            // ficaria estacionado num formulário de login com a sessão viva, e o
-            // shell continuaria montado atrás.
-            logout()
-            router.replace('/(auth)/login')
-          },
-        }}
-      />
-    )
+    return <RoleGuardState logout={logout} />
   }
 
   // Estados 1 e 2 da Tabela de Verdade.
@@ -371,43 +348,10 @@ export default function ScanScreen() {
   }
 
   if (!permission.granted) {
-    return permission.canAskAgain ? (
-      <StateView
-        kind="blocked"
-        icon="camera"
-        title="Permissão da câmera"
-        detail="O PureUrban precisa da câmera para ler o QR code dos alunos."
-        note={actionError}
-        action={{
-          label: 'Permitir acesso à câmera',
-          onPress: () => {
-            setActionError(null)
-            requestPermission().catch(() =>
-              setActionError(
-                'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
-              ),
-            )
-          },
-        }}
-      />
-    ) : (
-      <StateView
-        kind="blocked"
-        icon="camera-off"
-        title="Câmera bloqueada"
-        detail="A permissão foi negada. Libere o acesso à câmera nas configurações do sistema."
-        note={actionError}
-        action={{
-          label: 'Abrir configurações',
-          onPress: () => {
-            setActionError(null)
-            Linking.openSettings().catch(() =>
-              setActionError(
-                'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
-              ),
-            )
-          },
-        }}
+    return (
+      <CameraPermissionState
+        canAskAgain={permission.canAskAgain}
+        requestPermission={requestPermission}
       />
     )
   }
@@ -441,18 +385,7 @@ export default function ScanScreen() {
 
   // Estado 4.
   if (!activeTrip || activeTrip.status !== 'ACTIVE') {
-    return (
-      <StateView
-        kind="blocked"
-        icon="bus-clock"
-        title="Nenhuma viagem ativa"
-        detail="Inicie uma viagem para começar a registrar embarques."
-        action={{
-          label: 'Ir para Viagem',
-          onPress: () => router.navigate('/(driver)/trip'),
-        }}
-      />
-    )
+    return <NoActiveTripState />
   }
 
   // A câmera não montou: sem esta guarda a tela fica preta com a moldura e nada
@@ -474,11 +407,6 @@ export default function ScanScreen() {
   // ---- Estado 5 em diante: câmera na tela ----
 
   const isPaused = result.kind !== 'idle'
-  // Quando existe uma ação primária branca no overlay (retry ou "Ir para
-  // Viagem"), "Escanear próximo" vira secundária — dois botões brancos
-  // contained empilhados não teriam hierarquia nenhuma.
-  const hasPrimaryAction =
-    result.kind === 'failure' && (result.canRetry || result.code === 'TRIP_NOT_ACTIVE')
 
   return (
     <View style={styles.container}>
@@ -490,121 +418,17 @@ export default function ScanScreen() {
         <View style={styles.offscreen} />
       )}
 
-      {/* `box-none`: a barra não intercepta toques (a câmera continua atrás),
-          mas o botão "Ver lista" dentro dela sim. */}
-      <View style={styles.counterBar} pointerEvents="box-none">
-        <Text variant="titleMedium" style={styles.counterText}>
-          {boardedCount === 1
-            ? '1 embarque nesta sessão'
-            : `${boardedCount} embarques nesta sessão`}
-        </Text>
-        {/* `navigate`, nunca `push`: dois toques rápidos empilhavam duas telas
-            (finding da 3.2b). */}
-        <Button
-          mode="contained"
-          compact
-          buttonColor="rgba(255, 255, 255, 0.16)"
-          textColor={lightPalette.onPrimary}
-          onPress={() => router.navigate('/(driver)/student-list')}
-          style={styles.listButton}
-          contentStyle={styles.listButtonContent}
-          labelStyle={styles.listButtonLabel}
-        >
-          Ver lista
-        </Button>
-      </View>
+      <ScanHud
+        count={tripBoardedCount(roster, sessionStudentIds)}
+        sessionCount={sessionStudentIds.length}
+      />
 
-      {result.kind === 'checking' ? (
-        <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]}>
-          <View style={styles.overlayMessage}>
-            <ActivityIndicator size="large" color={lightPalette.onPrimary} />
-            <Text variant="headlineSmall" style={styles.overlayTitle}>
-              Verificando...
-            </Text>
-          </View>
-        </View>
-      ) : result.kind === 'success' ? (
-        <View style={[styles.overlay, { backgroundColor: TONE_COLOR.success }]}>
-          <View style={styles.overlayMessage}>
-            <Text style={styles.icon}>✓</Text>
-            <Text variant="headlineSmall" style={styles.overlayTitle}>
-              {result.title}
-            </Text>
-            <Text variant="titleMedium" style={styles.overlayDetail}>
-              {result.detail}
-            </Text>
-          </View>
-          <View style={styles.overlayActions}>
-            <Button
-              mode="contained"
-              buttonColor={lightPalette.onPrimary}
-              textColor={TONE_COLOR.success}
-              onPress={resume}
-              style={styles.action}
-              contentStyle={styles.actionContent}
-              labelStyle={styles.actionLabel}
-            >
-              Escanear próximo
-            </Button>
-          </View>
-        </View>
-      ) : result.kind === 'failure' ? (
-        <View style={[styles.overlay, { backgroundColor: TONE_COLOR[result.tone] }]}>
-          <View style={styles.overlayMessage}>
-            <Text style={styles.icon}>{feedbackIcon(result)}</Text>
-            <Text variant="headlineSmall" style={styles.overlayTitle}>
-              {result.title}
-            </Text>
-            <Text variant="titleMedium" style={styles.overlayDetail}>
-              {result.detail}
-            </Text>
-          </View>
-          <View style={styles.overlayActions}>
-            {result.canRetry ? (
-              <Button
-                mode="contained"
-                buttonColor={lightPalette.onPrimary}
-                textColor={TONE_COLOR[result.tone]}
-                onPress={handleRetry}
-                style={styles.action}
-                contentStyle={styles.actionContent}
-                labelStyle={styles.actionLabel}
-              >
-                Tentar novamente
-              </Button>
-            ) : null}
-            {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
-                afordância: sem ela o motorista lê "Inicie uma viagem antes de
-                registrar embarques" sem nenhum caminho até lá. */}
-            {result.code === 'TRIP_NOT_ACTIVE' ? (
-              <Button
-                mode="contained"
-                buttonColor={lightPalette.onPrimary}
-                textColor={TONE_COLOR[result.tone]}
-                onPress={() => router.navigate('/(driver)/trip')}
-                style={styles.action}
-                contentStyle={styles.actionContent}
-                labelStyle={styles.actionLabel}
-              >
-                Ir para Viagem
-              </Button>
-            ) : null}
-            {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema e
-                ficam ilegíveis sobre vermelho ou âmbar. */}
-            <Button
-              mode={hasPrimaryAction ? 'text' : 'contained'}
-              buttonColor={hasPrimaryAction ? undefined : lightPalette.onPrimary}
-              textColor={hasPrimaryAction ? lightPalette.onPrimary : TONE_COLOR[result.tone]}
-              onPress={resume}
-              style={styles.action}
-              contentStyle={styles.actionContent}
-              labelStyle={styles.actionLabel}
-            >
-              Escanear próximo
-            </Button>
-          </View>
-        </View>
-      ) : null}
+      <ScanResultOverlay
+        result={result}
+        onResume={resume}
+        onRetry={handleRetry}
+        autoResumeMs={SUCCESS_RESUME_MS}
+      />
     </View>
   )
 }
@@ -619,90 +443,5 @@ const styles = StyleSheet.create({
   offscreen: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
-  },
-  counterBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    // Scrim sobre a câmera: chrome de câmera (allowlist da guarda).
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-  },
-  counterText: {
-    color: lightPalette.onPrimary,
-    fontSize: 18,
-    lineHeight: 24,
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-  listButton: {
-    marginTop: 10,
-    alignSelf: 'center',
-    borderRadius: 10,
-  },
-  listButtonContent: {
-    height: 44,
-    paddingHorizontal: 12,
-  },
-  listButtonLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  // Overlay de resultado cobrindo a tela inteira: em movimento, o motorista não
-  // tem tempo de procurar um snackbar no rodapé (NFR18).
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    paddingHorizontal: 24,
-  },
-  // Mensagem ocupa o espaço livre e fica centrada; as ações são empurradas para
-  // a metade inferior. Com tudo numa pilha `justifyContent: 'center'`, os botões
-  // caíam no meio da tela, fora do alcance do polegar de quem segura o aparelho
-  // com uma mão só (NFR18 / Task 7.10).
-  overlayMessage: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  overlayActions: {
-    alignSelf: 'stretch',
-    gap: 12,
-    paddingBottom: 32,
-  },
-  icon: {
-    fontSize: 72,
-    lineHeight: 80,
-    color: lightPalette.onPrimary,
-    fontWeight: 'bold',
-  },
-  overlayTitle: {
-    color: lightPalette.onPrimary,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  // NFR18 / Task 7.10: >= 18sp e em negrito. `titleMedium` do MD3 resolve para
-  // 16sp com peso 500, e a opacidade reduzida piorava ainda mais a leitura em
-  // movimento — é esta linha que carrega o "por quê" do resultado.
-  overlayDetail: {
-    color: lightPalette.onPrimary,
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  // NFR18: alvo de toque de 56dp, alinhado ao precedente de `(driver)/trip.tsx`.
-  action: {
-    marginTop: 12,
-    borderRadius: 12,
-    alignSelf: 'stretch',
-  },
-  actionContent: {
-    height: 56,
-  },
-  actionLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 })

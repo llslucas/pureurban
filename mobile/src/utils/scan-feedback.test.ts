@@ -2,6 +2,7 @@ import { ApiClientError } from '@/services/api-error'
 import { MAX_QUEUE_SIZE } from '@/utils/offline-queue'
 import {
   describeFailure,
+  feedbackHaptic,
   feedbackIcon,
   QUEUE_FULL_FEEDBACK,
   QUEUED_FEEDBACK,
@@ -121,8 +122,9 @@ describe('estados da fila offline', () => {
     expect(QUEUED_FEEDBACK.canRetry).toBe(false)
   })
 
-  it('enfileirado é visualmente um sucesso, nunca um ✕', () => {
-    expect(feedbackIcon(QUEUED_FEEDBACK)).toBe('✓')
+  it('enfileirado é visualmente um envio guardado, nunca um ✕', () => {
+    expect(feedbackIcon(QUEUED_FEEDBACK)).toBe('cloud-upload-outline')
+    expect(feedbackHaptic(QUEUED_FEEDBACK)).toBe('light')
   })
 
   it('fila cheia informa o motorista em vez de descartar em silêncio', () => {
@@ -139,10 +141,28 @@ describe('estados da fila offline', () => {
   })
 })
 
-describe('feedbackIcon', () => {
-  it('âmbar leva !, o resto leva ✕', () => {
-    expect(feedbackIcon(describeFailure(new ApiClientError('DUPLICATE_CHECK_IN', '', 409)))).toBe('!')
-    expect(feedbackIcon(describeFailure(new ApiClientError('STUDENT_NOT_ALLOWED', '', 403)))).toBe('✕')
-    expect(feedbackIcon(describeFailure(new TypeError('offline')))).toBe('✕')
+describe('feedbackIcon / feedbackHaptic', () => {
+  const duplicate = describeFailure(new ApiClientError('DUPLICATE_CHECK_IN', '', 409))
+  const notAllowed = describeFailure(new ApiClientError('STUDENT_NOT_ALLOWED', '', 403))
+  const network = describeFailure(new TypeError('offline'))
+  const timeout = describeFailure(new ApiClientError('REQUEST_TIMEOUT', '', 0))
+
+  it.each([
+    ['sucesso', { kind: 'success' as const }, 'check-bold', 'success'],
+    ['já embarcou (âmbar)', duplicate, 'alert', 'warning'],
+    ['falha (vermelho)', notAllowed, 'close-thick', 'error'],
+    ['fila cheia (vermelho)', QUEUE_FULL_FEEDBACK, 'close-thick', 'error'],
+    ['sem conexão (fetch cru)', network, 'cloud-off-outline', 'error'],
+    ['sem conexão (timeout)', timeout, 'cloud-off-outline', 'error'],
+    ['enfileirado', QUEUED_FEEDBACK, 'cloud-upload-outline', 'light'],
+  ] as const)('%s → %s / %s', (_name, subject, icon, haptic) => {
+    expect(feedbackIcon(subject)).toBe(icon)
+    expect(feedbackHaptic(subject)).toBe(haptic)
+  })
+
+  it('nenhum ícone é glifo de texto', () => {
+    for (const subject of [{ kind: 'success' as const }, duplicate, notAllowed, network, QUEUED_FEEDBACK]) {
+      expect(feedbackIcon(subject)).toMatch(/^[a-z-]+$/)
+    }
   })
 })
