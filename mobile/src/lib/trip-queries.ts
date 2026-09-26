@@ -4,6 +4,7 @@ import { queryOptions } from '@tanstack/react-query'
 // expo-router/MMKV, que não carregam sob jest-expo — a classe é a mesma (o
 // api-client só a reexporta), então `instanceof` no retry continua correto.
 import { ApiClientError } from '@/services/api-error'
+import { boardingService } from '@/services/boarding.service'
 import { tripService } from '@/services/trip.service'
 
 // Fonte única das query keys e opções das queries de viagem (AI5 da retro 3).
@@ -12,6 +13,10 @@ import { tripService } from '@/services/trip.service'
 // escadas de backoff diferentes para o mesmo erro (DS8).
 
 export const activeTripKey = ['activeTrip'] as const
+
+export function studentBoardingStatusKey(tripId: string | null | undefined) {
+  return ['studentBoardingStatus', tripId ?? 'none'] as const
+}
 
 export function tripStudentsKey(tripId: string | undefined) {
   return ['trip', tripId, 'students'] as const
@@ -42,6 +47,21 @@ export function tripStudentsOptions(tripId: string | undefined) {
     // Não retenta erro de negócio 4xx (403 DRIVER_NOT_ASSIGNED, 404
     // TRIP_NOT_FOUND): a resposta é determinística — a escada de backoff
     // inteira antes da tela reagir seria ~3s de spinner à toa.
+    retry: (count, error) =>
+      count < 2 && !(error instanceof ApiClientError && error.status >= 400 && error.status < 500),
+  })
+}
+
+/**
+ * Student's state on the active return trip (`GET /boarding/status`). Keyed
+ * by the trip so a new return never inherits the previous one's state.
+ */
+export function studentBoardingStatusOptions(tripId: string | null | undefined) {
+  return queryOptions({
+    queryKey: studentBoardingStatusKey(tripId),
+    enabled: Boolean(tripId),
+    queryFn: () => boardingService.getMyStatus(),
+    staleTime: 10_000,
     retry: (count, error) =>
       count < 2 && !(error instanceof ApiClientError && error.status >= 400 && error.status < 500),
   })
