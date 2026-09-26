@@ -226,6 +226,12 @@ export default function StudentHomeScreen() {
   const checkedIn = boardingStatus?.status === 'CHECKED_IN'
   const windowExpired = !isCounting
 
+  // A poll can resolve the student's state while the dialog is open; confirming
+  // then could only 409.
+  React.useEffect(() => {
+    if (checkedIn || registered) setDialogVisible(false)
+  }, [checkedIn, registered])
+
   const handleConfirm = () => {
     if (!tripId) return
     notifyMutation.mutate(tripId)

@@ -699,6 +699,28 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     expect(await screen.findByText('Embarque confirmado')).toBeTruthy()
   })
 
+  it('closes the open dialog when a poll flips the status to CHECKED_IN', async () => {
+    jest.useFakeTimers()
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus
+      .mockResolvedValueOnce(STATUS_PENDING)
+      .mockResolvedValue(STATUS_CHECKED_IN)
+
+    renderScreen()
+
+    await openDialog()
+    expect(screen.getByText('Não vou voltar?')).toBeTruthy()
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15_000)
+    })
+
+    expect(await screen.findByText('Embarque confirmado')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Não vou voltar?')).toBeNull())
+    expect(screen.queryByText('Confirmar')).toBeNull()
+    expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
+  })
+
   it('erro no GET de status mantém o último estado conhecido', async () => {
     jest.useFakeTimers()
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
