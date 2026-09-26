@@ -602,11 +602,11 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
 })
 
 describe('locks de call-site (source-lock)', () => {
-  it('trip: botão destrutivo no vermelho único e chips nos tintes', () => {
-    expect(readSource('app/(driver)/trip.tsx')).toMatch(/buttonColor=\{lightPalette\.error\}/)
-    const chips = readSource('components/trip/trip-status.tsx')
-    expect(chips).toMatch(/chipActive: \{\s*backgroundColor: statusTints\.success,\s*\}/)
-    expect(chips).toMatch(/chipCompleted: \{\s*backgroundColor: statusTints\.info,\s*\}/)
+  it('trip: encerrar no vermelho único e chips nos tons de status', () => {
+    expect(readSource('components/trip/active-trip-actions.tsx')).toMatch(/color=\{lightPalette\.error\}/)
+    const card = readSource('components/trip/trip-card.tsx')
+    expect(card).toMatch(/icon="progress-clock" tone="success"/)
+    expect(card).toMatch(/icon="flag-checkered" tone="info"/)
   })
 
   it('scan: TONE_COLOR e overlay Verificando presos aos papéis da paleta (render-probe exigiria o stack da câmera)', () => {

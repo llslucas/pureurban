@@ -1,109 +1,84 @@
 import React, { useState } from 'react'
-import { Linking, StyleSheet } from 'react-native'
-import { Button, Card, Text } from 'react-native-paper'
+import { Linking, StyleSheet, View } from 'react-native'
+import { Text } from 'react-native-paper'
 import type { LocationPermissionResponse } from 'expo-location'
 
+import { MdiIcon } from '@/components/ui/mdi-icon'
+import { PrimaryAction } from '@/components/ui/primary-action'
 import { lightPalette } from '@/lib/palette'
+import { elevation, radius, spacing, typography } from '@/lib/tokens'
 
 interface LocationPermissionCardProps {
   permission: LocationPermissionResponse
   requestPermission: () => Promise<LocationPermissionResponse>
 }
 
-// Card de justificativa da permissão de localização (padrão scan.tsx): a
-// captura de GPS é automática, então este card é a ÚNICA porta de entrada do
-// motorista para autorizar — visível no estado inicial e durante a viagem sem
-// permissão. Negado permanente: abrir configurações é a única saída.
+const ICON_SIZE = 40
+
+// GPS capture is automatic, so this card is the driver's ONLY way in to grant
+// location — shown before the first trip and during a trip without permission.
+// Permanently denied: opening the system settings is the only way out.
 export function LocationPermissionCard({ permission, requestPermission }: LocationPermissionCardProps) {
   const [actionError, setActionError] = useState<string | null>(null)
 
+  const handlePress = permission.canAskAgain
+    ? () => {
+        setActionError(null)
+        requestPermission().catch(() =>
+          setActionError(
+            'Não foi possível pedir a permissão. Libere a localização nas configurações do sistema.',
+          ),
+        )
+      }
+    : () => {
+        setActionError(null)
+        Linking.openSettings().catch(() =>
+          setActionError(
+            'Não foi possível abrir as configurações. Abra manualmente e libere a localização para o PureUrban.',
+          ),
+        )
+      }
+
   return (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text style={styles.permissionTitle}>Permissão de localização</Text>
-        <Text style={styles.permissionText}>
-          O PureUrban usa sua localização para transmitir a posição do ônibus aos
-          alunos enquanto a viagem está em andamento. Nada é coletado fora da
-          viagem ativa.
-        </Text>
-        {permission.canAskAgain ? (
-          <Button
-            mode="contained"
-            onPress={() => {
-              setActionError(null)
-              requestPermission().catch(() =>
-                setActionError(
-                  'Não foi possível pedir a permissão. Libere a localização nas configurações do sistema.',
-                ),
-              )
-            }}
-            style={styles.primaryButton}
-            contentStyle={styles.buttonContent}
-            labelStyle={styles.buttonLabel}
-            icon="map-marker-radius"
-          >
-            Permitir acesso à localização
-          </Button>
-        ) : (
-          <Button
-            mode="contained"
-            onPress={() => {
-              setActionError(null)
-              Linking.openSettings().catch(() =>
-                setActionError(
-                  'Não foi possível abrir as configurações. Abra manualmente e libere a localização para o PureUrban.',
-                ),
-              )
-            }}
-            style={styles.primaryButton}
-            contentStyle={styles.buttonContent}
-            labelStyle={styles.buttonLabel}
-            icon="cog"
-          >
-            Abrir configurações
-          </Button>
-        )}
-        {actionError && <Text style={styles.permissionError}>{actionError}</Text>}
-      </Card.Content>
-    </Card>
+    <View style={styles.card} testID="location-permission-card">
+      <MdiIcon name="map-marker-radius" size={ICON_SIZE} color={lightPalette.text} />
+      <Text style={styles.title} accessibilityRole="header">
+        Permissão de localização
+      </Text>
+      <Text style={styles.body}>
+        O PureUrban usa sua localização para transmitir a posição do ônibus aos alunos enquanto a
+        viagem está em andamento. Nada é coletado fora da viagem ativa.
+      </Text>
+      {/* Secondary: during a trip the bar's "Escanear" stays the only contained action. */}
+      <PrimaryAction
+        variant="secondary"
+        label={permission.canAskAgain ? 'Permitir acesso à localização' : 'Abrir configurações'}
+        icon={permission.canAskAgain ? 'map-marker-radius' : 'cog'}
+        onPress={handlePress}
+        testID="location-permission-action"
+      />
+      {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
-    marginBottom: 24,
-    elevation: 2,
-    backgroundColor: lightPalette.surface,
+    ...elevation.level1,
+    borderRadius: radius.lg,
+    padding: spacing[4],
+    gap: spacing[3],
   },
-  permissionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  title: {
+    ...typography.title,
+    color: lightPalette.text,
+  },
+  body: {
+    ...typography.bodyLg,
     color: lightPalette.textBody,
-    marginBottom: 8,
   },
-  permissionText: {
-    fontSize: 15,
-    color: lightPalette.textBody,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  permissionError: {
-    fontSize: 13,
+  error: {
+    ...typography.bodyLg,
     color: lightPalette.error,
-    marginTop: 8,
-  },
-  primaryButton: {
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  buttonContent: {
-    height: 56,
-    paddingHorizontal: 8,
-  },
-  buttonLabel: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
   },
 })

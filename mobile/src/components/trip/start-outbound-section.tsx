@@ -1,165 +1,159 @@
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Button, SegmentedButtons, Text } from 'react-native-paper'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { Text } from 'react-native-paper'
 
+import { MdiIcon } from '@/components/ui/mdi-icon'
+import { StateView } from '@/components/ui/state-view'
 import { lightPalette } from '@/lib/palette'
+import { elevation, radius, spacing, typography } from '@/lib/tokens'
 import type { AssignedRoute } from '@/services/routes.service'
 
-interface StartOutboundSectionProps {
+export type StartOutboundPhase = 'loading' | 'error' | 'no-routes' | 'ready'
+
+interface RoutesQueryState {
   routes: AssignedRoute[] | undefined
   isPending: boolean
   isError: boolean
   isFetching: boolean
+}
+
+// The screen reads the same phase to decide whether "Iniciar Viagem" goes in
+// the action bar: only when there is a route to start on.
+export function startOutboundPhase({ routes, isPending, isError, isFetching }: RoutesQueryState): StartOutboundPhase {
+  const noRoutes = !routes || routes.length === 0
+  // While the query is pending (or disabled) `noRoutes` is true only because
+  // there is no data yet, so the "no routes" state must not show.
+  if (isPending || (isFetching && noRoutes && !isError)) return 'loading'
+  // A network error is never rendered as "no route".
+  if (isError && noRoutes) return 'error'
+  if (noRoutes) return 'no-routes'
+  return 'ready'
+}
+
+interface StartOutboundSectionProps {
+  phase: StartOutboundPhase
+  routes: AssignedRoute[] | undefined
+  isFetching: boolean
   onRetry: () => void
   selectedRouteId: string | null
   onSelectRoute: (routeId: string) => void
-  resolvedRouteId: string | null
-  isMutating: boolean
-  onStart: () => void
+  disabled: boolean
 }
 
-// "Iniciar Viagem" area when there is no active trip. The routeId comes from
-// GET /routes/mine (Epic 2): one route -> auto-selected; two or more -> selector
-// before the button; none -> button disabled with guidance. A network error is
-// never rendered as "no route" -- distinct message and retry, like
-// (driver)/routes.tsx.
+// Content of the no-trip state; the "Iniciar Viagem" action lives in the
+// screen's StickyActionBar. One route is auto-selected; two or more need a pick.
 export function StartOutboundSection({
+  phase,
   routes,
-  isPending,
-  isError,
   isFetching,
   onRetry,
   selectedRouteId,
   onSelectRoute,
-  resolvedRouteId,
-  isMutating,
-  onStart,
+  disabled,
 }: StartOutboundSectionProps) {
-  const noRoutes = !routes || routes.length === 0
+  if (phase === 'loading') {
+    return <StateView kind="loading" title="Carregando rotas..." testID="start-outbound-state" />
+  }
 
-  // Hold the loading indicator until the routes query has actually resolved
-  // once: while it is still pending (or disabled) `noRoutes` is true only
-  // because there is no data yet, so the "no routes" empty state must not show.
-  if (isPending || (isFetching && noRoutes && !isError)) {
+  if (phase === 'error') {
     return (
-      <View style={styles.routesLoading}>
-        <ActivityIndicator />
-        <Text style={styles.loadingText}>Carregando rotas...</Text>
-      </View>
+      <StateView
+        kind="error"
+        title="Não foi possível carregar suas rotas."
+        detail="Verifique sua conexão e tente novamente."
+        action={{ label: 'Tentar novamente', onPress: onRetry, icon: 'refresh', loading: isFetching }}
+        testID="start-outbound-state"
+      />
     )
   }
 
-  if (isError && noRoutes) {
+  if (phase === 'no-routes' || !routes) {
     return (
-      <View style={styles.routesMessage}>
-        <Text style={styles.routesErrorText}>Não foi possível carregar suas rotas.</Text>
-        <Text style={styles.routesHint}>Verifique sua conexão e tente novamente.</Text>
-        <Button
-          mode="contained"
-          onPress={onRetry}
-          loading={isFetching}
-          style={styles.primaryButton}
-          contentStyle={styles.buttonContent}
-          labelStyle={styles.buttonLabel}
-        >
-          Tentar novamente
-        </Button>
-      </View>
+      <StateView
+        kind="empty"
+        icon="map-marker-off"
+        title="Você ainda não tem rota"
+        detail="Peça ao administrador para vincular uma rota."
+        testID="start-outbound-state"
+      />
     )
   }
 
-  if (noRoutes) {
-    return (
-      <View style={styles.routesMessage}>
-        <Text style={styles.routesHint}>Peça ao administrador para vincular uma rota.</Text>
-        <Button
-          mode="contained"
-          disabled
-          style={styles.primaryButton}
-          contentStyle={styles.buttonContent}
-          labelStyle={styles.buttonLabel}
-          icon="bus"
-        >
-          Iniciar Viagem
-        </Button>
-      </View>
-    )
-  }
+  const single = routes.length === 1
 
   return (
-    <>
-      {routes.length > 1 && (
-        <View style={styles.selectorBlock}>
+    <View style={styles.root}>
+      <StateView
+        kind="empty"
+        icon="bus-clock"
+        title="Nenhuma viagem em andamento"
+        detail={single ? routes[0].name : undefined}
+        testID="start-outbound-state"
+      />
+      {single ? null : (
+        <View style={styles.selector} accessibilityRole="radiogroup">
           <Text style={styles.selectorLabel}>Escolha a rota da viagem</Text>
-          <SegmentedButtons
-            value={selectedRouteId ?? ''}
-            onValueChange={onSelectRoute}
-            buttons={routes.map((route) => ({ value: route.id, label: route.name }))}
-          />
+          <View style={styles.list}>
+            {routes.map((route, index) => {
+              const checked = route.id === selectedRouteId
+              return (
+                <Pressable
+                  key={route.id}
+                  onPress={() => onSelectRoute(route.id)}
+                  disabled={disabled}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked, disabled }}
+                  accessibilityLabel={route.name}
+                  style={[styles.option, index > 0 && styles.divider]}
+                  testID={`route-option-${route.id}`}
+                >
+                  <MdiIcon
+                    name={checked ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={24}
+                    color={checked ? lightPalette.primary : lightPalette.textMuted}
+                  />
+                  <Text style={styles.optionLabel}>{route.name}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
         </View>
       )}
-      <Button
-        mode="contained"
-        onPress={onStart}
-        loading={isMutating}
-        disabled={isMutating || !resolvedRouteId}
-        style={styles.primaryButton}
-        contentStyle={styles.buttonContent}
-        labelStyle={styles.buttonLabel}
-        icon="bus"
-      >
-        Iniciar Viagem
-      </Button>
-    </>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  loadingText: {
-    marginTop: 8,
-    color: lightPalette.textMuted,
-    fontSize: 16,
+  root: {
+    flexGrow: 1,
+    gap: spacing.sectionGap,
   },
-  routesLoading: {
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 24,
-  },
-  routesMessage: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  routesErrorText: {
-    fontSize: 16,
-    color: lightPalette.textBody,
-    fontWeight: '600',
-  },
-  routesHint: {
-    fontSize: 14,
-    color: lightPalette.textMuted,
-    lineHeight: 20,
-  },
-  selectorBlock: {
-    marginBottom: 16,
-    gap: 8,
+  selector: {
+    gap: spacing[2],
   },
   selectorLabel: {
-    fontSize: 15,
+    ...typography.label,
     color: lightPalette.textBody,
-    fontWeight: '600',
   },
-  // NFR18: botões grandes, mínimo 48dp, operação com uma mão
-  primaryButton: {
-    borderRadius: 12,
-    marginTop: 8,
+  list: {
+    ...elevation.level1,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
   },
-  buttonContent: {
-    height: 56,
-    paddingHorizontal: 8,
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: spacing.actionHeight,
+    paddingHorizontal: spacing[4],
+    gap: spacing[3],
   },
-  buttonLabel: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: lightPalette.hairline,
+  },
+  optionLabel: {
+    ...typography.bodyLg,
+    color: lightPalette.text,
+    flexShrink: 1,
   },
 })
