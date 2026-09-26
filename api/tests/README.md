@@ -129,8 +129,8 @@ scripts `test:pw`, `test:pw:e2e`, `test:pw:headed`).
 pré-requisitos da seção acima) prova o Épico 4 pela UI, em **duas páginas em
 contextos separados sobre a mesma viagem RETURN**: o aluno na home (botão "Não
 vou voltar", banner "E a volta?", card "Ausência registrada") e o motorista na
-lista de embarque (badge "! Não vai voltar", contagem `{boarded}/{total}
-embarcados`, toast). Cobre quatro fluxos: notificar (com NFR3), cancelar dentro
+lista de embarque (chip "Não vai voltar", contagem pelo `aria-label` "B de T
+embarcados" do `roster-counter`, toast). Cobre quatro fluxos: notificar (com NFR3), cancelar dentro
 da janela, fora da janela (UI + API) e o lembrete respondido pelo aluno.
 
 ### Cenário semeado

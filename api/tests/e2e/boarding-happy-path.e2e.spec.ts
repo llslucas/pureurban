@@ -76,7 +76,15 @@ test.describe('Épico 3 — caminho feliz', () => {
     await expect(page.getByText('Embarque confirmado')).toBeVisible();
 
     await page.getByRole('button', { name: 'Ver lista' }).click();
-    await expect(page.getByText(`1/${total} embarcados`)).toBeVisible();
-    await expect(page.getByText('Embarcou').first()).toBeVisible();
+    // Scoped by testID: the trip screen stays mounted under the list with a
+    // counter of the same label.
+    await expect(page.getByTestId('roster-counter')).toHaveAttribute(
+      'aria-label',
+      `1 de ${total} embarcados`,
+    );
+    // `exact`: the roster legend's "1 embarcou" would match otherwise.
+    await expect(
+      page.getByText('Embarcou', { exact: true }).first(),
+    ).toBeVisible();
   });
 });
