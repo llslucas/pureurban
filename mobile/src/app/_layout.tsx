@@ -58,7 +58,7 @@ export default function RootLayout() {
   useEffect(() => setupAppFocus(), [])
 
   useEffect(() => {
-    if (fontError) console.error('[fonts] falha ao carregar Inter:', fontError)
+    if (fontError) console.error('[fonts] failed to load Inter:', fontError)
   }, [fontError])
 
   useEffect(() => {
@@ -80,7 +80,15 @@ export default function RootLayout() {
   if (mockError) {
     return (
       <PaperProvider theme={lightTheme}>
-        <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 8 }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            padding: 24,
+            gap: 8,
+            backgroundColor: lightTheme.colors.background,
+          }}
+        >
           <Text variant="titleMedium">Falha ao inicializar os mocks (MSW)</Text>
           <Text variant="bodySmall">{mockError}</Text>
           <Text variant="bodySmall">
@@ -112,7 +120,14 @@ export default function RootLayout() {
         {isBooting ? (
           // Nunca null enquanto os portões de boot não abrem: um layout raiz sem
           // saída de router é exatamente a tela em branco que esta tela evita.
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: lightTheme.colors.background,
+            }}
+          >
             <ActivityIndicator />
           </View>
         ) : (
