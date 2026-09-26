@@ -47,7 +47,7 @@ test.describe('Épico 3 — caminho feliz', () => {
 
     await loginAsDriver(page, epic3.driver);
     // A tela de Viagem reflete a viagem real e a contagem do servidor.
-    await expect(page.getByText(`Alunos: 0/${total}`)).toBeVisible();
+    await expect(page.getByLabel(`0 de ${total} embarcados`)).toBeVisible();
     await openScanner(page);
 
     const checkInResponse = page.waitForResponse(

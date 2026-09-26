@@ -266,5 +266,6 @@ paint), mesmo critério do NFR3.
 
 Caveat: o "estado inicial" do motorista após encerrar uma OUTBOUND é o botão
 "Iniciar Retorno" (branch `isReturn` de `trip.tsx`) — é isso que o spec de fim
-de viagem assertiona, junto com o chip "✅ Concluída" e o sumiço de
-"Encerrar Viagem".
+de viagem assertiona, junto com o chip "Concluída" e o sumiço de
+"Encerrar Viagem". Desde a story 6.5, "Encerrar Viagem" abre um ConfirmDialog e o
+PATCH só sai do "Encerrar" do dialog (`end-trip-dialog-confirm`).

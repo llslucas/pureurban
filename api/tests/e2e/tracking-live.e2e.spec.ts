@@ -434,7 +434,10 @@ test.describe('Épico 5 — acompanhamento do ônibus em tempo real', () => {
           response.url().endsWith('/end'),
         { timeout: 15_000 },
       );
+      // Ending asks for confirmation (D-UX-7, story 6.5): the PATCH comes from
+      // the dialog's "Encerrar", not from the bar button.
       await driverPage.getByRole('button', { name: 'Encerrar Viagem' }).click();
+      await driverPage.getByTestId('end-trip-dialog-confirm').click();
       const end = await endResponse;
       expect(end.status()).toBe(200);
       const tripEndedAt = Date.now();
@@ -448,7 +451,9 @@ test.describe('Épico 5 — acompanhamento do ônibus em tempo real', () => {
       // Motorista de volta ao estado de partida: para uma OUTBOUND concluída,
       // o botão de partida é o da próxima perna ("Iniciar Retorno", branch
       // isReturn em trip.tsx) — o estado de viagem ativa acabou.
-      await expect(driverPage.getByText('✅ Concluída')).toBeVisible();
+      await expect(
+        driverPage.getByText('Concluída', { exact: true }),
+      ).toBeVisible();
       await expect(
         driverPage.getByRole('button', { name: 'Iniciar Retorno' }),
       ).toBeVisible();

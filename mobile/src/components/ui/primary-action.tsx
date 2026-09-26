@@ -24,7 +24,7 @@ export interface PrimaryActionProps {
   disabled?: boolean
   /** Impact actions (start/end trip, "não vou voltar") get a selection haptic. */
   impact?: boolean
-  /** Label color for `on-color` (the overlay tone) and `quiet` (e.g. on a solid banner). */
+  /** Label/icon color for `on-color` (overlay tone), `quiet` (solid banner) and `secondary` (e.g. a red "Encerrar"). */
   color?: string
   /** Becomes the DOM `id` on web; e2e selectors rely on it. */
   id?: string
@@ -43,7 +43,7 @@ interface VariantStyle {
 function variantStyle(variant: PrimaryActionVariant, color?: string): VariantStyle {
   switch (variant) {
     case 'secondary':
-      return { mode: 'outlined', buttonColor: lightPalette.canvas, textColor: lightPalette.text, height: spacing.actionHeight }
+      return { mode: 'outlined', buttonColor: lightPalette.canvas, textColor: color ?? lightPalette.text, height: spacing.actionHeight }
     case 'danger':
       return { mode: 'contained', buttonColor: lightPalette.error, textColor: lightPalette.onPrimary, height: spacing.actionHeight }
     case 'on-color':
