@@ -128,7 +128,7 @@ scripts `test:pw`, `test:pw:e2e`, `test:pw:headed`).
 `tests/e2e/absence-reminder.e2e.spec.ts` (mesmo projeto `e2e`, mesmos
 pré-requisitos da seção acima) prova o Épico 4 pela UI, em **duas páginas em
 contextos separados sobre a mesma viagem RETURN**: o aluno na home (botão "Não
-vou voltar", banner "E a volta?", card "Ausência registrada") e o motorista na
+vou voltar", banner "E a volta?", card "Motorista avisado") e o motorista na
 lista de embarque (chip "Não vai voltar", contagem pelo `aria-label` "B de T
 embarcados" do `roster-counter`, toast). Cobre quatro fluxos: notificar (com NFR3), cancelar dentro
 da janela, fora da janela (UI + API) e o lembrete respondido pelo aluno.
@@ -206,7 +206,7 @@ propósito para variação do ambiente local (Metro, CDP, primeiro paint).
 pré-requisitos das seções acima) prova o pipeline inteiro pela UI —
 REST → Redis Pub/Sub → SSE → render — sem nenhum mock de tracking: o motorista
 inicia a viagem e o GPS transmite sozinho (`POST /tracking/location` a cada
-~5s); o aluno abre "Acompanhar ônibus" e vê posição + distância/ETA; o
+~5s); o aluno abre "Onde está o ônibus" e vê posição + distância/ETA; o
 motorista muda de ponto e o texto do aluno atualiza em <5s (NFR2); ~15s sem
 sinal, o chip "Sem sinal GPS" aparece com o último ponto mantido e volta a
 "Em tempo real" com o texto reatualizado na recuperação; e "Encerrar Viagem"

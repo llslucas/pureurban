@@ -148,7 +148,7 @@ async function openStudentTracking(
     accuracy: GPS_ACCURACY_M,
   });
   await loginAsStudent(page, student);
-  await page.getByRole('button', { name: 'Acompanhar ônibus' }).click();
+  await page.getByRole('button', { name: 'Onde está o ônibus' }).click();
 }
 
 // A tela do aluno só mostra distância/ETA com a posição do PRÓPRIO aluno em

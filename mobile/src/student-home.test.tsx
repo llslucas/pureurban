@@ -1,9 +1,15 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import * as Haptics from 'expo-haptics'
+import { Platform } from 'react-native'
 import { Provider as PaperProvider } from 'react-native-paper'
+import { router } from 'expo-router'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import StudentHomeScreen from '@/app/(student)/home'
+import { TEST_INSETS, type TestNode } from '@/components/ui/test-utils'
+import { lightTheme } from '@/lib/theme'
 import { ApiClientError } from '@/services/api-error'
 import {
   boardingService,
@@ -18,12 +24,17 @@ import { useAuthStore } from '@/stores/auth.store'
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap and
 // throws on the module-scope jest.mock (same reason as trip-screen.test.tsx).
 //
-// The screen renders a Paper Dialog (Portal), which REQUIRES a PortalHost —
-// hence the PaperProvider here, unlike trip-screen.test.tsx (that screen has no
-// Portal). Default MD3 theme, same choice as student-row.test.tsx.
+// PaperProvider hosts the ConfirmDialog's Portal; SafeAreaProvider feeds the
+// Screen and the StickyActionBar's inset (same setup as trip-screen.test.tsx).
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn(), push: jest.fn(), replace: jest.fn() },
+}))
+
+jest.mock('expo-haptics', () => ({
+  notificationAsync: jest.fn(() => Promise.resolve()),
+  selectionAsync: jest.fn(() => Promise.resolve()),
+  NotificationFeedbackType: { Success: 'success' },
 }))
 
 jest.mock('expo-crypto', () => ({
@@ -146,11 +157,15 @@ function renderScreen() {
     },
   })
   return render(
-    <PaperProvider>
-      <QueryClientProvider client={queryClient}>
-        <StudentHomeScreen />
-      </QueryClientProvider>
-    </PaperProvider>,
+    <SafeAreaProvider
+      initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: TEST_INSETS }}
+    >
+      <PaperProvider theme={lightTheme}>
+        <QueryClientProvider client={queryClient}>
+          <StudentHomeScreen />
+        </QueryClientProvider>
+      </PaperProvider>
+    </SafeAreaProvider>,
   )
 }
 
@@ -173,7 +188,7 @@ async function openDialog() {
   const button = await screen.findByText('Não vou voltar')
   await waitFor(() => expect(button).not.toBeDisabled())
   fireEvent.press(button)
-  return screen.findByText('Confirmar')
+  return screen.findByTestId('home-not-returning-dialog-confirm')
 }
 
 describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
@@ -193,7 +208,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
   })
 
-  it('fluxo em 2 toques: 1º abre o dialog, 2º (Confirmar) chama a API com tripId e key UUID', async () => {
+  it('fluxo em 2 toques: 1º abre o dialog, 2º (Avisar motorista) chama a API com tripId e key UUID', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
     mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
 
@@ -207,7 +222,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
 
     // Toque 2: confirma.
-    fireEvent.press(await screen.findByText('Confirmar'))
+    fireEvent.press(await screen.findByTestId('home-not-returning-dialog-confirm'))
 
     await waitFor(() =>
       expect(mockBoarding.notifyNotReturning).toHaveBeenCalledWith(
@@ -217,7 +232,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     )
   })
 
-  it('sucesso: mostra "Ausência registrada" com countdown do cancellableUntil e grava o cache', async () => {
+  it('sucesso: mostra "Motorista avisado" com countdown do cancellableUntil e grava o cache', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
     mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
 
@@ -225,16 +240,16 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     fireEvent.press(await openDialog())
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
     expect(
-      screen.getByText('O motorista já foi avisado de que você não vai voltar.'),
+      screen.getByText('Você não vai voltar nesta viagem.'),
     ).toBeTruthy()
-    // Janela factual no formato m:ss alimentada pelo cancellableUntil do
-    // servidor, com o "Cancelar" da 4.3 dentro dela.
-    expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
-    expect(screen.getByText('Cancelar')).toBeTruthy()
+    // Factual m:ss window fed by the server's cancellableUntil, with the 4.3
+    // "Desfazer" inside it.
+    expect(screen.getByText(/Desfazer em 1:\d{2}/)).toBeTruthy()
+    expect(screen.getByTestId('home-undo-absence')).toBeTruthy()
     // Registro da ausência não esconde o embarque: o QR continua na tela.
-    expect(screen.getByText('Meu QR Code')).toBeTruthy()
+    expect(screen.getByTestId('home-qr-shortcut')).toBeTruthy()
     expect(screen.queryByText('Não vou voltar')).toBeNull()
 
     // The known outcome is written straight into the status query.
@@ -243,7 +258,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
     )
   })
 
-  it('janela expirada: ausência apresentada como consolidada, sem countdown e sem botão Cancelar', async () => {
+  it('janela expirada: ausência apresentada como consolidada, sem countdown e sem botão Desfazer', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
     mockBoarding.notifyNotReturning.mockResolvedValue({
       ...ABSENCE,
@@ -254,10 +269,10 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     fireEvent.press(await openDialog())
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
-    expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
-    // Consolidada = o card fica, mas o caminho de volta (Cancelar) some com a janela.
-    expect(screen.queryByText('Cancelar')).toBeNull()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(screen.queryByTestId('countdown-pill')).toBeNull()
+    // Consolidated = the card stays, but the way back (Desfazer) goes with the window.
+    expect(screen.queryByTestId('home-undo-absence')).toBeNull()
     expect(mockBoarding.cancelAbsence).not.toHaveBeenCalled()
   })
 
@@ -280,8 +295,8 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     fireEvent.press(await openDialog())
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
-    expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(screen.getByTestId('countdown-pill')).toBeTruthy()
     expect(mockBoarding.getMyStatus).toHaveBeenCalledTimes(2)
     expect(
       screen.queryByText('Não foi possível registrar a ausência. Tente novamente.'),
@@ -301,12 +316,12 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     fireEvent.press(await openDialog())
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
     await waitFor(() =>
       expect(queryClient.getQueryState(statusKey)?.status).toBe('error'),
     )
-    expect(screen.getByText('Ausência registrada')).toBeTruthy()
-    expect(screen.queryByText(/Janela de cancelamento/)).toBeNull()
+    expect(screen.getByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(screen.queryByTestId('countdown-pill')).toBeNull()
     expect(queryClient.getQueryData(statusKey)).toEqual({
       tripId: RETURN_TRIP.id,
       status: 'NOT_RETURNING',
@@ -332,7 +347,7 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
       await screen.findByText('Você já embarcou nesta viagem. Fale com o motorista.'),
     ).toBeTruthy()
     // Não vira estado registrado: a ausência não existe no servidor.
-    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    expect(screen.queryByTestId('trip-status-card-title-registered')).toBeNull()
     expect(mockBoarding.notifyNotReturning).toHaveBeenCalledTimes(1)
   })
 
@@ -373,10 +388,10 @@ describe('StudentHomeScreen — aviso "Não vou voltar" (spec-4-1)', () => {
 
     renderScreen()
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
-    expect(screen.getByText(/Janela de cancelamento 1:\d{2}/)).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(screen.getByTestId('countdown-pill')).toBeTruthy()
     // O cancelamento volta a ficar disponível também na reidratação.
-    expect(screen.getByText('Cancelar')).toBeTruthy()
+    expect(screen.getByTestId('home-undo-absence')).toBeTruthy()
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
   })
 })
@@ -391,13 +406,13 @@ describe('StudentHomeScreen — cancelamento de ausência (spec-4-3)', () => {
 
     // Fluxo completo da AC: registrar → cancelar, ≤ 2 toques por operação.
     fireEvent.press(await openDialog())
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
 
-    fireEvent.press(screen.getByText('Cancelar'))
+    fireEvent.press(screen.getByTestId('home-undo-absence'))
 
     // O ramo normal É o estado confirmado: o aviso volta a ficar disponível.
     expect(await screen.findByText('Não vou voltar')).toBeTruthy()
-    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    expect(screen.queryByTestId('trip-status-card-title-registered')).toBeNull()
     expect(mockBoarding.cancelAbsence).toHaveBeenCalledWith(
       RETURN_TRIP.id,
       'generated-key-1',
@@ -433,24 +448,24 @@ describe('StudentHomeScreen — cancelamento de ausência (spec-4-3)', () => {
     renderScreen()
 
     fireEvent.press(await openDialog())
-    await screen.findByText('Ausência registrada')
+    await screen.findByTestId('trip-status-card-title-registered')
 
-    fireEvent.press(screen.getByText('Cancelar'))
+    fireEvent.press(screen.getByTestId('home-undo-absence'))
 
     expect(
       await screen.findByText(
         'O tempo para cancelar pelo app passou. Avise o motorista pessoalmente.',
       ),
     ).toBeTruthy()
-    // Consolidado: o card permanece, mas sem countdown e sem novo Cancelar.
+    // Consolidated: the card stays, without countdown and without a new Desfazer.
     await waitFor(() =>
       expect(queryClient.getQueryData(statusKey)).toEqual(expired),
     )
-    expect(screen.getByText('Ausência registrada')).toBeTruthy()
+    expect(screen.getByTestId('trip-status-card-title-registered')).toBeTruthy()
     await waitFor(() =>
-      expect(screen.queryByText(/Janela de cancelamento/)).toBeNull(),
+      expect(screen.queryByTestId('countdown-pill')).toBeNull(),
     )
-    expect(screen.queryByText('Cancelar')).toBeNull()
+    expect(screen.queryByTestId('home-undo-absence')).toBeNull()
   })
 
   it('404 ABSENCE_NOT_FOUND (estado local velho): mensagem clara e volta ao ramo normal', async () => {
@@ -467,9 +482,9 @@ describe('StudentHomeScreen — cancelamento de ausência (spec-4-3)', () => {
     renderScreen()
 
     fireEvent.press(await openDialog())
-    await screen.findByText('Ausência registrada')
+    await screen.findByTestId('trip-status-card-title-registered')
 
-    fireEvent.press(screen.getByText('Cancelar'))
+    fireEvent.press(screen.getByTestId('home-undo-absence'))
 
     expect(
       await screen.findByText('Não há registro de ausência para cancelar.'),
@@ -494,7 +509,7 @@ describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () =>
       await screen.findByText(/ainda não confirmou o retorno/),
     ).toBeTruthy()
     // O fluxo normal da 4.1 continua disponível ao lado do banner.
-    expect(screen.getByText('Meu QR Code')).toBeTruthy()
+    expect(screen.getByTestId('home-qr-shortcut')).toBeTruthy()
   })
 
   it('GET null (sem lembrete): nenhum banner', async () => {
@@ -525,27 +540,24 @@ describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () =>
     expect(mockBoarding.getPendingReminder).not.toHaveBeenCalled()
   })
 
-  it('answering from the banner: same 4.1 dialog/mutation with the same per-attempt key, in 2 taps', async () => {
+  it('with the banner up there is a single "Não vou voltar" (the footer) and it answers in 2 taps', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
     mockBoarding.getPendingReminder.mockResolvedValue(REMINDER)
     mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
 
     renderScreen()
 
-    // The banner must be mounted before the tap: while the GET has not
-    // resolved, the only "Não vou voltar" in the tree is the normal-branch
-    // button.
-    expect(await screen.findByText(/ainda não confirmou o retorno/)).toBeTruthy()
+    expect(await screen.findByText('E a volta?')).toBeTruthy()
+    expect(screen.getAllByText('Não vou voltar')).toHaveLength(1)
 
-    // Tap 1 — banner action (first "Não vou voltar" in the tree: the banner
-    // renders before the normal branch).
-    const bannerButton = (await screen.findAllByText('Não vou voltar'))[0]
-    await waitFor(() => expect(bannerButton).not.toBeDisabled())
-    fireEvent.press(bannerButton)
+    // Tap 1 — footer action.
+    const footerButton = screen.getByText('Não vou voltar')
+    await waitFor(() => expect(footerButton).not.toBeDisabled())
+    fireEvent.press(footerButton)
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
 
     // Tap 2 — the SAME 4.1 dialog confirms.
-    fireEvent.press(await screen.findByText('Confirmar'))
+    fireEvent.press(await screen.findByTestId('home-not-returning-dialog-confirm'))
 
     await waitFor(() =>
       expect(mockBoarding.notifyNotReturning).toHaveBeenCalledWith(
@@ -553,7 +565,7 @@ describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () =>
         'generated-key-1',
       ),
     )
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
   })
 
   it('after success the banner disappears: reminder invalidated and the GET refetch already returns null', async () => {
@@ -568,10 +580,9 @@ describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () =>
     // Same precondition as the previous test: banner mounted before the tap.
     expect(await screen.findByText(/ainda não confirmou o retorno/)).toBeTruthy()
 
-    fireEvent.press((await screen.findAllByText('Não vou voltar'))[0])
-    fireEvent.press(await screen.findByText('Confirmar'))
+    fireEvent.press(await openDialog())
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
     await waitFor(() =>
       expect(screen.queryByText(/ainda não confirmou o retorno/)).toBeNull(),
     )
@@ -598,10 +609,10 @@ describe('StudentHomeScreen — lembrete de check-in pendente (spec-4-4)', () =>
 
     // Register (2 taps) — the absence card replaces the normal branch.
     fireEvent.press(await openDialog())
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
 
     // Cancel (1 tap) — the reminder pending state is restored server-side.
-    fireEvent.press(screen.getByText('Cancelar'))
+    fireEvent.press(screen.getByTestId('home-undo-absence'))
 
     // Without the invalidation in cancelMutation the stale null would stay
     // until the next poll; with it the query refetches and the banner returns.
@@ -654,18 +665,18 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
 
     renderScreen()
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(15_000)
     })
 
     expect(await screen.findByText('Embarque confirmado')).toBeTruthy()
-    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    expect(screen.queryByTestId('trip-status-card-title-registered')).toBeNull()
     expect(screen.queryByText('Não vou voltar')).toBeNull()
-    expect(screen.queryByText('Cancelar')).toBeNull()
+    expect(screen.queryByTestId('home-undo-absence')).toBeNull()
     // The QR stays reachable.
-    expect(screen.getByText('Meu QR Code')).toBeTruthy()
+    expect(screen.getByTestId('home-qr-shortcut')).toBeTruthy()
   })
 
   it('CHECKED_IN ao abrir: "Embarque confirmado" sem ações e sem banner de lembrete', async () => {
@@ -717,7 +728,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
 
     expect(await screen.findByText('Embarque confirmado')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('Não vou voltar?')).toBeNull())
-    expect(screen.queryByText('Confirmar')).toBeNull()
+    expect(screen.queryByTestId('home-not-returning-dialog-confirm')).toBeNull()
     expect(mockBoarding.notifyNotReturning).not.toHaveBeenCalled()
   })
 
@@ -730,7 +741,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
 
     renderScreen()
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(15_000)
@@ -741,7 +752,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
       expect(queryClient.getQueryState(statusKey)?.status).toBe('error'),
     )
     expect(queryClient.getQueryData(statusKey)).toEqual(STATUS_ABSENT)
-    expect(screen.getByText('Ausência registrada')).toBeTruthy()
+    expect(screen.getByTestId('trip-status-card-title-registered')).toBeTruthy()
   })
 
   it('notify: a status GET in flight during the POST does not overwrite the outcome', async () => {
@@ -753,7 +764,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     renderScreen()
 
     fireEvent.press(await openDialog())
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
 
     // The GET that started before the POST lands with the pre-POST state.
     await act(async () => {
@@ -762,7 +773,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     })
 
     expect(queryClient.getQueryData(statusKey)).toEqual(STATUS_ABSENT)
-    expect(screen.getByText('Ausência registrada')).toBeTruthy()
+    expect(screen.getByTestId('trip-status-card-title-registered')).toBeTruthy()
   })
 
   it('cancel: a status GET in flight during the POST does not overwrite the outcome', async () => {
@@ -772,7 +783,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
 
     renderScreen()
 
-    expect(await screen.findByText('Ausência registrada')).toBeTruthy()
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
 
     // A poll starts and stays open while the student cancels.
     const held = deferred<StudentBoardingStatusResponse>()
@@ -780,7 +791,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     void queryClient.refetchQueries({ queryKey: statusKey })
     await waitFor(() => expect(mockBoarding.getMyStatus).toHaveBeenCalledTimes(2))
 
-    fireEvent.press(screen.getByText('Cancelar'))
+    fireEvent.press(screen.getByTestId('home-undo-absence'))
     expect(await screen.findByText('Não vou voltar')).toBeTruthy()
 
     await act(async () => {
@@ -789,7 +800,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     })
 
     expect(queryClient.getQueryData(statusKey)).toEqual(STATUS_PENDING)
-    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    expect(screen.queryByTestId('trip-status-card-title-registered')).toBeNull()
   })
 
   it('ignores a status that belongs to another trip', async () => {
@@ -805,7 +816,7 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
       expect(queryClient.getQueryState(statusKey)?.status).toBe('success'),
     )
     expect(screen.queryByText('Embarque confirmado')).toBeNull()
-    expect(screen.queryByText('Ausência registrada')).toBeNull()
+    expect(screen.queryByTestId('trip-status-card-title-registered')).toBeNull()
     await waitFor(() =>
       expect(screen.getByText('Não vou voltar')).not.toBeDisabled(),
     )
@@ -830,6 +841,181 @@ describe('StudentHomeScreen — estado do servidor com a home aberta (fix studen
     })
 
     expect(await screen.findByText(/ainda não confirmou o retorno/)).toBeTruthy()
+  })
+})
+
+describe('StudentHomeScreen — painel do dia (story 6.8)', () => {
+  const hidden = { includeHiddenElements: true }
+  const HH_MM = /^\d{2}:\d{2}$/
+
+  function chipIcon(): string | undefined {
+    return screen
+      .getByTestId('trip-status-card-chip', hidden)
+      .findAll((node: TestNode) => typeof node.props.name === 'string')[0]?.props.name
+  }
+
+  const originalOS = Platform.OS
+
+  afterEach(() => {
+    Platform.OS = originalOS
+  })
+
+  it('shortcuts sit side by side and navigate (not push) to the QR and the bus tracking', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    const qr = await screen.findByRole('button', { name: 'Meu QR' })
+    const track = screen.getByRole('button', { name: 'Onde está o ônibus' })
+    expect(screen.getByTestId('home-qr-shortcut')).toBe(qr)
+    expect(screen.getByTestId('home-track-shortcut')).toBe(track)
+
+    fireEvent.press(qr)
+    expect(router.navigate).toHaveBeenCalledWith('/(student)/qr-code')
+    fireEvent.press(track)
+    expect(router.navigate).toHaveBeenCalledWith('/(student)/track-bus')
+    expect(router.push).not.toHaveBeenCalled()
+  })
+
+  it('greets by name', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    expect(await screen.findByText('Olá, Ana')).toBeTruthy()
+  })
+
+  it('no trip: card without chip, footer disabled', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    expect(
+      await screen.findByText('Sem viagem de retorno ativa. O aviso fica disponível quando ela começar.'),
+    ).toBeTruthy()
+    expect(screen.queryByTestId('trip-status-card-chip')).toBeNull()
+    expect(screen.getByTestId('home-not-returning')).toBeDisabled()
+  })
+
+  it('waiting: "Aguardando" chip with clock-outline, trip in progress and its start time', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+
+    renderScreen()
+
+    expect(await screen.findByText('Aguardando')).toBeTruthy()
+    expect(chipIcon()).toBe('clock-outline')
+    expect(screen.getByText('Viagem de volta em andamento')).toBeTruthy()
+    const started = screen.getByText(/^Iniciada às /)
+    expect(String(started.props.children).replace('Iniciada às ', '')).toMatch(HH_MM)
+    await waitFor(() => expect(screen.getByTestId('home-not-returning')).not.toBeDisabled())
+  })
+
+  it('checked in: "Embarcou" chip, no footer and no reminder', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus.mockResolvedValue(STATUS_CHECKED_IN)
+
+    renderScreen()
+
+    expect(await screen.findByText('Embarque confirmado')).toBeTruthy()
+    expect(screen.getByText('Embarcou')).toBeTruthy()
+    expect(chipIcon()).toBe('check-circle')
+    const started = screen.getByText(/^Iniciada às /)
+    expect(String(started.props.children).replace('Iniciada às ', '')).toMatch(HH_MM)
+    expect(screen.queryByTestId('home-not-returning')).toBeNull()
+    expect(screen.queryByTestId('sticky-action-bar')).toBeNull()
+  })
+
+  it('registered in the window: "Não vai voltar" chip, notified time, pill and Desfazer, no footer', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus.mockResolvedValue(STATUS_ABSENT)
+
+    renderScreen()
+
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(screen.getByText('Não vai voltar')).toBeTruthy()
+    expect(chipIcon()).toBe('account-cancel')
+    const notified = screen.getByText(/^Avisado às /)
+    expect(String(notified.props.children).replace('Avisado às ', '')).toMatch(HH_MM)
+    expect(screen.getByTestId('countdown-pill')).toBeTruthy()
+    expect(screen.getByTestId('home-undo-absence')).toBeTruthy()
+    expect(screen.queryByTestId('sticky-action-bar')).toBeNull()
+  })
+
+  it('consolidated with absence: null — no notified time, no pill, no Desfazer', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus.mockResolvedValue({ ...STATUS_ABSENT, absence: null })
+
+    renderScreen()
+
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(screen.queryByText(/Avisado às/)).toBeNull()
+    expect(screen.queryByTestId('countdown-pill')).toBeNull()
+    expect(screen.queryByTestId('home-undo-absence')).toBeNull()
+  })
+
+  it('reminder: warning Banner titled "E a volta?" without its own action', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getPendingReminder.mockResolvedValue(REMINDER)
+
+    renderScreen()
+
+    expect(await screen.findByText('E a volta?')).toBeTruthy()
+    expect(
+      screen.getByText('Você ainda não confirmou o retorno. Se não vai voltar, avise o motorista.'),
+    ).toBeTruthy()
+    expect(screen.queryByTestId('home-reminder-action')).toBeNull()
+  })
+
+  it('undo brings the footer back', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.getMyStatus.mockResolvedValue(STATUS_ABSENT)
+    mockBoarding.cancelAbsence.mockResolvedValue(CANCELLATION)
+
+    renderScreen()
+
+    fireEvent.press(await screen.findByTestId('home-undo-absence'))
+
+    expect(await screen.findByTestId('home-not-returning')).toBeTruthy()
+    expect(mockBoarding.cancelAbsence).toHaveBeenCalledTimes(1)
+  })
+
+  it('the footer is an impact action: selection haptic on native', async () => {
+    Platform.OS = 'android'
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+
+    renderScreen()
+
+    const footer = await screen.findByTestId('home-not-returning')
+    await waitFor(() => expect(footer).not.toBeDisabled())
+    fireEvent.press(footer)
+
+    expect(Haptics.selectionAsync).toHaveBeenCalled()
+  })
+
+  it('notify success plays the success haptic on native', async () => {
+    Platform.OS = 'android'
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+
+    renderScreen()
+
+    fireEvent.press(await openDialog())
+
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success)
+  })
+
+  it('no success haptic on web', async () => {
+    Platform.OS = 'web'
+    mockTrip.getActiveTrip.mockResolvedValue(RETURN_TRIP)
+    mockBoarding.notifyNotReturning.mockResolvedValue(ABSENCE)
+
+    renderScreen()
+
+    fireEvent.press(await openDialog())
+
+    expect(await screen.findByTestId('trip-status-card-title-registered')).toBeTruthy()
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled()
   })
 })
 

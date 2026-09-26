@@ -1,10 +1,19 @@
 import * as Crypto from 'expo-crypto'
+import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
-import { Button, Card, Dialog, Portal, Snackbar, Text } from 'react-native-paper'
+import { Platform, StyleSheet, View } from 'react-native'
+import { Snackbar, Text } from 'react-native-paper'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { ShortcutCard } from '@/components/student-home/shortcut-card'
+import { TripStatusCard, type TripStatusCardProps } from '@/components/student-home/trip-status-card'
+import { Banner } from '@/components/ui/banner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { CountdownPill } from '@/components/ui/countdown-pill'
+import { PrimaryAction } from '@/components/ui/primary-action'
+import { Screen } from '@/components/ui/screen'
+import { StickyActionBar } from '@/components/ui/sticky-action-bar'
 import { ApiClientError } from '@/services/api-error'
 import {
   boardingService,
@@ -15,6 +24,8 @@ import {
   studentBoardingStatusKey,
   studentBoardingStatusOptions,
 } from '@/lib/trip-queries'
+import { lightPalette } from '@/lib/palette'
+import { spacing, typography } from '@/lib/tokens'
 import { useAuthStore } from '@/stores/auth.store'
 
 // While the home is open it must notice the driver starting the return and
@@ -45,12 +56,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   ABSENCE_NOT_FOUND: 'Não há registro de ausência para cancelar.',
 }
 
-const formatCountdown = (ms: number) => {
-  const totalSeconds = Math.max(0, Math.ceil(ms / 1000))
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 export default function StudentHomeScreen() {
   const { user } = useAuthStore()
@@ -101,9 +108,9 @@ export default function StudentHomeScreen() {
   const [dialogVisible, setDialogVisible] = React.useState(false)
   const [snackbarVisible, setSnackbarVisible] = React.useState(false)
   const [snackbarMessage, setSnackbarMessage] = React.useState('')
-  // Chave da tentativa corrente: gerada no primeiro toque em "Confirmar" e
-  // mantida até o desfecho — um segundo toque durante o envio reenvia a MESMA
-  // key, e o servidor deduplica (padrão do scan.tsx).
+  // Key of the current attempt: generated on the first "Avisar motorista" tap
+  // and kept until the outcome — a second tap mid-flight resends the SAME key,
+  // and the server deduplicates (scan.tsx pattern).
   const attemptKeyRef = React.useRef<string | null>(null)
 
   const notifyMutation = useMutation({
@@ -117,8 +124,8 @@ export default function StudentHomeScreen() {
       )
     },
     onSuccess: async (absence, currentTripId) => {
-      // Cache sob o tripId que a mutation recebeu, não o do render: o escopo
-      // pode ter mudado (viagem encerrada/aberta) enquanto o envio voava.
+      // Cache under the tripId the mutation received, not the render's: the
+      // scope may have changed (trip ended/opened) while the request flew.
       // A poll GET started before the POST would land afterwards with the old
       // state — cancel it before writing the known outcome.
       await queryClient.cancelQueries({
@@ -141,6 +148,9 @@ export default function StudentHomeScreen() {
       })
       attemptKeyRef.current = null
       setDialogVisible(false)
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+      }
     },
     onError: async (error, currentTripId) => {
       attemptKeyRef.current = null
@@ -163,8 +173,9 @@ export default function StudentHomeScreen() {
     },
   })
 
-  // Key por tentativa do CANCELAMENTO, separada da do registro: cada operação
-  // tem replay próprio no servidor (a cancel key persiste na linha anulada).
+  // Per-attempt key for the CANCELLATION, separate from the notify one: each
+  // operation has its own replay on the server (the cancel key persists on the
+  // voided row).
   const cancelAttemptKeyRef = React.useRef<string | null>(null)
 
   const cancelMutation = useMutation({
@@ -178,9 +189,9 @@ export default function StudentHomeScreen() {
       )
     },
     onSuccess: async (_cancellation, currentTripId) => {
-      // Success = back to the normal branch: "Não vou voltar" is available
-      // again — that branch is the confirmed state of the cancellation. Same
-      // in-flight poll guard as the notify mutation.
+      // Success = back to the waiting state: "Não vou voltar" is available
+      // again — that state confirms the cancellation. Same in-flight poll
+      // guard as the notify mutation.
       await queryClient.cancelQueries({
         queryKey: studentBoardingStatusKey(currentTripId),
       })
@@ -209,8 +220,8 @@ export default function StudentHomeScreen() {
     },
   })
 
-  // Ticking local de 1s derivado de cancellableUntil — o cliente NUNCA
-  // recalcula a janela, só exibe o countdown com o valor do servidor.
+  // Local 1s tick derived from cancellableUntil — the client NEVER recomputes
+  // the window, it only counts down to the server's value.
   const [nowMs, setNowMs] = React.useState(() => Date.now())
   const absence = boardingStatus?.absence ?? null
   const expiryMs = absence ? Date.parse(absence.cancellableUntil) : null
@@ -224,7 +235,6 @@ export default function StudentHomeScreen() {
 
   const registered = boardingStatus?.status === 'NOT_RETURNING'
   const checkedIn = boardingStatus?.status === 'CHECKED_IN'
-  const windowExpired = !isCounting
 
   // A poll can resolve the student's state while the dialog is open; confirming
   // then could only 409.
@@ -237,17 +247,17 @@ export default function StudentHomeScreen() {
     notifyMutation.mutate(tripId)
   }
 
-  // O tripId é capturado no toque (argumento da mutation), não no render: o
-  // escopo pode mudar enquanto o cancelamento voa (padrão do notifyMutation).
+  // The tripId is captured on tap (mutation argument), not on render: the
+  // scope may change while the cancellation flies (notifyMutation pattern).
   const handleCancel = () => {
     if (!tripId) return
     cancelMutation.mutate(tripId)
   }
 
   const handleDismissDialog = () => {
-    // Enquanto o envio está em curso, a tentativa continua viva: descartar o
-    // dialog não descarta a mutation, e manter a MESMA key faz um re-confirmo
-    // reenviar o que já saiu em vez de registrar ausência duas vezes.
+    // Defensive: ConfirmDialog already blocks dismissing while the request is
+    // in flight. Should it ever get through, keeping the SAME key makes a
+    // re-confirm resend what already left instead of registering twice.
     if (!notifyMutation.isPending) {
       attemptKeyRef.current = null
     }
@@ -261,137 +271,110 @@ export default function StudentHomeScreen() {
         ? 'Não foi possível verificar sua viagem. Verifique sua conexão.'
         : 'Sem viagem de retorno ativa. O aviso fica disponível quando ela começar.'
 
+  const statusCard: TripStatusCardProps = !tripId
+    ? { stateKey: 'none', detail: tripHint }
+    : checkedIn
+      ? {
+          stateKey: 'checked-in',
+          chip: { status: 'CHECKED_IN' },
+          title: 'Embarque confirmado',
+          detail: 'O motorista registrou seu embarque na volta.',
+          caption: activeTrip ? `Iniciada às ${formatTime(activeTrip.startedAt)}` : undefined,
+        }
+      : registered
+        ? {
+            stateKey: 'registered',
+            chip: { status: 'NOT_RETURNING' },
+            title: 'Motorista avisado',
+            detail: 'Você não vai voltar nesta viagem.',
+            caption: absence ? `Avisado às ${formatTime(absence.notifiedAt)}` : undefined,
+          }
+        : {
+            stateKey: 'waiting',
+            chip: { label: 'Aguardando', icon: 'clock-outline', tone: 'neutral' },
+            title: 'Viagem de volta em andamento',
+            caption: activeTrip ? `Iniciada às ${formatTime(activeTrip.startedAt)}` : undefined,
+          }
+
+  const footer =
+    checkedIn || registered ? undefined : (
+      <StickyActionBar>
+        <PrimaryAction
+          variant="secondary"
+          label="Não vou voltar"
+          icon="bus-alert"
+          impact
+          disabled={!tripId || notifyMutation.isPending}
+          onPress={() => setDialogVisible(true)}
+          testID="home-not-returning"
+        />
+      </StickyActionBar>
+    )
+
   return (
-    <View style={styles.container}>
-      <Text variant="headlineSmall" style={styles.greeting}>
-        Olá, {user?.name ?? 'aluno'}
-      </Text>
+    <View style={styles.root}>
+      <Screen variant="scroll" footer={footer} testID="student-home">
+        <View style={styles.content}>
+          <Text style={styles.greeting} accessibilityRole="header">
+            Olá, {user?.name ?? 'aluno'}
+          </Text>
 
-      <View>
-        {/* Contagem de toques da AC #5: login leva a home (0 toques) → 1 toque aqui → QR na tela. */}
-        <Button
-          mode="contained"
-          contentStyle={styles.buttonContent}
-          // navigate, não push: dois toques rápidos empilhavam duas telas de QR
-          // (duas queries, dois backs) antes da transição terminar.
-          onPress={() => router.navigate('/(student)/qr-code')}
-        >
-          Meu QR Code
-        </Button>
+          {/* No action here: the footer is the single entry to the same dialog,
+              so there are never two "Não vou voltar" buttons. */}
+          {pendingReminder && !registered && !checkedIn ? (
+            <Banner
+              tone="warning"
+              title="E a volta?"
+              message="Você ainda não confirmou o retorno. Se não vai voltar, avise o motorista."
+              testID="home-reminder"
+            />
+          ) : null}
 
-        {/* Acompanhamento em tempo real (Story 5.2): entrada ao lado do QR —
-            a viagem (ida ou volta) é descoberta dentro da tela. */}
-        <Button
-          mode="contained-tonal"
-          contentStyle={styles.buttonContent}
-          icon="bus-clock"
-          onPress={() => router.navigate('/(student)/track-bus')}
-        >
-          Acompanhar ônibus
-        </Button>
-
-        {/* Reminder (4.4) between the QR and the absence branch: it answers
-            with the EXACT 4.1 mutation — the banner only opens the existing
-            dialog. It disappears when the absence is registered or the GET
-            returns null (pending state resolved). */}
-        {pendingReminder && !registered && !checkedIn ? (
-          <Card mode="outlined" style={styles.reminderBanner}>
-            <Card.Content style={styles.reminderContent}>
-              <Text variant="titleSmall">E a volta?</Text>
-              <Text variant="bodyMedium" style={styles.reminderHint}>
-                Você ainda não confirmou o retorno. Se não vai voltar, avise o
-                motorista.
-              </Text>
-              <Button
-                mode="contained"
-                contentStyle={styles.buttonContent}
-                icon="bus-alert"
-                onPress={() => setDialogVisible(true)}
-              >
-                Não vou voltar
-              </Button>
-            </Card.Content>
-          </Card>
-        ) : null}
-
-        {checkedIn ? (
-          <Card mode="elevated" style={styles.absenceCard}>
-            <Card.Content style={styles.absenceContent}>
-              <Text variant="titleMedium">Embarque confirmado</Text>
-              <Text variant="bodyMedium" style={styles.absenceHint}>
-                O motorista registrou seu embarque na volta.
-              </Text>
-            </Card.Content>
-          </Card>
-        ) : registered ? (
-          <Card mode="elevated" style={styles.absenceCard}>
-            <Card.Content style={styles.absenceContent}>
-              <Text variant="titleMedium">Ausência registrada</Text>
-              <Text variant="bodyMedium" style={styles.absenceHint}>
-                O motorista já foi avisado de que você não vai voltar.
-              </Text>
-              {windowExpired ? null : (
-                <>
-                  <Text variant="titleMedium" style={styles.countdown}>
-                    Janela de cancelamento{' '}
-                    {formatCountdown((expiryMs ?? 0) - nowMs)}
-                  </Text>
-                  <Button
-                    mode="outlined"
-                    contentStyle={styles.buttonContent}
-                    icon="undo-variant"
-                    disabled={!tripId || cancelMutation.isPending}
-                    loading={cancelMutation.isPending}
-                    onPress={handleCancel}
-                  >
-                    Cancelar
-                  </Button>
-                </>
-              )}
-            </Card.Content>
-          </Card>
-        ) : (
-          <>
-            <Button
-              mode="contained-tonal"
-              contentStyle={styles.buttonContent}
-              icon="bus-alert"
-              disabled={!tripId || notifyMutation.isPending}
-              onPress={() => setDialogVisible(true)}
-              style={styles.absenceButton}
-            >
-              Não vou voltar
-            </Button>
-            {!tripId ? (
-              <Text variant="bodySmall" style={styles.tripHint}>
-                {tripHint}
-              </Text>
+          <TripStatusCard {...statusCard}>
+            {registered && isCounting ? (
+              <>
+                <CountdownPill remainingMs={(expiryMs ?? 0) - nowMs} label="Desfazer em" />
+                <PrimaryAction
+                  variant="secondary"
+                  label="Desfazer"
+                  icon="undo-variant"
+                  disabled={!tripId || cancelMutation.isPending}
+                  loading={cancelMutation.isPending}
+                  onPress={handleCancel}
+                  testID="home-undo-absence"
+                />
+              </>
             ) : null}
-          </>
-        )}
-      </View>
+          </TripStatusCard>
 
-      <Portal>
-        <Dialog visible={dialogVisible} onDismiss={handleDismissDialog}>
-          <Dialog.Title>Não vou voltar?</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">
-              O motorista será avisado agora de que você não vai voltar no
-              ônibus.
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={handleDismissDialog}>Voltar</Button>
-            <Button
-              onPress={handleConfirm}
-              loading={notifyMutation.isPending}
-              disabled={notifyMutation.isPending || !tripId}
-            >
-              Confirmar
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+          <View style={styles.shortcuts}>
+            {/* navigate, not push: two quick taps stacked two screens before the transition ended. */}
+            <ShortcutCard
+              label="Meu QR"
+              icon="qrcode"
+              onPress={() => router.navigate('/(student)/qr-code')}
+              testID="home-qr-shortcut"
+            />
+            <ShortcutCard
+              label="Onde está o ônibus"
+              icon="bus-marker"
+              onPress={() => router.navigate('/(student)/track-bus')}
+              testID="home-track-shortcut"
+            />
+          </View>
+        </View>
+      </Screen>
+
+      <ConfirmDialog
+        visible={dialogVisible}
+        title="Não vou voltar?"
+        message="O motorista será avisado agora de que você não vai voltar no ônibus."
+        confirmLabel="Avisar motorista"
+        onConfirm={handleConfirm}
+        onDismiss={handleDismissDialog}
+        loading={notifyMutation.isPending}
+        testID="home-not-returning-dialog"
+      />
 
       <Snackbar
         visible={snackbarVisible}
@@ -405,49 +388,19 @@ export default function StudentHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    gap: 24,
+    backgroundColor: lightPalette.surfaceSoft,
+  },
+  content: {
+    gap: spacing.sectionGap,
   },
   greeting: {
-    textAlign: 'center',
+    ...typography.titleLg,
+    color: lightPalette.text,
   },
-  buttonContent: {
-    paddingVertical: 10,
-  },
-  absenceButton: {
-    marginTop: 16,
-  },
-  tripHint: {
-    textAlign: 'center',
-    opacity: 0.7,
-    marginTop: 8,
-  },
-  absenceCard: {
-    borderRadius: 16,
-  },
-  reminderBanner: {
-    borderRadius: 16,
-  },
-  reminderContent: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  reminderHint: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  absenceContent: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  absenceHint: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  countdown: {
-    fontVariant: ['tabular-nums'],
+  shortcuts: {
+    flexDirection: 'row',
+    gap: spacing[3],
   },
 })
