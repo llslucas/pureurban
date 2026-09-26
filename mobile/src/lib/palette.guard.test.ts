@@ -626,6 +626,13 @@ describe('locks de call-site (source-lock)', () => {
     expect(source).toMatch(/routeValue: \{[^}]*color: lightPalette\.textBody,/)
   })
 
+  it('app-header: fundo, divisória e tinta presos à paleta', () => {
+    const source = readSource('lib/app-header.tsx')
+    expect(source).toMatch(/headerTintColor: lightPalette\.text,/)
+    expect(source).toMatch(/background: \{[^}]*backgroundColor: lightPalette\.canvas,/)
+    expect(source).toMatch(/background: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
+  })
+
   it('student-list: papéis de texto, header e divisória presos à paleta', () => {
     const source = readSource('app/(driver)/student-list.tsx')
     expect(source).toMatch(/container: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)

@@ -4,11 +4,10 @@ import { useAuthStore } from '@/stores/auth.store'
 import type { AuthUser } from '@/services/auth.service'
 import type { QueueStatus, QueueStorage } from '@/utils/offline-queue'
 
-// Purga da fila no logout (D5/AC7). O logout do motorista hoje só acontece por
-// caminho programático (401 do api-client, guardas de role) — não existe botão
-// "Sair" no grupo do motorista (defer registrado no deferred-work). Por isso o
-// aviso de descarte é consumido na TELA DE LOGIN: é a única superfície que
-// toda saída de sessão atravessa.
+// Purga da fila no logout (D5/AC7). O logout do motorista parte do "Sair" do
+// header (story 6.3) ou de caminho programático (401 do api-client, guardas de
+// role). Por isso o aviso de descarte é consumido na TELA DE LOGIN: é a única
+// superfície que toda saída de sessão atravessa.
 
 jest.mock('react-native-mmkv', () => ({
   createMMKV: () => ({
