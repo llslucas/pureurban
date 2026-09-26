@@ -1,43 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { router } from 'expo-router'
-import { AppState, Linking, View, StyleSheet, ScrollView, Alert } from 'react-native'
-import {
-  Button,
-  Card,
-  Text,
-  ActivityIndicator,
-  Chip,
-  SegmentedButtons,
-} from 'react-native-paper'
+import { AppState, View, StyleSheet, ScrollView, Alert } from 'react-native'
+import { Button, Card, Text, ActivityIndicator } from 'react-native-paper'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { LocationPermissionResponse } from 'expo-location'
 import { useForegroundPermissions } from 'expo-location'
+import { LocationPermissionCard } from '@/components/trip/location-permission-card'
+import { StartOutboundSection } from '@/components/trip/start-outbound-section'
+import { TripStatusChip, TripTypeLabel } from '@/components/trip/trip-status'
 import { tripService } from '@/services/trip.service'
 import type { TripType } from '@/services/trip.service'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
 import { useTripGpsCapture } from '@/hooks/use-trip-gps-capture'
-import { lightPalette, statusTints } from '@/lib/palette'
+import { lightPalette } from '@/lib/palette'
 import { activeTripKey, activeTripOptions, tripStudentsOptions } from '@/lib/trip-queries'
-
-function TripStatusChip({ status }: { status: 'ACTIVE' | 'COMPLETED' }) {
-  return (
-    <Chip
-      mode="flat"
-      style={[styles.statusChip, status === 'ACTIVE' ? styles.chipActive : styles.chipCompleted]}
-      textStyle={styles.chipText}
-    >
-      {status === 'ACTIVE' ? '🟢 Em Andamento' : '✅ Concluída'}
-    </Chip>
-  )
-}
-
-function TripTypeLabel({ type }: { type: 'OUTBOUND' | 'RETURN' }) {
-  return (
-    <Text style={styles.tripTypeLabel}>
-      {type === 'OUTBOUND' ? '🚌 Viagem de Ida' : '🔄 Viagem de Retorno'}
-    </Text>
-  )
-}
 
 function resolveRouteId(
   routes: AssignedRoute[] | undefined,
@@ -48,179 +23,6 @@ function resolveRouteId(
     return selectedRouteId
   }
   return null
-}
-
-interface LocationPermissionCardProps {
-  permission: LocationPermissionResponse
-  requestPermission: () => Promise<LocationPermissionResponse>
-}
-
-// Card de justificativa da permissão de localização (padrão scan.tsx): a
-// captura de GPS é automática, então este card é a ÚNICA porta de entrada do
-// motorista para autorizar — visível no estado inicial e durante a viagem sem
-// permissão. Negado permanente: abrir configurações é a única saída.
-function LocationPermissionCard({ permission, requestPermission }: LocationPermissionCardProps) {
-  const [actionError, setActionError] = useState<string | null>(null)
-
-  return (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text style={styles.permissionTitle}>Permissão de localização</Text>
-        <Text style={styles.permissionText}>
-          O PureUrban usa sua localização para transmitir a posição do ônibus aos
-          alunos enquanto a viagem está em andamento. Nada é coletado fora da
-          viagem ativa.
-        </Text>
-        {permission.canAskAgain ? (
-          <Button
-            mode="contained"
-            onPress={() => {
-              setActionError(null)
-              requestPermission().catch(() =>
-                setActionError(
-                  'Não foi possível pedir a permissão. Libere a localização nas configurações do sistema.',
-                ),
-              )
-            }}
-            style={styles.primaryButton}
-            contentStyle={styles.buttonContent}
-            labelStyle={styles.buttonLabel}
-            icon="map-marker-radius"
-          >
-            Permitir acesso à localização
-          </Button>
-        ) : (
-          <Button
-            mode="contained"
-            onPress={() => {
-              setActionError(null)
-              Linking.openSettings().catch(() =>
-                setActionError(
-                  'Não foi possível abrir as configurações. Abra manualmente e libere a localização para o PureUrban.',
-                ),
-              )
-            }}
-            style={styles.primaryButton}
-            contentStyle={styles.buttonContent}
-            labelStyle={styles.buttonLabel}
-            icon="cog"
-          >
-            Abrir configurações
-          </Button>
-        )}
-        {actionError && <Text style={styles.permissionError}>{actionError}</Text>}
-      </Card.Content>
-    </Card>
-  )
-}
-
-interface StartOutboundSectionProps {
-  routes: AssignedRoute[] | undefined
-  isPending: boolean
-  isError: boolean
-  isFetching: boolean
-  onRetry: () => void
-  selectedRouteId: string | null
-  onSelectRoute: (routeId: string) => void
-  resolvedRouteId: string | null
-  isMutating: boolean
-  onStart: () => void
-}
-
-// "Iniciar Viagem" area when there is no active trip. The routeId comes from
-// GET /routes/mine (Epic 2): one route -> auto-selected; two or more -> selector
-// before the button; none -> button disabled with guidance. A network error is
-// never rendered as "no route" -- distinct message and retry, like
-// (driver)/routes.tsx.
-function StartOutboundSection({
-  routes,
-  isPending,
-  isError,
-  isFetching,
-  onRetry,
-  selectedRouteId,
-  onSelectRoute,
-  resolvedRouteId,
-  isMutating,
-  onStart,
-}: StartOutboundSectionProps) {
-  const noRoutes = !routes || routes.length === 0
-
-  // Hold the loading indicator until the routes query has actually resolved
-  // once: while it is still pending (or disabled) `noRoutes` is true only
-  // because there is no data yet, so the "no routes" empty state must not show.
-  if (isPending || (isFetching && noRoutes && !isError)) {
-    return (
-      <View style={styles.routesLoading}>
-        <ActivityIndicator />
-        <Text style={styles.loadingText}>Carregando rotas...</Text>
-      </View>
-    )
-  }
-
-  if (isError && noRoutes) {
-    return (
-      <View style={styles.routesMessage}>
-        <Text style={styles.routesErrorText}>Não foi possível carregar suas rotas.</Text>
-        <Text style={styles.routesHint}>Verifique sua conexão e tente novamente.</Text>
-        <Button
-          mode="contained"
-          onPress={onRetry}
-          loading={isFetching}
-          style={styles.primaryButton}
-          contentStyle={styles.buttonContent}
-          labelStyle={styles.buttonLabel}
-        >
-          Tentar novamente
-        </Button>
-      </View>
-    )
-  }
-
-  if (noRoutes) {
-    return (
-      <View style={styles.routesMessage}>
-        <Text style={styles.routesHint}>Peça ao administrador para vincular uma rota.</Text>
-        <Button
-          mode="contained"
-          disabled
-          style={styles.primaryButton}
-          contentStyle={styles.buttonContent}
-          labelStyle={styles.buttonLabel}
-          icon="bus"
-        >
-          Iniciar Viagem
-        </Button>
-      </View>
-    )
-  }
-
-  return (
-    <>
-      {routes.length > 1 && (
-        <View style={styles.selectorBlock}>
-          <Text style={styles.selectorLabel}>Escolha a rota da viagem</Text>
-          <SegmentedButtons
-            value={selectedRouteId ?? ''}
-            onValueChange={onSelectRoute}
-            buttons={routes.map((route) => ({ value: route.id, label: route.name }))}
-          />
-        </View>
-      )}
-      <Button
-        mode="contained"
-        onPress={onStart}
-        loading={isMutating}
-        disabled={isMutating || !resolvedRouteId}
-        style={styles.primaryButton}
-        contentStyle={styles.buttonContent}
-        labelStyle={styles.buttonLabel}
-        icon="bus"
-      >
-        Iniciar Viagem
-      </Button>
-    </>
-  )
 }
 
 export default function TripScreen() {
@@ -535,76 +337,10 @@ const styles = StyleSheet.create({
     elevation: 2,
     backgroundColor: lightPalette.surface,
   },
-  statusChip: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  chipActive: {
-    backgroundColor: statusTints.success,
-  },
-  chipCompleted: {
-    backgroundColor: statusTints.info,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  tripTypeLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: lightPalette.textBody,
-    marginBottom: 4,
-  },
   infoText: {
     fontSize: 15,
     color: lightPalette.textBody,
     marginTop: 6,
-  },
-  permissionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: lightPalette.textBody,
-    marginBottom: 8,
-  },
-  permissionText: {
-    fontSize: 15,
-    color: lightPalette.textBody,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  permissionError: {
-    fontSize: 13,
-    color: lightPalette.error,
-    marginTop: 8,
-  },
-  routesLoading: {
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 24,
-  },
-  routesMessage: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  routesErrorText: {
-    fontSize: 16,
-    color: lightPalette.textBody,
-    fontWeight: '600',
-  },
-  routesHint: {
-    fontSize: 14,
-    color: lightPalette.textMuted,
-    lineHeight: 20,
-  },
-  selectorBlock: {
-    marginBottom: 16,
-    gap: 8,
-  },
-  selectorLabel: {
-    fontSize: 15,
-    color: lightPalette.textBody,
-    fontWeight: '600',
   },
   // NFR18: botões grandes, mínimo 48dp, operação com uma mão
   primaryButton: {
