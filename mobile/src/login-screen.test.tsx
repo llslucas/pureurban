@@ -1,9 +1,12 @@
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
 import React from 'react'
+import { Keyboard, Platform } from 'react-native'
+import * as Reanimated from 'react-native-reanimated'
 
 import LoginScreen from '@/app/(auth)/login'
 import { renderUi } from '@/components/ui/test-utils'
 import { setDiscardNotice } from '@/lib/offline-discard-notice'
+import { tokenStorage } from '@/lib/storage'
 import { authService } from '@/services/auth.service'
 
 // Metade de UI do AC7 (D5): o aviso de "N embarques não sincronizados
@@ -94,5 +97,75 @@ describe('LoginScreen — apresentação (story 6.4)', () => {
     expect(screen.getByLabelText('Ocultar senha')).toBeTruthy()
     fireEvent.press(screen.getByLabelText('Ocultar senha'))
     expect(screen.getByLabelText('Mostrar senha')).toBeTruthy()
+  })
+})
+
+describe('LoginScreen — erros do login no Banner', () => {
+  async function submit(email = 'Motorista@PureUrban.com', password = 'segredo') {
+    await renderUi(<LoginScreen />)
+    fireEvent.changeText(screen.UNSAFE_getByProps({ id: 'login-email' }), email)
+    fireEvent.changeText(screen.UNSAFE_getByProps({ id: 'login-password' }), password)
+    fireEvent.press(screen.getByText('Entrar'))
+  }
+
+  it('mostra a mensagem do servidor quando o login falha', async () => {
+    jest.mocked(authService.login).mockRejectedValue(new Error('Credenciais inválidas.'))
+    await submit()
+
+    expect(await screen.findByText('Credenciais inválidas.')).toBeTruthy()
+    expect(screen.getByTestId('login-error')).toBeTruthy()
+    expect(authService.login).toHaveBeenCalledWith('motorista@pureurban.com', 'segredo')
+  })
+
+  it('usa a mensagem genérica quando a falha não é um Error', async () => {
+    jest.mocked(authService.login).mockRejectedValue('boom')
+    await submit()
+
+    expect(await screen.findByText('Erro ao fazer login. Tente novamente.')).toBeTruthy()
+  })
+
+  it('perfil sem destino limpa os tokens e avisa no Banner', async () => {
+    jest.mocked(authService.login).mockResolvedValue({
+      accessToken: 'a',
+      refreshToken: 'r',
+      user: { role: 'admin' },
+    } as unknown as Awaited<ReturnType<typeof authService.login>>)
+    await submit()
+
+    expect(await screen.findByText('Perfil de usuário não suportado neste aplicativo.')).toBeTruthy()
+    expect(tokenStorage.clearTokens).toHaveBeenCalled()
+  })
+})
+
+describe('LoginScreen — hero encolhe com o teclado', () => {
+  type Listener = () => void
+  const [SHOW, HIDE] =
+    Platform.OS === 'ios' ? ['keyboardWillShow', 'keyboardWillHide'] : ['keyboardDidShow', 'keyboardDidHide']
+  const listeners: Record<string, Listener[]> = {}
+
+  beforeEach(() => {
+    for (const key of Object.keys(listeners)) delete listeners[key]
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, listener: Listener) => {
+      ;(listeners[event] ??= []).push(listener)
+      return { remove: jest.fn() }
+    }) as unknown as typeof Keyboard.addListener)
+  })
+
+  afterEach(() => jest.restoreAllMocks())
+
+  const emit = (event: string) => act(() => listeners[event]?.forEach((listener) => listener()))
+
+  // The Reanimated mock doesn't re-evaluate animated styles, so pin the target
+  // the hero animates to: 1 = compact, 0 = full.
+  it('encolhe o hero ao abrir o teclado e restaura ao fechar', async () => {
+    const withTiming = jest.spyOn(Reanimated, 'withTiming')
+    await renderUi(<LoginScreen />)
+
+    withTiming.mockClear()
+    emit(SHOW)
+    expect(withTiming).toHaveBeenLastCalledWith(1, expect.anything())
+
+    emit(HIDE)
+    expect(withTiming).toHaveBeenLastCalledWith(0, expect.anything())
   })
 })
