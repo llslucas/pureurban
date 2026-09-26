@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react-native'
 import React from 'react'
 import { StyleSheet } from 'react-native'
 
-import { STATUS_PRESENTATION } from '@/components/student-card'
+import { STATUS_PRESENTATION } from '@/lib/boarding-status'
 import { CHIP_TONES, StatusChip, type ChipTone } from '@/components/ui/status-chip'
 import { contrastRatio, renderUi, type TestNode } from '@/components/ui/test-utils'
 import { lightPalette } from '@/lib/palette'

@@ -33,7 +33,7 @@ interface ChipLook {
 function resolve(props: StatusChipProps): ChipLook {
   if ('status' in props) {
     // A status from an older contract rehydrated from the cache falls back like
-    // the StudentCard does instead of crashing the row.
+    // the StudentRow does instead of crashing the row.
     const p = STATUS_PRESENTATION[props.status] ?? STATUS_PRESENTATION.NOT_CHECKED_IN
     return {
       label: p.label,

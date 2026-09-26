@@ -4,13 +4,8 @@ import type { BoardingStatus } from '@/services/trip.service'
 
 export interface StatusPresentation {
   label: string
-  /** Cor do texto do chip. */
   color: string
-  /** Fundo do chip. */
   background: string
-  /** Glifo textual — nunca a única pista (Task 2.4): o rótulo carrega o sentido. */
-  icon: string
-  /** MDI icon for the StatusChip; the StudentCard keeps the glyph until story 6.7. */
   mdiIcon: MdiIconName
   accessibilityLabel: string
 }
@@ -23,7 +18,6 @@ export const STATUS_PRESENTATION: Record<BoardingStatus, StatusPresentation> = {
     label: 'Embarcou',
     color: lightPalette.success,
     background: statusTints.success,
-    icon: '✓',
     mdiIcon: 'check-circle',
     accessibilityLabel: 'Status: embarcou',
   },
@@ -31,7 +25,6 @@ export const STATUS_PRESENTATION: Record<BoardingStatus, StatusPresentation> = {
     label: 'Não embarcou',
     color: lightPalette.textBody,
     background: statusTints.neutral,
-    icon: '—',
     mdiIcon: 'clock-outline',
     accessibilityLabel: 'Status: não embarcou',
   },
@@ -39,7 +32,6 @@ export const STATUS_PRESENTATION: Record<BoardingStatus, StatusPresentation> = {
     label: 'Não vai voltar',
     color: lightPalette.warning,
     background: statusTints.warning,
-    icon: '!',
     mdiIcon: 'account-cancel',
     accessibilityLabel: 'Status: não vai voltar',
   },

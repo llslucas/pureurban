@@ -1,13 +1,16 @@
 import { router } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
-import { Banner, Snackbar, Text } from 'react-native-paper'
+import { Snackbar } from 'react-native-paper'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { StudentCard } from '@/components/student-card'
+import { RosterHeader } from '@/components/student-list/roster-header'
+import { StudentRow } from '@/components/student-row'
+import { Banner } from '@/components/ui/banner'
 import { StateView } from '@/components/ui/state-view'
 import { ApiClientError } from '@/services/api-client'
 import { lightPalette } from '@/lib/palette'
+import { spacing } from '@/lib/tokens'
 import {
   connectBoardingEvents,
   type BoardingAbsenceCancelledEvent,
@@ -21,10 +24,11 @@ import {
 } from '@/lib/trip-queries'
 import { useAuthStore } from '@/stores/auth.store'
 
-// Eventos aplicados ao cache como NOVO array + novos objetos (StudentCard é
-// React.memo: mutação in-place não re-renderizaria o card). O summary é
-// ajustado no próprio cache e a query é sempre invalidada em seguida — o
-// servidor é a verdade (o total que exclui ausentes é regra dele).
+// Events land in the cache as a NEW array with a new object for the affected
+// student only (StudentRow is React.memo: an in-place mutation would not
+// re-render it, and fresh objects for everyone would re-render every row). The
+// summary is adjusted in the cache and the query is always invalidated right
+// after — the server is the truth (the total excluding absentees is its rule).
 function applyNotReturningToRoster(
   roster: TripStudents,
   event: BoardingNotReturningEvent,
@@ -297,29 +301,29 @@ export default function StudentListScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        {/* Contagem SEMPRE de `summary` do servidor — nunca derivada de
-            `students` (AC #2, FR25). */}
-        <Text variant="titleLarge" style={styles.count}>
-          {`${summary.boarded}/${summary.total} embarcados`}
-        </Text>
-      </View>
+      {/* Outside the FlatList so the count stays put while the list scrolls.
+          Always from the server `summary`, never derived from `students` (FR25). */}
+      <RosterHeader summary={summary} students={students} />
 
-      {/* Banner persistente, não Snackbar: o estado dura enquanto não houver
-          rede ou o stream não for reaberto. Texto distinto do OfflineBanner da
-          3.4b (fila de escrita) — esta tela é leitura (Tier 1), prometer
-          sincronização seria mentira. */}
-      <Banner
-        visible={showStaleBanner}
-        actions={[{ label: 'Atualizar', onPress: () => void roster.refetch() }]}
-      >
-        Dados podem estar desatualizados — sem atualização em tempo real
-      </Banner>
+      {/* A persistent banner, not a Snackbar: the state lasts while there is no
+          network or the stream is not reopened. Wording distinct from the
+          OfflineBanner (write queue) — this screen is read-only (Tier 1), so
+          promising a sync would be a lie. */}
+      {showStaleBanner ? (
+        <View style={styles.bannerSlot}>
+          <Banner
+            tone="warning"
+            message="Dados podem estar desatualizados — sem atualização em tempo real"
+            action={{ label: 'Atualizar', onPress: () => void roster.refetch() }}
+            testID="stale-banner"
+          />
+        </View>
+      ) : null}
 
       <FlatList
         data={students}
         keyExtractor={(s) => s.studentId}
-        renderItem={({ item }) => <StudentCard student={item} />}
+        renderItem={({ item }) => <StudentRow student={item} testID={`student-row-${item.studentId}`} />}
         refreshControl={
           <RefreshControl
             refreshing={roster.isFetching}
@@ -331,16 +335,17 @@ export default function StudentListScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text variant="titleMedium" style={styles.emptyTitle}>
-              Nenhum aluno vinculado a esta rota
-            </Text>
-          </View>
+          <StateView
+            kind="empty"
+            icon="account-group-outline"
+            title="Nenhum aluno vinculado a esta rota"
+            testID="roster-empty"
+          />
         }
-        contentContainerStyle={students.length === 0 ? styles.emptyContent : undefined}
+        contentContainerStyle={students.length === 0 ? styles.listFill : undefined}
       />
 
-      {/* Toast de ausência em tempo real — precedente: (student)/home.tsx. */}
+      {/* Real-time absence toast — precedent: (student)/home.tsx. */}
       <Snackbar
         visible={snackbar.visible}
         onDismiss={() => setSnackbar((s) => ({ ...s, visible: false }))}
@@ -357,29 +362,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: lightPalette.surfaceSoft,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 12,
-    backgroundColor: lightPalette.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
+  bannerSlot: {
+    paddingHorizontal: spacing.gutter,
+    paddingTop: spacing[3],
   },
-  count: {
-    fontWeight: '700',
-    color: lightPalette.text,
-  },
-  empty: {
-    alignItems: 'center',
-    padding: 32,
-    gap: 8,
-  },
-  emptyTitle: {
-    color: lightPalette.textBody,
-    textAlign: 'center',
-  },
-  emptyContent: {
+  listFill: {
     flexGrow: 1,
-    justifyContent: 'center',
   },
 })
