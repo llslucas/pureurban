@@ -502,6 +502,13 @@ describe('lock de binding dos temas Paper', () => {
     expect(source.match(/<PaperProvider theme=\{lightTheme\}>/g)).toHaveLength(2)
   })
 
+  it('_layout: navegador envolto no navigationTheme e Inter no gate de boot (6.1)', () => {
+    const source = readSource('app/_layout.tsx')
+    expect(source.match(/<ThemeProvider value=\{navigationTheme\}>/g)).toHaveLength(1)
+    expect(source).toMatch(/useFonts\(\{[^}]*Inter_400Regular,[^}]*Inter_500Medium,[^}]*Inter_600SemiBold,[^}]*Inter_700Bold,/)
+    expect(source).toMatch(/const isBooting = [^\n]*!isFontReady/)
+  })
+
   it('app.json: chrome nativo (userInterfaceStyle/splash/ícone) também travado em light (1.11b)', () => {
     // A varredura de hex cobre só src/: o chrome nativo (headers, status bar,
     // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, a
