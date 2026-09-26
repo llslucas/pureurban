@@ -1,13 +1,19 @@
 import * as Crypto from 'expo-crypto'
 import { router, useFocusEffect } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { AppState, Linking, StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Button, Text } from 'react-native-paper'
+import { AppState, StyleSheet, View } from 'react-native'
+import { Button, Text } from 'react-native-paper'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useIsFocused } from '@react-navigation/native'
 import { useCameraPermissions } from 'expo-camera'
 
 import { QrScanner } from '@/components/qr-scanner'
+import {
+  CameraPermissionState,
+  NoActiveTripState,
+  RoleGuardState,
+} from '@/components/scan/scan-blocked-states'
+import { ScanResultOverlay, type ScanResult } from '@/components/scan/scan-result-overlay'
 import { StateView } from '@/components/ui/state-view'
 import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
@@ -19,35 +25,12 @@ import { useAuthStore } from '@/stores/auth.store'
 import { enqueueCheckIn, isTransportFailure, type QueueOwner } from '@/utils/offline-queue'
 import { decodeQrPayload } from '@/utils/qr-payload'
 import { registerE2eScanHook } from '@/utils/e2e-scan-hook'
-import {
-  describeFailure,
-  feedbackIcon,
-  QUEUE_FULL_FEEDBACK,
-  QUEUED_FEEDBACK,
-  type Tone,
-} from '@/utils/scan-feedback'
+import { describeFailure, QUEUE_FULL_FEEDBACK, QUEUED_FEEDBACK } from '@/utils/scan-feedback'
 
 // Quanto tempo o resultado de SUCESSO fica na tela antes de a câmera voltar
 // sozinha. Só o sucesso auto-retoma: nos estados de erro o motorista precisa ler
 // o que aconteceu antes de continuar.
 const SUCCESS_RESUME_MS = 2500
-
-// Union discriminado em vez de booleanos soltos (architecture.md §6). Com
-// booleanos, `isChecking && isError` é representável e significa nada.
-type ScanResult =
-  | { kind: 'idle' }
-  | { kind: 'checking' }
-  | { kind: 'success'; title: string; detail: string }
-  | {
-      kind: 'failure'
-      // Campos de `ScanFeedback` (`@/utils/scan-feedback`), achatados no union
-      // para o render discriminar por `kind` sem desembrulhar um nível a mais.
-      code: string
-      tone: Tone
-      title: string
-      detail: string
-      canRetry: boolean
-    }
 
 // A última tentativa, guardada para o botão "Tentar novamente" reenviar com a
 // MESMA chave de idempotência. Chave nova para o mesmo aluno faria o servidor
@@ -67,16 +50,6 @@ interface Attempt {
   owner: QueueOwner
 }
 
-const TONE_COLOR: Record<Tone, string> = {
-  // Verde/âmbar/vermelho/tinta (família ink/body para offline) sobre o preto da
-  // câmera — contraste alto, legível em movimento e sob sol direto (NFR18).
-  // Papéis da paleta única (`@/lib/palette`); o branco dos overlays é `onPrimary`.
-  success: lightPalette.success,
-  warn: lightPalette.warning,
-  error: lightPalette.error,
-  offline: lightPalette.textBody,
-}
-
 export default function ScanScreen() {
   const { user, logout } = useAuthStore()
   const queryClient = useQueryClient()
@@ -89,10 +62,6 @@ export default function ScanScreen() {
   const [result, setResult] = useState<ScanResult>({ kind: 'idle' })
   const [boardedCount, setBoardedCount] = useState(0)
   const [cameraError, setCameraError] = useState<string | null>(null)
-  // Falha ao abrir o pedido de permissão ou as configurações do sistema. Antes
-  // as duas promises eram descartadas com `void`: a rejeição ficava sem
-  // tratamento e o botão simplesmente parecia morto.
-  const [actionError, setActionError] = useState<string | null>(null)
   const lastAttempt = useRef<Attempt | null>(null)
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Segunda metade do gate do Bloqueador 3. O `isPaused` passado ao QrScanner é
@@ -342,26 +311,8 @@ export default function ScanScreen() {
 
   // ---- Estados que não mostram a câmera ----
 
-  // Guarda de role: um aluno que chegue nesta rota não pode escanear ninguém.
   if (!user || user.role !== 'DRIVER') {
-    return (
-      <StateView
-        kind="blocked"
-        title="Acesso restrito"
-        detail="Apenas motoristas podem registrar embarques."
-        action={{
-          label: 'Entrar novamente',
-          onPress: () => {
-            // `logout()` ANTES do replace, como em `(student)/qr-code.tsx`
-            // (Task 7.11). Só navegar deixaria `isAuthenticated` true: o aluno
-            // ficaria estacionado num formulário de login com a sessão viva, e o
-            // shell continuaria montado atrás.
-            logout()
-            router.replace('/(auth)/login')
-          },
-        }}
-      />
-    )
+    return <RoleGuardState logout={logout} />
   }
 
   // Estados 1 e 2 da Tabela de Verdade.
@@ -371,43 +322,10 @@ export default function ScanScreen() {
   }
 
   if (!permission.granted) {
-    return permission.canAskAgain ? (
-      <StateView
-        kind="blocked"
-        icon="camera"
-        title="Permissão da câmera"
-        detail="O PureUrban precisa da câmera para ler o QR code dos alunos."
-        note={actionError}
-        action={{
-          label: 'Permitir acesso à câmera',
-          onPress: () => {
-            setActionError(null)
-            requestPermission().catch(() =>
-              setActionError(
-                'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
-              ),
-            )
-          },
-        }}
-      />
-    ) : (
-      <StateView
-        kind="blocked"
-        icon="camera-off"
-        title="Câmera bloqueada"
-        detail="A permissão foi negada. Libere o acesso à câmera nas configurações do sistema."
-        note={actionError}
-        action={{
-          label: 'Abrir configurações',
-          onPress: () => {
-            setActionError(null)
-            Linking.openSettings().catch(() =>
-              setActionError(
-                'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
-              ),
-            )
-          },
-        }}
+    return (
+      <CameraPermissionState
+        canAskAgain={permission.canAskAgain}
+        requestPermission={requestPermission}
       />
     )
   }
@@ -441,18 +359,7 @@ export default function ScanScreen() {
 
   // Estado 4.
   if (!activeTrip || activeTrip.status !== 'ACTIVE') {
-    return (
-      <StateView
-        kind="blocked"
-        icon="bus-clock"
-        title="Nenhuma viagem ativa"
-        detail="Inicie uma viagem para começar a registrar embarques."
-        action={{
-          label: 'Ir para Viagem',
-          onPress: () => router.navigate('/(driver)/trip'),
-        }}
-      />
-    )
+    return <NoActiveTripState />
   }
 
   // A câmera não montou: sem esta guarda a tela fica preta com a moldura e nada
@@ -474,11 +381,6 @@ export default function ScanScreen() {
   // ---- Estado 5 em diante: câmera na tela ----
 
   const isPaused = result.kind !== 'idle'
-  // Quando existe uma ação primária branca no overlay (retry ou "Ir para
-  // Viagem"), "Escanear próximo" vira secundária — dois botões brancos
-  // contained empilhados não teriam hierarquia nenhuma.
-  const hasPrimaryAction =
-    result.kind === 'failure' && (result.canRetry || result.code === 'TRIP_NOT_ACTIVE')
 
   return (
     <View style={styles.container}>
@@ -514,97 +416,7 @@ export default function ScanScreen() {
         </Button>
       </View>
 
-      {result.kind === 'checking' ? (
-        <View style={[styles.overlay, { backgroundColor: lightPalette.primary }]}>
-          <View style={styles.overlayMessage}>
-            <ActivityIndicator size="large" color={lightPalette.onPrimary} />
-            <Text variant="headlineSmall" style={styles.overlayTitle}>
-              Verificando...
-            </Text>
-          </View>
-        </View>
-      ) : result.kind === 'success' ? (
-        <View style={[styles.overlay, { backgroundColor: TONE_COLOR.success }]}>
-          <View style={styles.overlayMessage}>
-            <Text style={styles.icon}>✓</Text>
-            <Text variant="headlineSmall" style={styles.overlayTitle}>
-              {result.title}
-            </Text>
-            <Text variant="titleMedium" style={styles.overlayDetail}>
-              {result.detail}
-            </Text>
-          </View>
-          <View style={styles.overlayActions}>
-            <Button
-              mode="contained"
-              buttonColor={lightPalette.onPrimary}
-              textColor={TONE_COLOR.success}
-              onPress={resume}
-              style={styles.action}
-              contentStyle={styles.actionContent}
-              labelStyle={styles.actionLabel}
-            >
-              Escanear próximo
-            </Button>
-          </View>
-        </View>
-      ) : result.kind === 'failure' ? (
-        <View style={[styles.overlay, { backgroundColor: TONE_COLOR[result.tone] }]}>
-          <View style={styles.overlayMessage}>
-            <Text style={styles.icon}>{feedbackIcon(result)}</Text>
-            <Text variant="headlineSmall" style={styles.overlayTitle}>
-              {result.title}
-            </Text>
-            <Text variant="titleMedium" style={styles.overlayDetail}>
-              {result.detail}
-            </Text>
-          </View>
-          <View style={styles.overlayActions}>
-            {result.canRetry ? (
-              <Button
-                mode="contained"
-                buttonColor={lightPalette.onPrimary}
-                textColor={TONE_COLOR[result.tone]}
-                onPress={handleRetry}
-                style={styles.action}
-                contentStyle={styles.actionContent}
-                labelStyle={styles.actionLabel}
-              >
-                Tentar novamente
-              </Button>
-            ) : null}
-            {/* Estado 12 é a única linha da Tabela de Verdade que pede esta
-                afordância: sem ela o motorista lê "Inicie uma viagem antes de
-                registrar embarques" sem nenhum caminho até lá. */}
-            {result.code === 'TRIP_NOT_ACTIVE' ? (
-              <Button
-                mode="contained"
-                buttonColor={lightPalette.onPrimary}
-                textColor={TONE_COLOR[result.tone]}
-                onPress={() => router.navigate('/(driver)/trip')}
-                style={styles.action}
-                contentStyle={styles.actionContent}
-                labelStyle={styles.actionLabel}
-              >
-                Ir para Viagem
-              </Button>
-            ) : null}
-            {/* Cores explícitas: `outlined`/`contained-tonal` derivam do tema e
-                ficam ilegíveis sobre vermelho ou âmbar. */}
-            <Button
-              mode={hasPrimaryAction ? 'text' : 'contained'}
-              buttonColor={hasPrimaryAction ? undefined : lightPalette.onPrimary}
-              textColor={hasPrimaryAction ? lightPalette.onPrimary : TONE_COLOR[result.tone]}
-              onPress={resume}
-              style={styles.action}
-              contentStyle={styles.actionContent}
-              labelStyle={styles.actionLabel}
-            >
-              Escanear próximo
-            </Button>
-          </View>
-        </View>
-      ) : null}
+      <ScanResultOverlay result={result} onResume={resume} onRetry={handleRetry} />
     </View>
   )
 }
@@ -649,60 +461,5 @@ const styles = StyleSheet.create({
   listButtonLabel: {
     fontSize: 15,
     fontWeight: '700',
-  },
-  // Overlay de resultado cobrindo a tela inteira: em movimento, o motorista não
-  // tem tempo de procurar um snackbar no rodapé (NFR18).
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    paddingHorizontal: 24,
-  },
-  // Mensagem ocupa o espaço livre e fica centrada; as ações são empurradas para
-  // a metade inferior. Com tudo numa pilha `justifyContent: 'center'`, os botões
-  // caíam no meio da tela, fora do alcance do polegar de quem segura o aparelho
-  // com uma mão só (NFR18 / Task 7.10).
-  overlayMessage: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  overlayActions: {
-    alignSelf: 'stretch',
-    gap: 12,
-    paddingBottom: 32,
-  },
-  icon: {
-    fontSize: 72,
-    lineHeight: 80,
-    color: lightPalette.onPrimary,
-    fontWeight: 'bold',
-  },
-  overlayTitle: {
-    color: lightPalette.onPrimary,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  // NFR18 / Task 7.10: >= 18sp e em negrito. `titleMedium` do MD3 resolve para
-  // 16sp com peso 500, e a opacidade reduzida piorava ainda mais a leitura em
-  // movimento — é esta linha que carrega o "por quê" do resultado.
-  overlayDetail: {
-    color: lightPalette.onPrimary,
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  // NFR18: alvo de toque de 56dp, alinhado ao precedente de `(driver)/trip.tsx`.
-  action: {
-    marginTop: 12,
-    borderRadius: 12,
-    alignSelf: 'stretch',
-  },
-  actionContent: {
-    height: 56,
-  },
-  actionLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 })

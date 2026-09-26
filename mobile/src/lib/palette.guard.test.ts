@@ -610,7 +610,7 @@ describe('locks de call-site (source-lock)', () => {
   })
 
   it('scan: TONE_COLOR e overlay Verificando presos aos papéis da paleta (render-probe exigiria o stack da câmera)', () => {
-    const source = readSource('app/(driver)/scan.tsx')
+    const source = readSource('components/scan/scan-result-overlay.tsx')
     expect(source).toMatch(/success: lightPalette\.success,/)
     expect(source).toMatch(/warn: lightPalette\.warning,/)
     expect(source).toMatch(/error: lightPalette\.error,/)
