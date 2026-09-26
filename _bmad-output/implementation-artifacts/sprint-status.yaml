@@ -266,7 +266,7 @@ development_status:
   6-6-redesign-escanear-qr: backlog
   6-7-redesign-alunos-da-viagem: done # FECHADO em 26/09/2026 (PR #64); plan-6-7 done
   6-8-redesign-inicio-do-aluno: done # FECHADO em 26/09/2026 (PR #65); plan-6-8 done
-  6-9-redesign-meu-qr-code: backlog
+  6-9-redesign-meu-qr-code: done # FECHADO em 26/09/2026 (PR #66); plan-6-9 done
   6-10-redesign-acompanhar-onibus: backlog
   6-11-polimento-de-estados: backlog
   6-12-gate-visual-da-demo: backlog
