@@ -257,7 +257,12 @@ development_status:
   # planning-artifacts/ux-designs/ux-pureurban-2026-09-26/ (DESIGN.md + EXPERIENCE.md,
   # decisões D-UX-1..13). Visual + microinterações, fluxos intactos (exceções: Sair e
   # confirmação de Encerrar viagem). Marco = 6.12, antes da defesa; 6.13/6.14 opcionais.
-  epic-6: in-progress
+  # FECHADO em 27/09/2026: todas as 14 stories done e a retro rodada no mesmo dia
+  # (veredito accepted-with-open-items — epic-6-retro-2026-09-27.md). Fluxos da demo
+  # refeitos nos AVDs contra a API real, incluindo "Iniciar Retorno" pela UI. Tema
+  # escuro nativo e háptico seguem sem verificação (dev build anterior à 6.14). Os
+  # achados viraram os action items 21-27, para uma rodada de hardening.
+  epic-6: done
   6-1-tokens-tema-paper-e-dependencias-de-marca: done # FECHADO em 26/09/2026 (PR #56); plan-6-1 done, dev build validado nos AVDs
   6-2-componentes-base-de-estado-e-acao: done # FECHADO em 26/09/2026 (PR #57); plan-6-2 done
   6-3-cabecalho-padrao-e-saida-da-conta: done # FECHADO em 26/09/2026 (PR #59); plan-6-3 done
@@ -272,7 +277,7 @@ development_status:
   6-12-gate-visual-da-demo: done # FECHADO em 27/09/2026 (PR #69); plan-6-12 done. Aceito com pendências registradas: lint da API na baseline vermelha, lightPalette em 5 telas (6.14), háptico sem verificação manual
   6-13-redesign-minhas-rotas-e-admin: done # FECHADO em 27/09/2026 (PR #70); plan-6-13 done. Pendências: teste do header dos layouts de grupo (deferred), sem verificação em device
   6-14-consumo-do-tema-escuro: done # FECHADO em 27/09/2026 (PR #71); plan-6-14 done. Pendências: verificação em device (dev build regenerado) e cor de fundo nativa da raiz, ambas diferidas no plan
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
 action_items:
   # === Specs de execução do wrap pós-MVP (12/09/2026) — _bmad-output/implementation-artifacts/ ===
@@ -635,3 +640,47 @@ action_items:
     # concordam (supertest: discovery null + last-known 403 + stream 403).
     status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-5-retro-2026-09-12.md"
+
+  # === Action items da retro do Épico 6 (27/09/2026) — rodada de hardening ===
+  - id: "epic-6-retro-item-21-coerencia-do-tema-escuro"
+    epic: 6
+    action: "Coerência do tema escuro nas fronteiras 6.2 x 6.14: mapear inverseSurface/inverseOnSurface/inversePrimary (Snackbar sem violeta); alinhar colors.surface a custom.palette.surface; menu, ConfirmDialog, StickyActionBar e pressed de linha distintos do fundo no escuro; shimmer e RefreshControl tematizados; guarda sem cor MD3 residual em colors.* e regex de consumo ampliada (designTokens, appExtensions, darkMapping, MD3*Theme, DefaultTheme) + pin do amarelo do app.json"
+    owner: "Dev"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
+  - id: "epic-6-retro-item-22-dev-build-e-verificacao-nativa"
+    epic: 6
+    action: "Regenerar o dev build e verificar em device: tema escuro seguindo o SO (StatusBar, troca com o app aberto, flash de fundo nativo), háptico do scan e do Não vou voltar, inset duplicado com OfflineBanner; remedir o NFR4 (pw:api) após a migração useThemedStyles"
+    owner: "Lucas (device) + Dev (NFR4)"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
+  - id: "epic-6-retro-item-23-correcoes-de-comportamento"
+    epic: 6
+    action: "Correções de comportamento: erros de iniciar/encerrar viagem em Banner na tela com cópia pt-BR (Alert.alert é mudo no web e mostra 'Network request failed' cru no Android); track-bus re-checa permissão com getForegroundPermissionsAsync no foreground (hoje re-pede ao voltar); PrimaryAction sem disabled junto de loading + accessibilityState busy; HUD do scan conta NOT_RETURNING escaneado no total; admin reusa a sequência de saída logout + replace"
+    owner: "Dev"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
+  - id: "epic-6-retro-item-24-pacote-de-acessibilidade"
+    epic: 6
+    action: "Pacote de acessibilidade: live region/anúncio nas mudanças de estado (StateView, TripStatusCard, linha de rota do QR, chip/ETA do ônibus, nota do PermissionCard) e login com autoComplete/textContentType/returnKeyType"
+    owner: "Dev (decisão: Lucas, antes ou depois da defesa)"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
+  - id: "epic-6-retro-item-25-testes-das-fronteiras"
+    epic: 6
+    action: "Testes das fronteiras: stub de Stack que registre screenOptions (3 layouts + admin sem headerRight); render sob darkTheme dos 14 componentes tematizados sem cobertura; teste do handler MSW de summary.total"
+    owner: "Dev"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
+  - id: "epic-6-retro-item-26-reconciliacao-de-docs"
+    epic: 6
+    action: "Reconciliação de docs e rastreio: project-context.md:101 descreve useAppTheme/useThemedStyles e a allowlist de lightPalette; plan-6-6 com status done; registrar no plan-6-14 que a revisão de follow-up recomendada não rodou"
+    owner: "Dev"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
+  - id: "epic-6-retro-item-27-licao-de-processo"
+    epic: 6
+    action: "Lição de processo: plan oversized exige divisão ou justificativa aceita antes do build; defer que nomeia story futura entra nos ACs dela no mesmo momento; followup_review_recommended true bloqueia o fechamento até rodar ou ser recusado"
+    owner: "Lucas"
+    status: backlog
+    ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
