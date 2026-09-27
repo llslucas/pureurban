@@ -1,6 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import React, { type ReactElement } from 'react'
-import { StyleSheet } from 'react-native'
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
 
 import { AccountMenu } from '@/components/account-menu'
 import { RouteCard } from '@/components/routes/route-card'
@@ -232,11 +232,11 @@ describe('dark overlays stand out from the canvas (AI1)', () => {
     // still holds the style function.
     let node: TestNode | null = screen.getByTestId('trip-link-row')
     while (node && typeof node.props.style !== 'function') node = node.parent
-    const styleFor = node!.props.style as (state: { pressed: boolean }) => unknown
-    expect(StyleSheet.flatten(styleFor({ pressed: true }) as never)).toMatchObject({
+    const styleFor = node!.props.style as (state: { pressed: boolean }) => StyleProp<ViewStyle>
+    expect(StyleSheet.flatten(styleFor({ pressed: true }))).toMatchObject({
       backgroundColor: darkPalette.surfaceStrong,
     })
-    expect(StyleSheet.flatten(styleFor({ pressed: false }) as never)?.backgroundColor).toBe(darkPalette.canvas)
+    expect(StyleSheet.flatten(styleFor({ pressed: false }))?.backgroundColor).toBe(darkPalette.canvas)
   })
 })
 
