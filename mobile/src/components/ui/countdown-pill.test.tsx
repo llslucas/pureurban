@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native'
 
 import { CountdownPill, formatCountdown } from '@/components/ui/countdown-pill'
 import { renderUi, type TestNode } from '@/components/ui/test-utils'
-import { lightPalette, statusTints } from '@/lib/palette'
+import { lightPalette, lightStatusTints } from '@/lib/palette'
 import { fontFamily, radius } from '@/lib/tokens'
 
 const hidden = { includeHiddenElements: true }
@@ -31,7 +31,7 @@ describe('CountdownPill', () => {
     await renderUi(<CountdownPill remainingMs={299_000} label="Desfazer em" />)
     expect(screen.getByText('Desfazer em 4:59')).toBeTruthy()
     const pill = StyleSheet.flatten(screen.getByTestId('countdown-pill').props.style)
-    expect(pill.backgroundColor).toBe(statusTints.warning)
+    expect(pill.backgroundColor).toBe(lightStatusTints.warning)
     expect(pill.borderRadius).toBe(radius.full)
     const icons = screen
       .getByTestId('countdown-pill', hidden)

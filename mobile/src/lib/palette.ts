@@ -5,8 +5,9 @@
  * `palette.guard.test.ts` falha em qualquer hex/rgba() em `src/` que não esteja
  * na allowlist documentada (quiet zone do QR e chrome de câmera).
  *
- * As extensões além do DESIGN.md são as duas aprovadas na matriz D1–D7 da story:
- * erro (D2) e aviso (D3). Nova cor = nova entrada aqui com decisão registrada.
+ * As extensões além do DESIGN.md são as duas aprovadas na matriz D1–D7 da story,
+ * erro (D2) e aviso (D3), mais o erro on-dark da Story 6.14. Nova cor = nova
+ * entrada aqui com decisão registrada.
  */
 
 /** Alfa dos tintes de fundo de status (chips/faixas): 12% da cor base. */
@@ -217,6 +218,3 @@ export function makeStatusTints(p: SemanticColors): StatusTints {
 
 export const lightStatusTints = makeStatusTints(lightPalette)
 export const darkStatusTints = makeStatusTints(darkPalette)
-
-/** Legacy alias, removed once every consumer reads tints from the theme. */
-export const statusTints = lightStatusTints

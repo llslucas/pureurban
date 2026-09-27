@@ -193,6 +193,3 @@ export function themeFor(scheme: ColorSchemeName): { paper: AppTheme; navigation
     ? { paper: darkTheme, navigation: darkNavigationTheme }
     : { paper: lightTheme, navigation: lightNavigationTheme }
 }
-
-/** Legacy alias, removed once the root layout reads the theme per scheme. */
-export const navigationTheme = lightNavigationTheme

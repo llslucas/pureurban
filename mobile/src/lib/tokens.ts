@@ -120,9 +120,6 @@ export function makeElevation(p: SemanticColors) {
 // Fixed-identity surfaces (the QR pass) keep the light look in both schemes.
 export const lightElevation = makeElevation(lightPalette)
 
-/** Legacy alias, removed once every consumer reads elevation from the theme. */
-export const elevation = lightElevation
-
 /** Durations in ms plus the press scale factor (EXPERIENCE.md → Microinterações). */
 export const motion = {
   press: 90,

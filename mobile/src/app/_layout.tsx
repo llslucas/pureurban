@@ -7,9 +7,10 @@ import {
 } from '@expo-google-fonts/inter'
 import { ThemeProvider } from '@react-navigation/native'
 import { Stack } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import React, { useEffect, useState } from 'react'
-import { View } from 'react-native'
+import { useColorScheme, View } from 'react-native'
 import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper'
 
 import { setupAppFocus } from '@/lib/app-focus'
@@ -18,7 +19,7 @@ import { isFontGateOpen } from '@/lib/font-gate'
 import { registerOfflineQueueLifecycle } from '@/lib/offline-queue-lifecycle'
 import { mmkvPersister } from '@/lib/mmkv-persister'
 import { queryClient } from '@/lib/query-client'
-import { lightTheme, navigationTheme } from '@/lib/theme'
+import { themeFor } from '@/lib/theme'
 import { enableMocking, MOCKS_ENABLED } from '@/mocks'
 import { useAuthStore } from '@/stores/auth.store'
 import { ROLE_ROUTES, ROLES } from '@/utils/role-routes'
@@ -32,6 +33,8 @@ export default function RootLayout() {
   const [isMockReady, setIsMockReady] = useState(!MOCKS_ENABLED)
   const [mockError, setMockError] = useState<string | null>(null)
   const { user, isAuthenticated } = useAuthStore()
+  // Follows the OS scheme (story 6.14); `null`/`unspecified` fall back to light.
+  const theme = themeFor(useColorScheme())
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -79,14 +82,14 @@ export default function RootLayout() {
   // Hooks no render em que mockError deixa de ser null.
   if (mockError) {
     return (
-      <PaperProvider theme={lightTheme}>
+      <PaperProvider theme={theme.paper}>
         <View
           style={{
             flex: 1,
             justifyContent: 'center',
             padding: 24,
             gap: 8,
-            backgroundColor: lightTheme.colors.background,
+            backgroundColor: theme.paper.custom.palette.surfaceSoft,
           }}
         >
           <Text variant="titleMedium">Falha ao inicializar os mocks (MSW)</Text>
@@ -112,11 +115,8 @@ export default function RootLayout() {
         maxAge: 1000 * 60 * 60 * 24, // 24 horas — deve ser <= gcTime
       }}
     >
-      {/* Trava light (story 1.11b): sem ela o provider flipa com o esquema do
-          SO e os widgets Paper entram em dark sobre telas light-locked — o
-          render misto do defer da 1.11. Consumo reativo real (useTheme/
-          darkPalette) é story futura. */}
-      <PaperProvider theme={lightTheme}>
+      <PaperProvider theme={theme.paper}>
+        <StatusBar style="auto" />
         {isBooting ? (
           // Nunca null enquanto os portões de boot não abrem: um layout raiz sem
           // saída de router é exatamente a tela em branco que esta tela evita.
@@ -125,7 +125,7 @@ export default function RootLayout() {
               flex: 1,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: lightTheme.colors.background,
+              backgroundColor: theme.paper.custom.palette.surfaceSoft,
             }}
           >
             <ActivityIndicator />
@@ -135,7 +135,7 @@ export default function RootLayout() {
           // decide o próprio header; sem isso o app empilha dois. Vale para os
           // quatro grupos: (driver) e (student) dão títulos por tela, (admin) dá
           // um título, e (auth) desliga o header (ver o layout do grupo).
-          <ThemeProvider value={navigationTheme}>
+          <ThemeProvider value={theme.navigation}>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Protected guard={!isAuthenticated}>
                 <Stack.Screen name="(auth)" />

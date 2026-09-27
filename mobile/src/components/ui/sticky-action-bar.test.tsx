@@ -5,7 +5,7 @@ import { Keyboard, Platform, StyleSheet } from 'react-native'
 import { PrimaryAction } from '@/components/ui/primary-action'
 import { StickyActionBar } from '@/components/ui/sticky-action-bar'
 import { renderUi, TEST_INSETS } from '@/components/ui/test-utils'
-import { elevation, spacing } from '@/lib/tokens'
+import { lightElevation as elevation, spacing } from '@/lib/tokens'
 
 type Listener = () => void
 const [SHOW, HIDE] =

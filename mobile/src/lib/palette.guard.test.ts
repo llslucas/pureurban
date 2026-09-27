@@ -18,7 +18,6 @@ import {
   lightStatusTints,
   makeStatusTints,
   STATUS_TINT_ALPHA,
-  statusTints,
 } from '@/lib/palette'
 import { darkNavigationTheme, darkTheme, lightNavigationTheme, lightTheme } from '@/lib/theme'
 import { fontFamily, makeElevation, typography } from '@/lib/tokens'
@@ -33,10 +32,13 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
-//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
-//     provider travado em lightTheme no _layout, o mapa de status do StudentRow, as faixas do OfflineBanner e os
-//     call-sites das telas presos aos papéis da paleta (a migração manual não
-//     pode trocar tokens silenciosamente).
+//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1), o
+//     provider escolhido pelo esquema do SO no _layout (6.14), o mapa de status
+//     do StudentRow, as faixas do OfflineBanner e os call-sites das telas presos
+//     aos papéis da paleta (a migração manual não pode trocar tokens
+//     silenciosamente);
+// (5) consumo do tema (6.14) — fora de `lib/`, só as superfícies de identidade
+//     fixa leem `lightPalette`; o resto do app lê a paleta do tema ativo.
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
 // varredura: o teste contém os hexes de referência por definição.
 
@@ -230,11 +232,11 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'erro × canvas', fg: lightPalette.error, bg: lightPalette.canvas, min: 4.5 },
   { desc: 'onSurfaceVariant × surfaceVariant (chips/labels Paper)', fg: lightPalette.textMuted, bg: lightPalette.surfaceStrong, min: 4.5 },
   { desc: 'títulos (ink) × superfície elevada (elevation 3–5)', fg: lightPalette.text, bg: lightPalette.surfaceStrong, min: 4.5 },
-  { desc: 'sucesso × tinte de sucesso', fg: lightPalette.success, bg: statusTints.success, min: 4.5 },
-  { desc: 'info × tinte de info (chip Concluída)', fg: lightPalette.info, bg: statusTints.info, min: 4.5 },
-  { desc: 'erro × tinte de erro', fg: lightPalette.error, bg: statusTints.error, min: 4.5 },
-  { desc: 'body × tinte neutro (chip Não embarcou)', fg: lightPalette.textBody, bg: statusTints.neutral, min: 4.5 },
-  { desc: 'aviso × tinte de aviso (chip Não vai voltar)', fg: lightPalette.warning, bg: statusTints.warning, min: 3, note: AMBER_NOTE },
+  { desc: 'sucesso × tinte de sucesso', fg: lightPalette.success, bg: lightStatusTints.success, min: 4.5 },
+  { desc: 'info × tinte de info (chip Concluída)', fg: lightPalette.info, bg: lightStatusTints.info, min: 4.5 },
+  { desc: 'erro × tinte de erro', fg: lightPalette.error, bg: lightStatusTints.error, min: 4.5 },
+  { desc: 'body × tinte neutro (chip Não embarcou)', fg: lightPalette.textBody, bg: lightStatusTints.neutral, min: 4.5 },
+  { desc: 'aviso × tinte de aviso (chip Não vai voltar)', fg: lightPalette.warning, bg: lightStatusTints.warning, min: 3, note: AMBER_NOTE },
   { desc: 'aviso × superfície clara (texto âmbar sobre botão branco do overlay)', fg: lightPalette.warning, bg: lightPalette.onPrimary, min: 3, note: AMBER_NOTE },
   { desc: 'onPrimary × overlay de sucesso', fg: lightPalette.onPrimary, bg: lightPalette.success, min: 4.5 },
   { desc: 'onPrimary × overlay de aviso', fg: lightPalette.onPrimary, bg: lightPalette.warning, min: 3, note: AMBER_NOTE },
@@ -338,6 +340,40 @@ const readSource = (rel: string) => readFileSync(join(SRC_ROOT, rel), 'utf8')
 
 // ---- Suíte ----
 
+// ---- (5) Consumo do tema ----
+
+// Superfícies de identidade fixa: não mudam com o esquema do SO, então leem a
+// paleta clara direto. Qualquer outro arquivo fora de `lib/` lê a paleta do
+// tema ativo (`useAppTheme().custom.palette` / `useThemedStyles`).
+const LIGHT_PALETTE_ALLOWLIST: Record<string, string> = {
+  'components/scan/scan-frame.tsx': 'chrome de câmera sobre o feed — overlay branco à noite seria ofuscamento',
+  'components/scan/scan-hud.tsx': 'chrome de câmera sobre o feed',
+  'components/scan/scan-result-overlay.tsx': 'overlay chapado sobre a câmera; ações em ThemeProvider claro',
+  'components/student-qr/qr-pass.tsx': 'passe do QR: amarelo de marca + quiet zone branca (leitura óptica)',
+}
+
+const isTestFile = (rel: string) => /\.test\.tsx?$/.test(rel) || rel === 'components/ui/test-utils.tsx'
+
+describe('consumo do tema — lightPalette só em lib/ e nas superfícies fixas (6.14)', () => {
+  it('nenhum arquivo de produção fora de lib/ e da allowlist lê lightPalette', () => {
+    const readers = walkSourceFiles(SRC_ROOT).filter(
+      (file) => !file.startsWith('lib/') && !isTestFile(file) && /\blightPalette\b/.test(readSource(file)),
+    )
+    expect(readers.sort()).toEqual(Object.keys(LIGHT_PALETTE_ALLOWLIST).sort())
+  })
+
+  it('nenhum arquivo de produção fora de lib/ lê os tintes ou a elevation claros direto', () => {
+    const readers = walkSourceFiles(SRC_ROOT).filter(
+      (file) =>
+        !file.startsWith('lib/') &&
+        !isTestFile(file) &&
+        !(file in LIGHT_PALETTE_ALLOWLIST) &&
+        /\b(lightStatusTints|lightElevation|lightTheme)\b/.test(readSource(file)),
+    )
+    expect(readers).toEqual([])
+  })
+})
+
 describe('guarda — nenhuma cor fora do módulo de paleta', () => {
   it('todo hex/rgb() em src/ está na paleta ou na allowlist (falha apontando arquivo:linha)', () => {
     const offenders: string[] = []
@@ -392,11 +428,11 @@ describe('token-pin — valores fixados ao DESIGN.md e à matriz D1–D7', () =>
 
   it('tinte de status usa o alfa congelado de 12%', () => {
     expect(STATUS_TINT_ALPHA).toBe(0.12)
-    expect(statusTints.success).toBe('rgba(0, 100, 0, 0.12)')
-    expect(statusTints.warning).toBe('rgba(178, 106, 0, 0.12)')
-    expect(statusTints.error).toBe('rgba(179, 38, 30, 0.12)')
-    expect(statusTints.info).toBe('rgba(37, 79, 173, 0.12)')
-    expect(statusTints.neutral).toBe('rgba(51, 56, 64, 0.12)')
+    expect(lightStatusTints.success).toBe('rgba(0, 100, 0, 0.12)')
+    expect(lightStatusTints.warning).toBe('rgba(178, 106, 0, 0.12)')
+    expect(lightStatusTints.error).toBe('rgba(179, 38, 30, 0.12)')
+    expect(lightStatusTints.info).toBe('rgba(37, 79, 173, 0.12)')
+    expect(lightStatusTints.neutral).toBe('rgba(51, 56, 64, 0.12)')
     expect(lightStatusTints).toEqual(makeStatusTints(lightPalette))
     expect(darkStatusTints).toEqual(makeStatusTints(darkPalette))
   })
@@ -552,26 +588,28 @@ describe('lock de binding dos temas Paper', () => {
     ])
   })
 
-  it('_layout: PaperProvider travado em lightTheme, sem flip por esquema do SO (trava da trava, 1.11b)', () => {
+  it('_layout: tema escolhido pelo esquema do SO, sem trava em lightTheme (6.14; a trava da 1.11b saiu)', () => {
     const source = readSource('app/_layout.tsx')
-    expect(source).not.toContain('useColorScheme')
-    expect(source).not.toContain('darkTheme')
-    expect(source.match(/<PaperProvider theme=\{lightTheme\}>/g)).toHaveLength(2)
+    expect(source).toMatch(/const theme = themeFor\(useColorScheme\(\)\)/)
+    expect(source).not.toMatch(/theme=\{lightTheme\}/)
+    expect(source).not.toContain('lightTheme')
+    expect(source.match(/<PaperProvider theme=\{theme\.paper\}>/g)).toHaveLength(2)
+    expect(source).toContain('<StatusBar style="auto" />')
   })
 
-  it('_layout: navegador envolto no navigationTheme e Inter no gate de boot (6.1)', () => {
+  it('_layout: navegador envolto no tema de navegação do esquema e Inter no gate de boot (6.1)', () => {
     const source = readSource('app/_layout.tsx')
-    expect(source.match(/<ThemeProvider value=\{navigationTheme\}>/g)).toHaveLength(1)
+    expect(source.match(/<ThemeProvider value=\{theme\.navigation\}>/g)).toHaveLength(1)
     expect(source).toMatch(/useFonts\(\{[^}]*Inter_400Regular,[^}]*Inter_500Medium,[^}]*Inter_600SemiBold,[^}]*Inter_700Bold,/)
     expect(source).toMatch(/const isFontReady = isFontGateOpen\(fontsLoaded, fontError\)/)
     expect(source).toMatch(/const isBooting = [^\n]*!isFontReady/)
   })
 
-  it('app.json: chrome nativo travado em light, splash e ícone no amarelo de marca (1.11b, D-UX-1)', () => {
+  it('app.json: chrome nativo segue o SO, splash e ícone no amarelo de marca (6.14, D-UX-1)', () => {
     // A varredura de hex cobre só src/: o chrome nativo (headers, status bar,
-    // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, a
-    // metade nativa da trava light reverteria em silêncio (era o azul #208AEF
-    // da paleta antiga).
+    // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, o
+    // esquema nativo poderia voltar a travar em silêncio (e o azul #208AEF da
+    // paleta antiga reaparecer).
     const appConfig = JSON.parse(
       readFileSync(join(SRC_ROOT, '..', 'app.json'), 'utf8'),
     ) as {
@@ -584,7 +622,7 @@ describe('lock de binding dos temas Paper', () => {
         plugins: [string, Record<string, unknown>][]
       }
     }
-    expect(appConfig.expo.userInterfaceStyle).toBe('light')
+    expect(appConfig.expo.userInterfaceStyle).toBe('automatic')
     expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(designTokens.signatureYellow)
     const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
     expect(splash?.[1].backgroundColor).toBe(designTokens.signatureYellow)
