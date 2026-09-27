@@ -106,6 +106,36 @@ describe('PrimaryAction', () => {
     expect(onPress).not.toHaveBeenCalled()
   })
 
+  it('loading keeps the idle fill (no grey flash) and exposes busy to assistive tech (R5)', async () => {
+    await renderAction()
+    const idleFill = containerStyle().backgroundColor
+    const idle = screen.getByRole('button', { name: 'Tentar novamente' })
+    expect(idle.props.accessibilityState).toEqual({ busy: false, disabled: false })
+
+    await renderAction({ loading: true })
+    expect(containerStyle().backgroundColor).toBe(idleFill)
+    expect(idleFill).toBe(lightPalette.primary)
+    const busy = screen.getByRole('button', { name: 'Tentar novamente' })
+    expect(busy.props.accessibilityState).toEqual({ busy: true, disabled: true })
+  })
+
+  it('the accessible button is the only one and activates like a tap', async () => {
+    const onPress = await renderAction()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    fireEvent(screen.getByRole('button', { name: 'Tentar novamente' }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    })
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('disabled reports disabled, not busy', async () => {
+    await renderAction({ disabled: true })
+    expect(screen.getByRole('button', { name: 'Tentar novamente' }).props.accessibilityState).toEqual({
+      busy: false,
+      disabled: true,
+    })
+  })
+
   it('forwards id to the button container (the DOM id on web)', async () => {
     await renderAction({ id: 'login-submit' })
     expect(screen.getByTestId('primary-action-container').props.id).toBe('login-submit')

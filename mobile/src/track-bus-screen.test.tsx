@@ -53,6 +53,7 @@ const locationEvent = (
 
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
+  getForegroundPermissionsAsync: jest.fn(),
   watchPositionAsync: jest.fn(),
   Accuracy: { Balanced: 3 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
@@ -509,22 +510,35 @@ describe('TrackBusScreen — posição do device do aluno (OQ-1)', () => {
     expect(screen.queryByTestId('location-permission-card')).toBeNull()
   })
 
-  it('returning to the foreground while denied asks again (settings round trip)', async () => {
+  // react-native's jest setup already mocks AppState.addEventListener: swap its
+  // implementation instead of restoring it (mockRestore would wipe the preset's
+  // subscription).
+  function captureAppStateListeners() {
     const listeners: ((state: AppStateStatus) => void)[] = []
-    // react-native's jest setup already mocks AppState.addEventListener: swap its implementation
-    // instead of restoring it (mockRestore would wipe the preset's subscription).
     const addEventListener = jest.spyOn(AppState, 'addEventListener')
     const presetImpl = addEventListener.getMockImplementation()
     addEventListener.mockImplementation((_type, listener) => {
       listeners.push(listener as (state: AppStateStatus) => void)
       return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>
     })
-    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce({
-      granted: false,
-      canAskAgain: false,
-      expires: 'never',
-      status: Location.PermissionStatus.DENIED,
-    })
+    const restore = () => {
+      if (presetImpl) addEventListener.mockImplementation(presetImpl)
+      else addEventListener.mockRestore()
+    }
+    return { listeners, restore }
+  }
+
+  const permission = (granted: boolean, canAskAgain: boolean) => ({
+    granted,
+    canAskAgain,
+    expires: 'never' as const,
+    status: granted ? Location.PermissionStatus.GRANTED : Location.PermissionStatus.DENIED,
+  })
+
+  it('returning to the foreground after granting in the settings re-subscribes (settings round trip)', async () => {
+    const { listeners, restore } = captureAppStateListeners()
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce(permission(false, false))
+    mockLocation.getForegroundPermissionsAsync.mockResolvedValue(permission(true, true))
 
     renderScreen()
     await screen.findByText('Aguardando a primeira posição')
@@ -536,10 +550,45 @@ describe('TrackBusScreen — posição do device do aluno (OQ-1)', () => {
     act(() => listeners.at(-1)!('active'))
 
     expect(await screen.findByText('0 m de você')).toBeTruthy()
-    expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(2)
+    expect(mockLocation.getForegroundPermissionsAsync).toHaveBeenCalledTimes(1)
     expect(screen.queryByTestId('location-permission-card')).toBeNull()
-    if (presetImpl) addEventListener.mockImplementation(presetImpl)
-    else addEventListener.mockRestore()
+    restore()
+  })
+
+  it('returning to the foreground while still denied never re-prompts (R4)', async () => {
+    const { listeners, restore } = captureAppStateListeners()
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValue(permission(false, true))
+    // The OS stopped offering the prompt meanwhile: the card must follow.
+    mockLocation.getForegroundPermissionsAsync.mockResolvedValue(permission(false, false))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+    expect(await screen.findByText('Permitir acesso à localização')).toBeTruthy()
+
+    await act(async () => listeners.at(-1)!('active'))
+
+    expect(await screen.findByText('Abrir configurações')).toBeTruthy()
+    expect(mockLocation.getForegroundPermissionsAsync).toHaveBeenCalledTimes(1)
+    expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1)
+    restore()
+  })
+
+  it('a failing permission getter on foreground keeps the denied state', async () => {
+    const { listeners, restore } = captureAppStateListeners()
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValue(permission(false, true))
+    mockLocation.getForegroundPermissionsAsync.mockRejectedValue(new Error('boom'))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+    expect(await screen.findByText('Permitir acesso à localização')).toBeTruthy()
+
+    await act(async () => listeners.at(-1)!('active'))
+
+    expect(screen.getByText('Permitir acesso à localização')).toBeTruthy()
+    expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1)
+    restore()
   })
 
   it('a failing permission request still offers to ask again', async () => {

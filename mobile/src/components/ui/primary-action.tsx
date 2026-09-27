@@ -34,6 +34,13 @@ export interface PrimaryActionProps {
 
 const ICON_SIZE = 22
 
+// Paper's Button hardcodes `accessibilityState={{ disabled }}` on its inner
+// touchable, so `busy` can't reach it: on native the wrapper becomes the
+// accessible element instead. Web keeps Paper's own button, because a second
+// nested role="button" would make every e2e `getByRole('button')` ambiguous.
+const A11Y_ON_WRAPPER = Platform.OS !== 'web'
+const ACTIVATE = [{ name: 'activate' as const }]
+
 interface VariantStyle {
   mode: 'contained' | 'outlined' | 'text'
   buttonColor?: string
@@ -102,8 +109,19 @@ export function PrimaryAction({
   }, [impact, inert, onPress])
 
   return (
-    <Animated.View style={[variant !== 'quiet' && styles.stretch, animatedStyle]}>
+    <Animated.View
+      style={[variant !== 'quiet' && styles.stretch, animatedStyle]}
+      {...(A11Y_ON_WRAPPER && {
+        accessible: true,
+        accessibilityRole: 'button' as const,
+        accessibilityLabel: label,
+        accessibilityState: { busy: loading, disabled: inert },
+        accessibilityActions: ACTIVATE,
+        onAccessibilityAction: handlePress,
+      })}
+    >
       <Button
+        accessible={!A11Y_ON_WRAPPER}
         mode={look.mode}
         buttonColor={look.buttonColor}
         textColor={look.textColor}

@@ -275,12 +275,25 @@ export default function TrackBusScreen() {
 
   // Coming back from the system settings doesn't re-run the request by itself:
   // without this the card and the "—" would stay until the screen remounts.
+  // Only the getter here: re-requesting on every foreground reopened the OS
+  // dialog after a denial. Asking again is the permission card's job.
   React.useEffect(() => {
     if (!deviceLocationDenied) return
+    let cancelled = false
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') bumpLocationEpoch()
+      if (state !== 'active') return
+      Location.getForegroundPermissionsAsync()
+        .then(({ granted, canAskAgain }) => {
+          if (cancelled) return
+          if (granted) bumpLocationEpoch()
+          else setDevicePermission({ canAskAgain })
+        })
+        .catch(() => {})
     })
-    return () => subscription.remove()
+    return () => {
+      cancelled = true
+      subscription.remove()
+    }
   }, [deviceLocationDenied])
 
   // ---- Render ----
