@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Provider as PaperProvider } from 'react-native-paper'
+import { ActivityIndicator, Provider as PaperProvider } from 'react-native-paper'
 
 import StudentListScreen from '@/app/(driver)/student-list'
 import {
@@ -156,6 +156,25 @@ beforeEach(() => {
 
 afterEach(() => {
   queryClient.clear()
+})
+
+describe('StudentListScreen — carregando (story 6.11)', () => {
+  it('viagem pendente: skeleton da lista com "Carregando viagem...", sem spinner', async () => {
+    mockTrip.getActiveTrip.mockReturnValue(new Promise<Trip | null>(() => {}))
+    renderScreen()
+    await act(async () => {})
+    expect(screen.getByLabelText('Carregando viagem...').props.testID).toBe('student-list-skeleton')
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
+
+  it('roster pendente sem cache: skeleton da lista com "Carregando alunos...", sem spinner', async () => {
+    mockTrip.getTripStudents.mockReturnValue(new Promise<TripStudents>(() => {}))
+    renderScreen()
+    const loading = await screen.findByLabelText('Carregando alunos...')
+    expect(loading.props.testID).toBe('student-list-skeleton')
+    expect(screen.queryByText('Carregando alunos...')).toBeNull()
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
 })
 
 describe('StudentListScreen — recebimento em tempo real (spec-4-2)', () => {

@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 import { useReducedMotion } from 'react-native-reanimated'
 
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonGroup } from '@/components/ui/skeleton'
 import { renderUi } from '@/components/ui/test-utils'
 import { lightPalette } from '@/lib/palette'
 import { radius } from '@/lib/tokens'
@@ -63,5 +63,21 @@ describe('Skeleton', () => {
     expect(screen.queryByTestId('skeleton-shimmer', hidden)).toBeNull()
     expect(withRepeat).not.toHaveBeenCalled()
     expect(withTiming).not.toHaveBeenCalled()
+  })
+})
+
+describe('SkeletonGroup', () => {
+  it('carries the loading name for assistive tech while its blocks stay hidden', async () => {
+    await renderUi(
+      <SkeletonGroup label="Carregando viagem..." testID="group">
+        <Skeleton height={16} />
+      </SkeletonGroup>,
+    )
+    const group = screen.getByLabelText('Carregando viagem...')
+    expect(group.props.testID).toBe('group')
+    expect(group.props.accessibilityRole).toBe('progressbar')
+    expect(group.props.accessibilityState).toEqual({ busy: true })
+    expect(screen.queryByTestId('skeleton')).toBeNull()
+    expect(screen.queryByText('Carregando viagem...')).toBeNull()
   })
 })

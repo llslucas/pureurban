@@ -1,20 +1,23 @@
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
-import { Button, Text } from 'react-native-paper'
+import { Text } from 'react-native-paper'
 
+import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
+import { PrimaryAction } from '@/components/ui/primary-action'
 import { lightPalette } from '@/lib/palette'
+import { spacing, typography } from '@/lib/tokens'
 import type { OfflineSyncState } from '@/hooks/use-offline-sync'
 
-// Banner GLOBAL, um por app (Story 3.4b). Badge por item e contador de teto na
-// UI foram cortados para a Fase 2 em 28/08/2026 — o motorista dirigindo precisa
-// de um sinal, não de um inventário. Cores = papéis da paleta (`@/lib/palette`):
-// pendente na família ink/body (era o slate do template), falha no vermelho único.
+// One GLOBAL banner for the app (story 3.4b). Per-item badges and a queue cap
+// counter were cut to Phase 2 on 2026-08-28: a driver at the wheel needs one
+// signal, not an inventory.
 const PENDING_COLOR = lightPalette.textBody
 const FAILED_COLOR = lightPalette.error
+const ICON_SIZE = 22
 
 function pendingLabel(count: number): string {
-  // O texto da NFR13 é literal e não varia com a contagem; o número entra como
-  // sufixo para o motorista saber se a fila está andando.
+  // The NFR13 text is literal and never varies with the count; the number is a
+  // suffix so the driver can tell whether the queue is moving.
   const suffix = count === 1 ? '1 embarque na fila' : `${count} embarques na fila`
   return `Modo Offline — dados serão sincronizados (${suffix})`
 }
@@ -26,13 +29,24 @@ function failedLabel(count: number): string {
 }
 
 interface OfflineBannerProps extends OfflineSyncState {
-  /** Inset inferior da safe area; o banner é a última coisa na tela. */
+  /** Bottom safe-area inset: the banner is the last thing on screen. */
   insetBottom?: number
   /**
-   * D1/AC6: reconhecimento explícito — sem ele o vermelho fica preso para
-   * sempre, porque `failedCount` de item definitivo nunca volta a zero sozinho.
+   * D1/AC6: explicit acknowledgement. Without it the red strip would stay
+   * forever, since a definitive failure's `failedCount` never drops on its own.
    */
   onDismissFailed?: () => void
+}
+
+function StripMessage({ icon, text, testID }: { icon: MdiIconName; text: string; testID: string }) {
+  return (
+    <View style={styles.message}>
+      <MdiIcon name={icon} size={ICON_SIZE} color={lightPalette.onPrimary} testID={testID} />
+      <Text style={styles.text} accessibilityRole="alert">
+        {text}
+      </Text>
+    </View>
+  )
 }
 
 export function OfflineBanner({
@@ -41,47 +55,38 @@ export function OfflineBanner({
   insetBottom = 0,
   onDismissFailed,
 }: OfflineBannerProps) {
-  // Nada pendente e nada falhado: o banner some por inteiro, inclusive o
-  // preenchimento da safe area — senão deixaria uma faixa vazia no rodapé.
+  // Nothing to show: drop the safe-area padding too, or an empty strip would
+  // sit at the bottom.
   if (pendingCount === 0 && failedCount === 0) return null
 
   return (
     <View
       style={[styles.container, { paddingBottom: insetBottom }]}
-      // O banner aparece e some sozinho: o liveRegion anuncia as faixas no
-      // Android; o papel `alert` vive nos TEXTS (auto-acessíveis) e não no
-      // container porque `accessible` aqui achataria a subárvore num único
-      // elemento e tornaria o botão "Dispensar" inalcançável no VoiceOver.
+      // The live region announces the strips on Android. `alert` lives on the
+      // texts, not here: `accessible` on the container would flatten the subtree
+      // into one element and make "Dispensar" unreachable on VoiceOver.
       accessibilityLiveRegion="polite"
     >
       {failedCount > 0 ? (
-        // Falha definitiva vem primeiro: é a única das duas que exige ação do
-        // motorista, e as tentativas já se esgotaram.
-        <View style={[styles.strip, { backgroundColor: FAILED_COLOR }]}>
-          <Text variant="titleMedium" style={styles.text} accessibilityRole="alert">
-            {failedLabel(failedCount)}
-          </Text>
+        // The failure comes first: it is the only one that needs the driver to act.
+        <View style={[styles.strip, { backgroundColor: FAILED_COLOR }]} testID="offline-banner-failed">
+          <StripMessage icon="alert-circle-outline" text={failedLabel(failedCount)} testID="offline-banner-failed-icon" />
           {onDismissFailed ? (
-            // "Dispensar" reconhece a falha (as linhas failed são apagadas) — é
-            // o desfecho do D1: o vermelho não é prisão perpétua.
-            <Button
-              mode="contained-tonal"
-              compact
-              onPress={onDismissFailed}
-              style={styles.dismissButton}
-              labelStyle={styles.dismissLabel}
-              testID="offline-banner-dismiss"
-            >
-              Dispensar
-            </Button>
+            <View style={styles.dismiss}>
+              <PrimaryAction
+                variant="quiet"
+                color={lightPalette.onPrimary}
+                label="Dispensar"
+                onPress={onDismissFailed}
+                testID="offline-banner-dismiss"
+              />
+            </View>
           ) : null}
         </View>
       ) : null}
       {pendingCount > 0 ? (
-        <View style={[styles.strip, { backgroundColor: PENDING_COLOR }]}>
-          <Text variant="titleMedium" style={styles.text} accessibilityRole="alert">
-            {pendingLabel(pendingCount)}
-          </Text>
+        <View style={[styles.strip, { backgroundColor: PENDING_COLOR }]} testID="offline-banner-pending">
+          <StripMessage icon="cloud-off-outline" text={pendingLabel(pendingCount)} testID="offline-banner-pending-icon" />
         </View>
       ) : null}
     </View>
@@ -89,34 +94,30 @@ export function OfflineBanner({
 }
 
 const styles = StyleSheet.create({
-  // Ocupa espaço no fluxo em vez de sobrepor: como overlay, cobriria os botões
-  // do overlay de resultado da tela de scan, que ficam na metade inferior.
+  // In the flow rather than overlaid: as an overlay it would cover the scan
+  // result overlay's buttons in the bottom half of the screen.
   container: {
     alignSelf: 'stretch',
   },
   strip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    // room para o botão de dispensar sem esconder o texto.
-    gap: 4,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing.gutter,
+    gap: spacing[1],
   },
-  // NFR18: alto contraste e >= 16sp, legível em movimento e sob sol direto.
+  message: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  // NFR18: high contrast and >= 16sp, readable on the move and in direct sun.
   text: {
+    ...typography.bodyLg,
+    fontFamily: typography.button.fontFamily,
+    fontWeight: typography.button.fontWeight,
     color: lightPalette.onPrimary,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '700',
-    textAlign: 'center',
+    flexShrink: 1,
   },
-  dismissButton: {
-    alignSelf: 'center',
-    // Sobre o vermelho do strip: tonal herda a cor do tema; forçar contraste.
-    // Branco 92% (allowlist da guarda de paleta): overlay funcional sobre a
-    // faixa de falha, não papel do tema.
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-  },
-  dismissLabel: {
-    color: FAILED_COLOR,
-    fontWeight: '700',
+  dismiss: {
+    alignSelf: 'flex-end',
   },
 })

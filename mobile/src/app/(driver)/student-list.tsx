@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { RosterHeader } from '@/components/student-list/roster-header'
 import { StudentRow } from '@/components/student-row'
 import { Banner } from '@/components/ui/banner'
+import { StudentListSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import { ApiClientError } from '@/services/api-client'
 import { lightPalette } from '@/lib/palette'
@@ -187,7 +188,7 @@ export default function StudentListScreen() {
   // Estado 2 — `status === 'pending'`, nunca `isLoading`: com o cache do MMKV
   // reidratado ou a query pausada, `isLoading` mente.
   if (tripStatus === 'pending') {
-    return <StateView kind="loading" title="Carregando viagem..." />
+    return <StudentListSkeleton label="Carregando viagem..." />
   }
 
   // Estado 3 — erro na viagem não é "sem viagem". Com o `networkMode: 'always'`
@@ -266,9 +267,9 @@ export default function StudentListScreen() {
   }
 
   // Estado 5 — roster carregando E sem dado em cache. Com `data` do MMKV já
-  // presente, cai direto na lista (Tier 1) em vez de um spinner por cima dele.
+  // presente, cai direto na lista (Tier 1) em vez de um skeleton por cima dele.
   if (roster.status === 'pending' && !roster.data) {
-    return <StateView kind="loading" title="Carregando alunos..." />
+    return <StudentListSkeleton label="Carregando alunos..." />
   }
 
   // Estado 6 — erro sem cache: erro ≠ vazio.
@@ -288,7 +289,7 @@ export default function StudentListScreen() {
 
   // Defensivo — `enabled` é true aqui (viagem ACTIVE), então `data` deve existir.
   if (!roster.data) {
-    return <StateView kind="loading" title="Carregando alunos..." />
+    return <StudentListSkeleton label="Carregando alunos..." />
   }
 
   const { students, summary } = roster.data

@@ -268,7 +268,7 @@ development_status:
   6-8-redesign-inicio-do-aluno: done # FECHADO em 26/09/2026 (PR #65); plan-6-8 done
   6-9-redesign-meu-qr-code: done # FECHADO em 26/09/2026 (PR #66); plan-6-9 done
   6-10-redesign-acompanhar-onibus: done # FECHADO em 26/09/2026 (PR #67); plan-6-10 done
-  6-11-polimento-de-estados: backlog
+  6-11-polimento-de-estados: done # FECHADO em 26/09/2026 (PR #68); plan-6-11 done
   6-12-gate-visual-da-demo: backlog
   6-13-redesign-minhas-rotas-e-admin: backlog # P2 opcional, pós-marco
   6-14-consumo-do-tema-escuro: backlog # P2 opcional, pós-defesa

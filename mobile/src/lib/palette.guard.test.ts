@@ -100,11 +100,6 @@ const ALLOWLIST: Record<string, { value: string; why: string }[]> = {
   'components/scan/scan-hud.tsx': [
     { value: 'rgba(0,0,0,0.55)', why: 'scrim do HUD sobre a câmera — chrome de câmera' },
   ],
-  // Botão "Dispensar" sobre a faixa vermelha de falha: branco 92% para o rótulo
-  // ter contraste — overlay funcional, não papel do tema.
-  'components/offline-banner.tsx': [
-    { value: 'rgba(255,255,255,0.92)', why: 'fundo do botão Dispensar sobre a faixa de falha' },
-  ],
 }
 
 // ---- (2) Token-pin ----
@@ -586,7 +581,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
     expect(backgrounds).toContain(lightPalette.error)
   })
 
-  it('render-probe do OfflineBanner: texto e rótulo do Dispensar em onPrimary/erro', () => {
+  it('render-probe do OfflineBanner: texto e rótulo do Dispensar em onPrimary', () => {
     render(
       createElement(OfflineBanner, {
         pendingCount: 1,
@@ -600,7 +595,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
     expect(StyleSheet.flatten(screen.getByText(/não pôde ser enviado/).props.style)?.color).toBe(
       lightPalette.onPrimary,
     )
-    expect(StyleSheet.flatten(screen.getByText('Dispensar').props.style)?.color).toBe(lightPalette.error)
+    expect(StyleSheet.flatten(screen.getByText('Dispensar').props.style)?.color).toBe(lightPalette.onPrimary)
   })
 })
 

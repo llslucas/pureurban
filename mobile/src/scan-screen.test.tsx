@@ -1,10 +1,11 @@
 import React from 'react'
 import { Linking } from 'react-native'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native'
 import * as Haptics from 'expo-haptics'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { useCameraPermissions } from 'expo-camera'
+import { ActivityIndicator } from 'react-native-paper'
 
 import ScanScreen from '@/app/(driver)/scan'
 import { ApiClientError } from '@/services/api-error'
@@ -184,6 +185,34 @@ describe('ScanScreen — states before the camera', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith('/(auth)/login')
   })
 
+  it('permission still resolving: scan skeleton named "Preparando câmera...", no spinner (story 6.11)', async () => {
+    mockPermission(null)
+    await renderScreen()
+    expect(screen.getByLabelText('Preparando câmera...').props.testID).toBe('scan-skeleton')
+    expect(screen.queryByText('Preparando câmera...')).toBeNull()
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
+
+  it('trip pending: scan skeleton named "Carregando viagem...", no spinner (story 6.11)', async () => {
+    mockTrip.getActiveTrip.mockReturnValue(new Promise<Trip | null>(() => {}))
+    await renderScreen()
+    expect(screen.getByLabelText('Carregando viagem...').props.testID).toBe('scan-skeleton')
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
+
+  it('camera not granted: PermissionCard asks for access with the primary action (story 6.11)', async () => {
+    mockPermission({ granted: false, canAskAgain: true })
+    requestPermission.mockResolvedValue({ granted: true, canAskAgain: true })
+    await renderScreen()
+    expect(screen.getByTestId('camera-permission-card')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Permissão da câmera' })).toBeTruthy()
+    expect(
+      screen.getByText('O PureUrban precisa da câmera para ler o QR code dos alunos.'),
+    ).toBeTruthy()
+    fireEvent.press(screen.getByTestId('camera-permission-action'))
+    expect(requestPermission).toHaveBeenCalledTimes(1)
+  })
+
   it('a rejected permission request shows the note', async () => {
     mockPermission({ granted: false, canAskAgain: true })
     requestPermission.mockRejectedValue(new Error('boom'))
@@ -201,8 +230,21 @@ describe('ScanScreen — states before the camera', () => {
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue()
     await renderScreen()
     expect(screen.getByText('Câmera bloqueada')).toBeTruthy()
+    expect(screen.getByTestId('camera-permission-card')).toBeTruthy()
     fireEvent.press(screen.getByText('Abrir configurações'))
     expect(openSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocked camera: a failed openSettings shows the note inside the PermissionCard', async () => {
+    mockPermission({ granted: false, canAskAgain: false })
+    jest.spyOn(Linking, 'openSettings').mockRejectedValue(new Error('boom'))
+    await renderScreen()
+    fireEvent.press(screen.getByTestId('camera-permission-action'))
+    expect(
+      await within(screen.getByTestId('camera-permission-card')).findByText(
+        'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
+      ),
+    ).toBeTruthy()
   })
 
   it('"Nenhuma viagem ativa" → "Ir para Viagem" navigates to the trip tab', async () => {
