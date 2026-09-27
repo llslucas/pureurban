@@ -1,10 +1,13 @@
 import React, { type ReactElement } from 'react'
 import { StyleSheet } from 'react-native'
 
+import { ScanHud } from '@/components/scan/scan-hud'
 import { ScanResultOverlay, type ScanResult } from '@/components/scan/scan-result-overlay'
 import { QrPass, QrPassRouteLine } from '@/components/student-qr/qr-pass'
 import { renderUi } from '@/components/ui/test-utils'
 import { darkTheme, lightTheme } from '@/lib/theme'
+import { ApiClientError } from '@/services/api-error'
+import { describeFailure } from '@/utils/scan-feedback'
 
 jest.mock('expo-router', () => ({ router: { navigate: jest.fn() } }))
 
@@ -28,6 +31,14 @@ const SUCCESS: ScanResult = {
   detail: 'Aluno registrado nesta viagem.',
   studentName: 'Ana Souza',
 }
+
+// Failures carry the on-color/quiet actions that the light ThemeProvider pins.
+const DUPLICATE: ScanResult = {
+  kind: 'failure',
+  ...describeFailure(new ApiClientError('DUPLICATE_CHECK_IN', '', 409)),
+  studentName: 'Ana Souza',
+}
+const NETWORK: ScanResult = { kind: 'failure', ...describeFailure(new TypeError('offline')) }
 
 // Styles are flattened so a Paper default overridden by the component's own
 // color (Text picks `onSurface` from the theme) compares by what renders.
@@ -63,6 +74,13 @@ describe('fixed-identity surfaces under the dark theme', () => {
     ['ScanResultOverlay (success)', () => (
       <ScanResultOverlay result={SUCCESS} onResume={jest.fn()} onRetry={jest.fn()} autoResumeMs={2500} />
     )],
+    ['ScanResultOverlay (duplicate)', () => (
+      <ScanResultOverlay result={DUPLICATE} onResume={jest.fn()} onRetry={jest.fn()} autoResumeMs={2500} />
+    )],
+    ['ScanResultOverlay (network failure)', () => (
+      <ScanResultOverlay result={NETWORK} onResume={jest.fn()} onRetry={jest.fn()} autoResumeMs={2500} />
+    )],
+    ['ScanHud', () => <ScanHud count={{ boarded: 1, total: 3 }} sessionCount={1} />],
   ])('%s renders the same tree as in light', async (_name, element) => {
     const light = await renderedTree(element(), lightTheme)
     const dark = await renderedTree(element(), darkTheme)
