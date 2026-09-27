@@ -516,3 +516,12 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_plan: `_bmad-output/implementation-artifacts/plan-6-4-redesign-login.md`
   summary: O encolhimento do hero não tem teste que observe a altura/tagline renderizadas — só o alvo do `withTiming`, porque o mock do Reanimated não reavalia estilos animados.
   evidence: Review da 6.4 (verification-gap). Exige outro setup de teste do Reanimated (ou verificação em device); a duração com/sem reduced motion ficou coberta.
+- source_plan: `_bmad-output/implementation-artifacts/plan-epic-6-item-22-dev-build-e-verificacao-nativa.md`
+  summary: CONFIRMADO em device — com o `OfflineBanner` visível, o inset inferior dobra na tela Viagem do motorista (~40 dp de vão entre "Escanear QR Code" e o banner). A `StickyActionBar` soma `insets.bottom` (`sticky-action-bar.tsx:36`) e o banner soma o mesmo inset (`(driver)/_layout.tsx:37`).
+  evidence: Dev build do item 22 (EAS `487dcec2`) no emulator-5554, escuro, reverse 3001 removido e 1 embarque na fila, 27/09/2026. Retro do épico 6, R7d. Correção provável: a barra zera o `insets.bottom` quando o banner está visível, ou o layout passa a ser o único dono do inset.
+- source_plan: `_bmad-output/implementation-artifacts/plan-epic-6-item-22-dev-build-e-verificacao-nativa.md`
+  summary: R7e segue aberto. O NFR4 remedido pelo `pw:api` (25 ms) só mede a chamada de rede; o custo de render do roster no mobile, com um StyleSheet por `StudentRow` via `useThemedStyles` (`theme.ts:159-162`), não foi medido.
+  evidence: Retro do épico 6, R7e (l.130, 135). Medir no device (dev build do item 22) a lista de alunos com 50+ linhas, ou memoizar o StyleSheet por tema em vez de por instância.
+- source_plan: `_bmad-output/implementation-artifacts/plan-epic-6-item-22-dev-build-e-verificacao-nativa.md`
+  summary: Não verificados no dev build do item 22: o háptico `notificationAsync` ("Não vou voltar", `(student)/home.tsx:153`, e scan com sucesso) e a StatusBar no login em escuro. Só o `impactAsync` do scan enfileirado foi observado.
+  evidence: `dumpsys vibrator_manager` do emulator-5554, 27/09/2026. A aluna61 já tinha ausência registrada numa viagem RETURN em andamento, e o login exigiria deslogar uma conta da demo. Roteiro: nova viagem → "Não vou voltar" no emulator-5556 e conferir o vibrador; deslogar em escuro e capturar o login.
