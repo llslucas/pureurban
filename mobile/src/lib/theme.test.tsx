@@ -61,6 +61,15 @@ describe('useAppTheme fallback', () => {
     const { gutter } = JSON.parse(String(screen.getByTestId('consumer').props.children)) as { gutter: number }
     expect(gutter).toBe(16)
   })
+
+  it('outside a PaperProvider hands out the light palette', () => {
+    function PaletteConsumer() {
+      const { palette } = useAppTheme().custom
+      return <Text testID="palette">{palette === lightPalette ? 'light' : 'other'}</Text>
+    }
+    render(<PaletteConsumer />)
+    expect(screen.getByTestId('palette')).toHaveTextContent('light')
+  })
 })
 
 describe('useThemedStyles', () => {
