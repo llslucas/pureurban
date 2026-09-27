@@ -224,9 +224,8 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     // ~8 min no passado.
     await ageAbsence({ tripId: epic4.returnTripId, studentId: student.id }, 10);
 
-    // O card vive no cache reidratado do MMKV e o
-    // persister sincroniza com throttle de 1s — recarregar antes disso perde
-    // a escrita junto com a página.
+    // O card vive no cache reidratado do MMKV e o persister sincroniza com
+    // throttle de 1s — recarregar antes disso perde a escrita junto com a página.
     await page.waitForTimeout(1500);
     // A UI exibe o countdown do `cancellableUntil` CACHED: envelhecer também o
     // cache do browser é o que leva o card ao estado consolidado sem esperar
