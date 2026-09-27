@@ -53,9 +53,18 @@ jest.mock('@/stores/auth.store', () => ({
 jest.mock('expo-router', () => {
   const { Text: RNText } = jest.requireActual('react-native')
   const { useTheme: useNavTheme } = jest.requireActual('@react-navigation/native')
+  const { useTheme: usePaperTheme } = jest.requireActual('react-native-paper')
   function Probe() {
     const { colors } = useNavTheme()
-    return <RNText testID="nav-probe">{`${colors.background}|${colors.card}`}</RNText>
+    const paper = usePaperTheme()
+    const { darkPalette, lightPalette } = jest.requireActual('@/lib/palette')
+    const scheme = paper.custom?.palette === darkPalette ? 'dark' : paper.custom?.palette === lightPalette ? 'light' : 'none'
+    return (
+      <>
+        <RNText testID="nav-probe">{`${colors.background}|${colors.card}`}</RNText>
+        <RNText testID="paper-probe">{scheme}</RNText>
+      </>
+    )
   }
   const Stack = Object.assign(() => <Probe />, {
     Protected: () => null,
@@ -94,11 +103,12 @@ describe('RootLayout — font boot gate and navigation theme', () => {
     ['light', lightPalette],
     ['dark', darkPalette],
     [null, lightPalette],
-  ] as const)('OS scheme %s picks the matching navigation theme', async (scheme, palette) => {
+  ] as const)('OS scheme %s picks the matching navigation and Paper themes', async (scheme, palette) => {
     mockUseFonts.mockReturnValue([true, null])
     mockColorScheme.mockReturnValue(scheme)
     render(<RootLayout />)
     const probe = await screen.findByTestId('nav-probe')
     expect(probe).toHaveTextContent(`${palette.surfaceSoft}|${palette.canvas}`)
+    expect(screen.getByTestId('paper-probe')).toHaveTextContent(palette === darkPalette ? 'dark' : 'light')
   })
 })
