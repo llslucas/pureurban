@@ -1,5 +1,5 @@
-import { lightPalette } from '@/lib/palette'
-import { elevation, fontFamily, motion, radius, spacing, typography } from '@/lib/tokens'
+import { darkPalette, lightPalette } from '@/lib/palette'
+import { ELEVATION_BORDER_WIDTH, fontFamily, makeElevation, motion, radius, spacing, typography } from '@/lib/tokens'
 
 // Token pin (same pattern as the palette guard): each value pinned to the redesign
 // DESIGN.md (`ux-pureurban-2026-09-26`) and EXPERIENCE.md → Microinterações.
@@ -54,6 +54,8 @@ describe('tokens — pin contra o DESIGN.md', () => {
   })
 
   it('elevation: tom e borda nos níveis 0–1, sombra curta só no nível 2, nível 3 chapado', () => {
+    const elevation = makeElevation(lightPalette)
+    expect(ELEVATION_BORDER_WIDTH).toBe(1)
     expect(elevation.level0).toEqual({ backgroundColor: lightPalette.surfaceSoft })
     expect(elevation.level1).toEqual({
       backgroundColor: lightPalette.canvas,
@@ -69,6 +71,16 @@ describe('tokens — pin contra o DESIGN.md', () => {
       elevation: 4,
     })
     expect(elevation.level3).toEqual({ shadowOpacity: 0, elevation: 0 })
+  })
+
+  it('elevation escura: mesma geometria, cores da paleta escura (6.14)', () => {
+    const elevation = makeElevation(darkPalette)
+    expect(elevation.level1).toEqual({
+      backgroundColor: darkPalette.canvas,
+      borderColor: darkPalette.hairline,
+      borderWidth: 1,
+    })
+    expect(elevation.level2).toMatchObject({ backgroundColor: darkPalette.canvas, shadowColor: darkPalette.text })
   })
 
   it('motion (EXPERIENCE.md → Microinterações)', () => {

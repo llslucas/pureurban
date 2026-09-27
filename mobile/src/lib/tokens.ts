@@ -1,4 +1,4 @@
-import { lightPalette } from '@/lib/palette'
+import { lightPalette, type SemanticColors } from '@/lib/palette'
 
 /**
  * Single vocabulary for typography, spacing, radius, elevation and motion (story 6.1).
@@ -85,31 +85,43 @@ export const radius = {
   full: 9999,
 } as const
 
+/** Hairline border of the level-1 card, for layout math that can't read the theme. */
+export const ELEVATION_BORDER_WIDTH = 1
+
 // Depth comes from tone and border; shadow only on level 2 (floating surfaces).
-export const elevation = {
-  level0: {
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  level1: {
-    backgroundColor: lightPalette.canvas,
-    borderColor: lightPalette.hairline,
-    borderWidth: 1,
-  },
-  level2: {
-    backgroundColor: lightPalette.canvas,
-    shadowColor: lightPalette.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    shadowOpacity: 0.12,
-    // shadow* props are iOS/web-only; Android needs `elevation`.
-    elevation: 4,
-  },
-  // Full-screen scan overlay: flat color, no shadow.
-  level3: {
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-} as const
+// Colors come from the scheme's palette: the theme carries `custom.elevation`.
+export function makeElevation(p: SemanticColors) {
+  return {
+    level0: {
+      backgroundColor: p.surfaceSoft,
+    },
+    level1: {
+      backgroundColor: p.canvas,
+      borderColor: p.hairline,
+      borderWidth: ELEVATION_BORDER_WIDTH,
+    },
+    level2: {
+      backgroundColor: p.canvas,
+      shadowColor: p.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      shadowOpacity: 0.12,
+      // shadow* props are iOS/web-only; Android needs `elevation`.
+      elevation: 4,
+    },
+    // Full-screen scan overlay: flat color, no shadow.
+    level3: {
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+  } as const
+}
+
+// Fixed-identity surfaces (the QR pass) keep the light look in both schemes.
+export const lightElevation = makeElevation(lightPalette)
+
+/** Legacy alias, removed once every consumer reads elevation from the theme. */
+export const elevation = lightElevation
 
 /** Durations in ms plus the press scale factor (EXPERIENCE.md → Microinterações). */
 export const motion = {

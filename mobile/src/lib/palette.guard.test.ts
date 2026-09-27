@@ -12,13 +12,16 @@ import {
   appExtensions,
   darkMapping,
   darkPalette,
+  darkStatusTints,
   designTokens,
   lightPalette,
+  lightStatusTints,
+  makeStatusTints,
   STATUS_TINT_ALPHA,
   statusTints,
 } from '@/lib/palette'
-import { darkTheme, lightTheme, navigationTheme } from '@/lib/theme'
-import { fontFamily, typography } from '@/lib/tokens'
+import { darkNavigationTheme, darkTheme, lightNavigationTheme, lightTheme } from '@/lib/theme'
+import { fontFamily, makeElevation, typography } from '@/lib/tokens'
 import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 
 // Tranca a paleta única da Story 1.11 por quatro camadas:
@@ -138,6 +141,7 @@ const DOCUMENTED_TOKENS: Record<keyof typeof designTokens, string> = {
 const DOCUMENTED_EXTENSIONS: Record<keyof typeof appExtensions, string> = {
   error: '#B3261E', // D2 — único vermelho
   warning: '#B26A00', // D3 — âmbar 3.5b, piso 3:1 (loopback 13/09/2026)
+  errorOnDark: '#f2b8b5', // 6.14 — erro baseline MD3 dark, único hex novo do tema escuro
 }
 
 const DOCUMENTED_DARK_MAPPING: Record<keyof typeof darkMapping, string> = {
@@ -201,8 +205,8 @@ function contrastOverTint(fgHex: string, tint: string, canvasHex: string): numbe
   return ratioPair(luminance(colorToRgb(fgHex)), luminance(bg))
 }
 
-function pairRatio(fg: string, bg: string): number {
-  return bg.startsWith('#') ? contrastHexes(fg, bg) : contrastOverTint(fg, bg, lightPalette.canvas)
+function pairRatio(fg: string, bg: string, backdrop: string = lightPalette.canvas): number {
+  return bg.startsWith('#') ? contrastHexes(fg, bg) : contrastOverTint(fg, bg, backdrop)
 }
 
 interface ColorPair {
@@ -211,6 +215,8 @@ interface ColorPair {
   bg: string
   min: number
   note?: string
+  /** Opaque surface under a translucent tint (default: the light canvas). */
+  backdrop?: string
 }
 
 const AMBER_NOTE = 'D3: piso 3:1 (AA texto grande/UI) renegociado no loopback de 13/09/2026 para badges/overlays'
@@ -238,6 +244,15 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'onBrand × brand (superfície full-bleed, D-UX-1)', fg: lightPalette.onBrand, bg: lightPalette.brand, min: 4.5 },
 ]
 
+const ON_DARK_ROLES = ['success', 'successBorder', 'warning', 'error', 'link', 'linkActive', 'info', 'infoBorder'] as const
+
+const DARK_CHIP_TONES = [
+  ['success', 'success'],
+  ['warning', 'warning'],
+  ['error', 'error'],
+  ['neutral', 'textBody'],
+] as const
+
 const DARK_PAIRS: ColorPair[] = [
   { desc: 'texto × canvas escuro', fg: darkPalette.text, bg: darkPalette.canvas, min: 4.5 },
   { desc: 'texto secundário × canvas escuro', fg: darkPalette.textBody, bg: darkPalette.canvas, min: 4.5 },
@@ -247,6 +262,24 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'onBrand × brand em dark', fg: darkPalette.onBrand, bg: darkPalette.brand, min: 4.5 },
+  // Variantes on-dark (6.14): todo papel de status/link/info ≥ 4.5 sobre canvas
+  // e surface escuros, e o chip de cada tom sobre o próprio tinte.
+  ...ON_DARK_ROLES.flatMap((role) => [
+    { desc: `${role} on-dark × canvas escuro`, fg: darkPalette[role], bg: darkPalette.canvas, min: 4.5 },
+    { desc: `${role} on-dark × surface escuro`, fg: darkPalette[role], bg: darkPalette.surface, min: 4.5 },
+  ]),
+  ...DARK_CHIP_TONES.flatMap(([tone, role]) =>
+    [darkPalette.canvas, darkPalette.surface].map((backdrop) => ({
+      desc: `chip ${tone} × tinte on-dark sobre ${backdrop === darkPalette.canvas ? 'canvas' : 'surface'}`,
+      fg: darkPalette[role],
+      bg: darkStatusTints[tone],
+      backdrop,
+      min: 4.5,
+    })),
+  ),
+  // O chip Concluída (info) só vive no TripCard, cartão nível 1 = canvas; sobre
+  // o surface escuro o tinte de info dá ~4.42:1 — por isso travado só aqui.
+  { desc: 'chip info × tinte on-dark sobre canvas (TripCard)', fg: darkPalette.info, bg: darkStatusTints.info, backdrop: darkPalette.canvas, min: 4.5 },
 ]
 
 // ---- Helpers dos render-probes ----
@@ -364,6 +397,19 @@ describe('token-pin — valores fixados ao DESIGN.md e à matriz D1–D7', () =>
     expect(statusTints.error).toBe('rgba(179, 38, 30, 0.12)')
     expect(statusTints.info).toBe('rgba(37, 79, 173, 0.12)')
     expect(statusTints.neutral).toBe('rgba(51, 56, 64, 0.12)')
+    expect(lightStatusTints).toEqual(makeStatusTints(lightPalette))
+    expect(darkStatusTints).toEqual(makeStatusTints(darkPalette))
+  })
+
+  it('variantes on-dark reusam tokens registrados; só o erro é hex novo (6.14)', () => {
+    expect(darkPalette.success).toBe(designTokens.successBorder)
+    expect(darkPalette.successBorder).toBe(designTokens.successBorder)
+    expect(darkPalette.info).toBe(designTokens.infoBorder)
+    expect(darkPalette.infoBorder).toBe(designTokens.infoBorder)
+    expect(darkPalette.link).toBe(designTokens.infoBorder)
+    expect(darkPalette.linkActive).toBe(darkMapping.text)
+    expect(darkPalette.warning).toBe(designTokens.signatureMustard)
+    expect(darkPalette.error).toBe(appExtensions.errorOnDark)
   })
 })
 
@@ -371,7 +417,7 @@ describe('contraste AA dos pares dos temas', () => {
   for (const pair of [...LIGHT_PAIRS, ...DARK_PAIRS]) {
     const theme = LIGHT_PAIRS.includes(pair) ? 'claro' : 'escuro'
     it(`${theme}: ${pair.desc} ≥ ${pair.min}:1${pair.note ? ` — ${pair.note}` : ''}`, () => {
-      expect(pairRatio(pair.fg, pair.bg)).toBeGreaterThanOrEqual(pair.min)
+      expect(pairRatio(pair.fg, pair.bg, pair.backdrop)).toBeGreaterThanOrEqual(pair.min)
     })
   }
 
@@ -472,19 +518,33 @@ describe('lock de binding dos temas Paper', () => {
       expect(actual).toEqual({ ...md3, fontFamily: expectedFamily })
     }
     expect(darkTheme.fonts).toBe(lightTheme.fonts)
-    expect(darkTheme.custom).toBe(lightTheme.custom)
   })
 
-  it('navigationTheme: fundo do React Navigation unificado no surface-soft, header canvas, Inter (6.1)', () => {
-    expect(navigationTheme.dark).toBe(false)
-    expect(navigationTheme.colors).toMatchObject({
-      primary: lightPalette.primary,
-      background: lightPalette.surfaceSoft,
-      card: lightPalette.canvas,
-      text: lightPalette.text,
-      border: lightPalette.hairline,
+  it('custom: tokens de layout compartilhados, paleta/tintes/elevation do próprio esquema (6.14)', () => {
+    for (const key of ['spacing', 'radius', 'motion'] as const) {
+      expect(darkTheme.custom[key]).toBe(lightTheme.custom[key])
+    }
+    expect(lightTheme.custom.palette).toBe(lightPalette)
+    expect(lightTheme.custom.tints).toBe(lightStatusTints)
+    expect(lightTheme.custom.elevation).toEqual(makeElevation(lightPalette))
+    expect(darkTheme.custom.palette).toBe(darkPalette)
+    expect(darkTheme.custom.tints).toBe(darkStatusTints)
+    expect(darkTheme.custom.elevation).toEqual(makeElevation(darkPalette))
+  })
+
+  it.each([
+    ['claro', lightNavigationTheme, lightPalette, false],
+    ['escuro', darkNavigationTheme, darkPalette, true],
+  ] as const)('navigation theme %s: fundo no surface-soft, header canvas, Inter (6.1, 6.14)', (_, nav, palette, dark) => {
+    expect(nav.dark).toBe(dark)
+    expect(nav.colors).toMatchObject({
+      primary: palette.primary,
+      background: palette.surfaceSoft,
+      card: palette.canvas,
+      text: palette.text,
+      border: palette.hairline,
     })
-    expect(Object.values(navigationTheme.fonts).map((f) => f.fontFamily)).toEqual([
+    expect(Object.values(nav.fonts).map((f) => f.fontFamily)).toEqual([
       fontFamily.regular,
       fontFamily.medium,
       fontFamily.semiBold,
