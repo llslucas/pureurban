@@ -317,6 +317,11 @@ const darkTwins = LIGHT_AND_LOGIN_CAPTURES.filter((shot) =>
   DARK_P0.some((id) => shot.name.startsWith(`light-${id}-`)),
 ).map((shot) => ({ ...shot, name: shot.name.replace(/^light-/, 'dark-'), colorScheme: 'dark' }))
 
+// A DARK_P0 id without a light twin would otherwise vanish from the run.
+if (darkTwins.length !== DARK_P0.length) {
+  throw new Error(`DARK_P0 has ${DARK_P0.length} ids but ${darkTwins.length} light twins were found`)
+}
+
 const CAPTURES = [...LIGHT_AND_LOGIN_CAPTURES, ...darkTwins]
 
 async function capture(browser, shot) {
