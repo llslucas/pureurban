@@ -9,11 +9,12 @@ function HeaderBackground() {
   return <View style={styles.background} />
 }
 
-// AppHeader (DESIGN.md): shared `screenOptions` for the (driver) and (student)
-// stacks. native-stack's `headerStyle` only takes `backgroundColor`, so the
-// hairline divider has to come from a custom background. No `headerRight` here:
-// each layout wires its own AccountMenu, so the driver can't silently lose the
-// pending-queue count that gates the logout warning.
+// AppHeader (DESIGN.md): shared `screenOptions` for the (driver), (student) and
+// (admin) stacks. native-stack's `headerStyle` only takes `backgroundColor`, so
+// the hairline divider has to come from a custom background. No `headerRight`
+// here: the driver and student layouts wire their own AccountMenu, so the driver
+// can't silently lose the pending-queue count that gates the logout warning;
+// (admin) has none because "Sair" is already on its only screen.
 export const appHeaderOptions: NativeStackNavigationOptions = {
   headerShadowVisible: false,
   headerBackground: HeaderBackground,

@@ -29,14 +29,16 @@ export function routeAccessibilityLabel({
 export function RouteCard({ route, testID = 'route-card' }: RouteCardProps) {
   return (
     <View style={styles.card} testID={testID} accessible accessibilityLabel={routeAccessibilityLabel(route)}>
-      <Text style={styles.name}>{route.name}</Text>
+      <Text style={styles.name} numberOfLines={2}>
+        {route.name}
+      </Text>
       <View style={styles.path} testID={`${testID}-path`}>
         <Text style={styles.city}>{route.originCity}</Text>
         <MdiIcon name="arrow-right" size={ARROW_SIZE} color={lightPalette.textMuted} testID={`${testID}-arrow`} />
         <Text style={styles.city}>{route.destinationCity}</Text>
       </View>
       {route.description ? (
-        <Text style={styles.description} testID={`${testID}-description`}>
+        <Text style={styles.description} numberOfLines={3} testID={`${testID}-description`}>
           {route.description}
         </Text>
       ) : null}

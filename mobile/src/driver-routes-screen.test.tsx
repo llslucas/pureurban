@@ -118,18 +118,42 @@ describe('DriverRoutesScreen (story 6.13)', () => {
     expect(await screen.findByText('Carregando rotas...')).toBeTruthy()
     expect(screen.getByTestId('routes-loading')).toBeTruthy()
     expect(screen.queryByTestId('routes-empty')).toBeNull()
+    // The first load shows the StateView spinner, not the pull-to-refresh one.
+    expect(screen.getByTestId('driver-routes-scroll').props.refreshControl.props.refreshing).toBe(false)
+  })
+
+  it('refetch with data shown: the pull-to-refresh spinner turns on while it is pending', async () => {
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+
+    renderScreen()
+    expect(await screen.findByText('1 rota atribuída')).toBeTruthy()
+    expect(screen.getByTestId('driver-routes-scroll').props.refreshControl.props.refreshing).toBe(false)
+
+    mockRoutes.getMyRoutes.mockReturnValue(new Promise(() => {}))
+    await act(async () => {
+      void queryClient.refetchQueries({ queryKey: ['routes', 'mine'] })
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('driver-routes-scroll').props.refreshControl.props.refreshing).toBe(true),
+    )
+    expect(screen.getByText('1 rota atribuída')).toBeTruthy()
   })
 
   it('offline (paused query): still loading, never "Você ainda não tem rota."', async () => {
     mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
     onlineManager.setOnline(false)
+    let unmount: (() => void) | undefined
     try {
-      renderScreen()
+      ;({ unmount } = renderScreen())
 
       expect(await screen.findByTestId('routes-loading')).toBeTruthy()
       expect(screen.queryByText('Você ainda não tem rota.')).toBeNull()
       expect(mockRoutes.getMyRoutes).not.toHaveBeenCalled()
     } finally {
+      // Unmount first: going back online resumes the paused fetch, which would
+      // otherwise resolve into this screen after the test has ended.
+      unmount?.()
       onlineManager.setOnline(true)
     }
   })

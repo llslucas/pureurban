@@ -12,7 +12,7 @@ import { useAuthStore } from '@/stores/auth.store'
 const BRAND_ICON_SIZE = 40
 
 export default function AdminHome() {
-  const { logout } = useAuthStore()
+  const logout = useAuthStore((state) => state.logout)
 
   return (
     <View style={styles.root} testID="admin-home">
