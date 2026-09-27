@@ -46,6 +46,7 @@
     "react-dom": "19.2.0",
     "react-native": "0.83.2",
     "react-native-gesture-handler": "~2.30.0",
+    "react-native-maps": "1.27.2",
     "react-native-mmkv": "^4.3.0",
     "react-native-nitro-modules": "^0.35.3",
     "react-native-paper": "^5.15.0",
