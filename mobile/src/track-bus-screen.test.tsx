@@ -18,6 +18,7 @@ import {
   connectTrackingEvents,
   type TrackingStreamHandlers,
 } from '@/services/tracking-stream.service'
+import { isGoogleMapsConfigured } from '@/lib/maps-config'
 
 // Lives at src/ root, not src/app/: Expo Router turns every file under src/app/
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap
@@ -58,6 +59,10 @@ jest.mock('expo-location', () => ({
   Accuracy: { Balanced: 3 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
 }))
+
+// Off by default, like a build without the key: the existing matrix runs
+// against the screen as it was before the map (story 7.1).
+jest.mock('@/lib/maps-config', () => ({ isGoogleMapsConfigured: jest.fn(() => false) }))
 
 jest.mock('@/services/tracking.service', () => ({
   trackingService: {
@@ -738,5 +743,64 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     )
     expect(screen.getByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
     expect(screen.queryByLabelText(/-10\.00000/)).toBeNull()
+  })
+})
+
+// Map markers are hidden from assistive tech (the map is one labeled element).
+const HIDDEN = { includeHiddenElements: true }
+
+describe('TrackBusScreen — mapa (story 7.1)', () => {
+  // clearAllMocks keeps return values: without this the key leaks into the
+  // "without the key" case.
+  afterEach(() => {
+    jest.mocked(isGoogleMapsConfigured).mockReturnValue(false)
+  })
+
+  it('with the key and a bus position: the map sits above the ETA card with both markers', async () => {
+    jest.mocked(isGoogleMapsConfigured).mockReturnValue(true)
+    renderScreen()
+
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect(await screen.findByTestId('bus-map')).toBeTruthy()
+    expect(screen.getByTestId('bus-map-bus-marker', HIDDEN).props.coordinate).toEqual(BUS_POINT)
+    expect(await screen.findByTestId('bus-map-student-marker', HIDDEN)).toBeTruthy()
+    expect(screen.getByTestId('bus-eta-value')).toBeTruthy()
+  })
+
+  it('15s without a signal: the bus marker is dimmed at its last point', async () => {
+    jest.mocked(isGoogleMapsConfigured).mockReturnValue(true)
+    renderScreen()
+
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+    await screen.findByTestId('bus-map')
+    act(() => {
+      jest.advanceTimersByTime(15_000)
+    })
+
+    expect(await screen.findByText(/Sem sinal GPS/)).toBeTruthy()
+    const marker = screen.getByTestId('bus-map-bus-marker', HIDDEN)
+    expect(marker.props.coordinate).toEqual(BUS_POINT)
+    expect(marker.props.opacity).toBeLessThan(1)
+  })
+
+  it('waiting for the first position: no map even with the key', async () => {
+    jest.mocked(isGoogleMapsConfigured).mockReturnValue(true)
+    renderScreen()
+
+    expect(await screen.findByText('Aguardando a primeira posição')).toBeTruthy()
+    expect(screen.queryByTestId('bus-map')).toBeNull()
+  })
+
+  it('without the key: the screen renders as before, with no map', async () => {
+    renderScreen()
+
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect(await screen.findByTestId('bus-eta-value')).toBeTruthy()
+    expect(screen.queryByTestId('bus-map')).toBeNull()
   })
 })
