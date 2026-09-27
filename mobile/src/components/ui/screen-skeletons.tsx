@@ -179,6 +179,7 @@ const styles = StyleSheet.create({
   },
   listRoot: {
     flex: 1,
+    overflow: 'hidden',
     backgroundColor: lightPalette.surfaceSoft,
   },
   rosterHeader: {

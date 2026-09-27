@@ -1,6 +1,6 @@
 import React from 'react'
 import { Linking } from 'react-native'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native'
 import * as Haptics from 'expo-haptics'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { router } from 'expo-router'
@@ -233,6 +233,18 @@ describe('ScanScreen — states before the camera', () => {
     expect(screen.getByTestId('camera-permission-card')).toBeTruthy()
     fireEvent.press(screen.getByText('Abrir configurações'))
     expect(openSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocked camera: a failed openSettings shows the note inside the PermissionCard', async () => {
+    mockPermission({ granted: false, canAskAgain: false })
+    jest.spyOn(Linking, 'openSettings').mockRejectedValue(new Error('boom'))
+    await renderScreen()
+    fireEvent.press(screen.getByTestId('camera-permission-action'))
+    expect(
+      await within(screen.getByTestId('camera-permission-card')).findByText(
+        'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
+      ),
+    ).toBeTruthy()
   })
 
   it('"Nenhuma viagem ativa" → "Ir para Viagem" navigates to the trip tab', async () => {

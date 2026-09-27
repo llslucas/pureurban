@@ -697,6 +697,19 @@ describe('TripScreen — permissão de localização (Story 5.1)', () => {
     expect(screen.queryByText('Abrir configurações')).toBeNull()
   })
 
+  it('the location action stays secondary so "Escanear" is the only contained action (story 6.11)', async () => {
+    setPermission(false, true)
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+
+    renderScreen()
+
+    await screen.findByTestId('location-permission-action')
+    const container = StyleSheet.flatten(
+      screen.getByTestId('location-permission-action-container').props.style,
+    )
+    expect(container.backgroundColor).toBe(lightPalette.canvas)
+  })
+
   it('sem permissão e viagem ativa: card segue visível junto à viagem em curso', async () => {
     setPermission(false, true)
     mockTrip.getActiveTrip.mockResolvedValue(makeTrip())
