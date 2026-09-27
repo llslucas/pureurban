@@ -4,6 +4,7 @@ import { AppState, StyleSheet, View } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { BusEtaCard, type BusEtaFreshness } from '@/components/track-bus/bus-eta-card'
+import { BusMap } from '@/components/track-bus/bus-map'
 import { LocationPermissionCard } from '@/components/trip/location-permission-card'
 import { Banner } from '@/components/ui/banner'
 import { Screen } from '@/components/ui/screen'
@@ -394,6 +395,7 @@ export default function TrackBusScreen() {
     <Screen variant="scroll" testID="track-bus-screen">
       <View style={styles.stack}>
         {staleBanner}
+        <BusMap bus={bus} student={studentPoint} stale={gpsStale} />
         <BusEtaCard
           eta={distance !== null ? formatEta(distance) : null}
           distance={distance !== null ? `${formatDistance(distance)} de você` : null}

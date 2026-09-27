@@ -525,3 +525,11 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_plan: `_bmad-output/implementation-artifacts/plan-epic-6-item-22-dev-build-e-verificacao-nativa.md`
   summary: Não verificados no dev build do item 22: o háptico `notificationAsync` ("Não vou voltar", `(student)/home.tsx:153`, e scan com sucesso) e a StatusBar no login em escuro. Só o `impactAsync` do scan enfileirado foi observado.
   evidence: `dumpsys vibrator_manager` do emulator-5554, 27/09/2026. A aluna61 já tinha ausência registrada numa viagem RETURN em andamento, e o login exigiria deslogar uma conta da demo. Roteiro: nova viagem → "Não vou voltar" no emulator-5556 e conferir o vibrador; deslogar em escuro e capturar o login.
+
+## Deferred from: review of plan-7-1-mapa-com-onibus-e-aluno-no-acompanhar-onibus.md (2026-09-27)
+
+- source_plan: `_bmad-output/implementation-artifacts/plan-7-1-mapa-com-onibus-e-aluno-no-acompanhar-onibus.md`
+  summary: O mapa do "Acompanhar ônibus" fica dentro de `Screen variant="scroll"`; no Android, arrastar o mapa na vertical pode rolar a página em vez do mapa.
+  evidence: maybe-false — o `ScrollView` do Android só intercepta o gesto quando o conteúdo é rolável, e não se sabe se banner + mapa (220px) + card passam da altura em 720p. Resolve na verificação manual nos AVDs (hitl da 7.1): se rolar, desligar `scrollEnabled` enquanto o mapa é tocado ou trocar a tela para `variant` fixo.
+  **Resolvido na verificação da 7.1 (27/09/2026):** no AVD (1080x2400) o arraste vertical move o mapa e a página não rola, porque o conteúdo cabe na tela (evidência `03-arraste-vertical-move-o-mapa.png`). Reabrir só se a tela ganhar conteúdo que role, ou num device de 720p com o banner de dado velho visível.
+
