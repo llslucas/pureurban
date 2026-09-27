@@ -279,6 +279,15 @@ development_status:
   6-14-consumo-do-tema-escuro: done # FECHADO em 27/09/2026 (PR #71); plan-6-14 done. Pendências: verificação em device (dev build regenerado) e cor de fundo nativa da raiz, ambas diferidas no plan
   epic-6-retrospective: done
 
+  # === Epic 7: Mapa Cartográfico no Acompanhamento do Ônibus ===
+  # Criado em 27/09/2026 (Fase 2 do PRD, "Mapa cartográfico", evolução do FR32).
+  # Polish da apresentação do TCC: mapa só no app nativo (react-native-maps + Google),
+  # Expo Web intocado, backend/contrato intocados. Uma story; hitl para a API key e
+  # para a verificação nos AVDs.
+  epic-7: backlog
+  7-1-mapa-com-onibus-e-aluno-no-acompanhar-onibus: backlog
+  epic-7-retrospective: optional
+
 action_items:
   # === Specs de execução do wrap pós-MVP (12/09/2026) — _bmad-output/implementation-artifacts/ ===
   # Ordem recomendada: wrap-1 → wrap-2 → wrap-3 → wrap-4 → wrap-5.

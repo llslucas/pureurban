@@ -220,6 +220,10 @@ Aluno acompanha o ônibus em tempo real — última posição conhecida com dist
 Design system e redesign visual + microinterações das telas da demo, sem mudar fluxos — o app deixa de parecer protótipo e cumpre de fato a usabilidade em campo. Fase 2 do PRD ("Polish de UX"), criado em 26/09/2026.
 **FRs cobertos:** Nenhum novo (qualidade de experiência) · **NFRs:** NFR13, NFR18, NFR19, NFR20
 
+### Epic 7: Mapa Cartográfico no Acompanhamento do Ônibus
+O aluno vê o ônibus e a si mesmo num mapa, acima do card de ETA, no app nativo. Polish de apresentação da Fase 2 do PRD ("Mapa cartográfico", evolução do FR32), criado em 27/09/2026. No Expo Web a tela segue como está.
+**FRs cobertos:** FR32 (evolução da forma de entrega)
+
 ---
 
 ## Epic 1: Fundação do Projeto e Infraestrutura
@@ -1388,6 +1392,65 @@ Para que eu use o app à noite sem ofuscamento.
 
 ---
 
+## Epic 7: Mapa Cartográfico no Acompanhamento do Ônibus
+
+O MVP entregou o FR32 como última posição conhecida + distância/ETA
+(`sprint-change-proposal-2026-08-28`), e isso atende a Jornada 1. O mapa volta agora como
+**polish para a apresentação do TCC**, não por uma lacuna de requisito. Ele foi cortado em 28/08
+porque não havia biblioteca de mapas com suporte web e o dev build ainda não existia. O dev build
+existe desde o item 22 do Épico 6, e o escopo abaixo deixa o web de fora de propósito.
+
+**Decisões (27/09/2026):**
+
+- **Só no app nativo (Android dev build).** No Expo Web o `track-bus` continua exatamente como
+  está: é o alvo dos testes Playwright e não ganha mapa.
+- **Biblioteca: `react-native-maps` com provider Google.** O Maps SDK for Android é gratuito, mas
+  exige uma API key de um projeto Google Cloud com faturamento ativado. A key fica restrita ao
+  package do app + SHA-1 do keystore e nunca é commitada.
+- **Backend e contrato intocados.** O mapa consome o mesmo `location.updated` e a mesma
+  posição do aluno que a tela já calcula.
+
+**Fora de escopo:** marcador animado (interpolação entre updates), mapa no web, estilo escuro
+do mapa, traçado da rota ou dos pontos de parada, persistência de histórico de posições.
+
+### Story 7.1: Mapa com Ônibus e Aluno no Acompanhar Ônibus
+
+Como aluno,
+Quero ver o ônibus e a minha posição num mapa,
+Para que eu entenda de relance onde ele está em relação a mim.
+
+**Acceptance Criteria:**
+
+**Given** o app nativo com viagem ativa e posição do ônibus conhecida
+**When** o aluno abre "Acompanhar ônibus"
+**Then** um mapa aparece acima do `BusEtaCard`, com um marcador para o ônibus e outro para o aluno
+(quando a posição do aluno for conhecida), e a câmera enquadra os dois
+**And** cada `location.updated` move o marcador do ônibus para a nova posição (salto, sem
+animação), e a câmera só se reposiciona se o ônibus sair da área visível
+**And** com o GPS do ônibus sem sinal (estado degradado da 5.2), o marcador fica na última posição
+com aparência atenuada, coerente com o chip "Sem sinal GPS há N min"
+**And** com a localização do aluno negada, o mapa mostra só o ônibus e o `LocationPermissionCard`
+continua como hoje
+**And** os estados aguardando, sem viagem e erro não mostram mapa (seguem com `StateView`)
+**And** no Expo Web a tela renderiza igual à `main` (o componente do mapa tem variante
+`.web.tsx` que não renderiza nada), e a suíte Playwright passa sem alteração
+**And** a key é lida do ambiente em build (`app.json` → `app.config.ts`, variável documentada no
+`.env.example`), e a ausência da key não quebra `npm run web` nem o Jest
+**And** o mapa tem `accessibilityLabel` descritivo; ETA e distância continuam no card, que segue
+sendo a fonte acessível da informação
+
+**Verificação:** teste Jest com `react-native-maps` mockado (marcadores presentes, marcador
+atenuado no degradado, só o ônibus com permissão negada); Playwright web inalterado e verde;
+verificação manual nos AVDs (motorista61 transmitindo, aluno61 acompanhando) com captura de
+tela anexada ao plan, após gerar um dev build novo.
+
+**Camada:** Mobile · **Depende de:** 5.2, 6.10 · **Prioridade:** P2 (polish da apresentação) ·
+**Tamanho:** M · **Dependência nativa nova:** `react-native-maps` (exige rebuild do dev build) ·
+**hitl:** criar a API key no Google Cloud (faturamento + restrição por package/SHA-1) e fazer a
+verificação manual nos AVDs
+
+---
+
 ## Validação de Cobertura Total
 
 | Épico | FRs cobertos | Qtd |
@@ -1398,6 +1461,7 @@ Para que eu use o app à noite sem ofuscamento.
 | Epic 4 | FR26–FR30 | 5 |
 | Epic 5 | FR31–FR35 | 5 |
 | Epic 6 | Nenhum novo (NFR13, NFR18–NFR20) | 0 |
+| Epic 7 | FR32 (evolução — mapa no app nativo, Fase 2) | 0 |
 | **Total MVP** | | **35/37** |
 | **Diferido (Fase 2)** | FR36, FR37 | 2 |
 
