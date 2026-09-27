@@ -1,4 +1,4 @@
-import { darkPalette, lightPalette } from '@/lib/palette'
+import { darkPalette, designTokens, lightPalette } from '@/lib/palette'
 import { ELEVATION_BORDER_WIDTH, fontFamily, makeElevation, motion, radius, spacing, typography } from '@/lib/tokens'
 
 // Token pin (same pattern as the palette guard): each value pinned to the redesign
@@ -80,7 +80,7 @@ describe('tokens — pin contra o DESIGN.md', () => {
       borderColor: darkPalette.hairline,
       borderWidth: 1,
     })
-    expect(elevation.level2).toMatchObject({ backgroundColor: darkPalette.canvas, shadowColor: darkPalette.text })
+    expect(elevation.level2).toMatchObject({ backgroundColor: darkPalette.canvas, shadowColor: designTokens.ink })
   })
 
   it('motion (EXPERIENCE.md → Microinterações)', () => {

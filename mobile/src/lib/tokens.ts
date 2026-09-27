@@ -1,4 +1,4 @@
-import { lightPalette, type SemanticColors } from '@/lib/palette'
+import { designTokens, lightPalette, type SemanticColors } from '@/lib/palette'
 
 /**
  * Single vocabulary for typography, spacing, radius, elevation and motion (story 6.1).
@@ -102,7 +102,8 @@ export function makeElevation(p: SemanticColors) {
     },
     level2: {
       backgroundColor: p.canvas,
-      shadowColor: p.text,
+      // Ink in both schemes: a `text`-colored shadow turns into a white glow in dark.
+      shadowColor: designTokens.ink,
       shadowOffset: { width: 0, height: 2 },
       shadowRadius: 8,
       shadowOpacity: 0.12,
