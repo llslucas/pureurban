@@ -54,7 +54,7 @@
 # Guarda-corpo: fatia acima de ~8 ACs ou ~15 arquivos é dividida por camada, em sequência.
 
 generated: "2026-03-25T21:46:25-03:00"
-last_updated: "26-09-2026"
+last_updated: "27-09-2026"
 project: pureurban
 project_key: NOKEY
 tracking_system: file-system
@@ -263,13 +263,13 @@ development_status:
   6-3-cabecalho-padrao-e-saida-da-conta: done # FECHADO em 26/09/2026 (PR #59); plan-6-3 done
   6-4-redesign-login: done # FECHADO em 26/09/2026 (PR #61); plan-6-4 done
   6-5-redesign-viagem-do-motorista: done # FECHADO em 26/09/2026 (PR #62); plan-6-5 done
-  6-6-redesign-escanear-qr: backlog
+  6-6-redesign-escanear-qr: done # FECHADO em 26/09/2026 (PR #63); status corrigido na 6.12 (ficou backlog por engano)
   6-7-redesign-alunos-da-viagem: done # FECHADO em 26/09/2026 (PR #64); plan-6-7 done
   6-8-redesign-inicio-do-aluno: done # FECHADO em 26/09/2026 (PR #65); plan-6-8 done
   6-9-redesign-meu-qr-code: done # FECHADO em 26/09/2026 (PR #66); plan-6-9 done
   6-10-redesign-acompanhar-onibus: done # FECHADO em 26/09/2026 (PR #67); plan-6-10 done
   6-11-polimento-de-estados: done # FECHADO em 26/09/2026 (PR #68); plan-6-11 done
-  6-12-gate-visual-da-demo: backlog
+  6-12-gate-visual-da-demo: review # Gate 27/09/2026: 26 capturas after/ + antes-depois.md; Jest 731, tsc só baseline, API unit 340, supertest 209, pw:api 2, pw:e2e 10 verdes, NFRs no budget. NÃO done: lint da API na baseline vermelha (147 erros), 5 telas importam lightPalette (AC do épico) e háptico sem verificação manual. Ver plan-6-12
   6-13-redesign-minhas-rotas-e-admin: backlog # P2 opcional, pós-marco
   6-14-consumo-do-tema-escuro: backlog # P2 opcional, pós-defesa
   epic-6-retrospective: optional
