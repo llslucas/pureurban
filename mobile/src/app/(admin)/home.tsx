@@ -1,43 +1,56 @@
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
-import { Text, Button } from 'react-native-paper'
+import { Text } from 'react-native-paper'
+
+import { MdiIcon } from '@/components/ui/mdi-icon'
+import { Screen } from '@/components/ui/screen'
+import { StateView } from '@/components/ui/state-view'
+import { lightPalette } from '@/lib/palette'
+import { spacing, typography } from '@/lib/tokens'
 import { useAuthStore } from '@/stores/auth.store'
+
+const BRAND_ICON_SIZE = 40
 
 export default function AdminHome() {
   const { logout } = useAuthStore()
 
   return (
-    <View style={styles.container}>
-      <Text variant="headlineMedium" style={styles.title}>
-        Painel Administrativo
-      </Text>
-      <Text variant="bodyMedium" style={styles.subtitle}>
-        Área reservada para administradores.
-      </Text>
-      <Button mode="outlined" onPress={logout} style={styles.button}>
-        Sair
-      </Button>
+    <View style={styles.root} testID="admin-home">
+      <View style={styles.brand} testID="admin-brand">
+        <MdiIcon name="bus-school" size={BRAND_ICON_SIZE} color={lightPalette.onBrand} />
+        <Text style={styles.wordmark} accessibilityRole="header">
+          PureUrban
+        </Text>
+      </View>
+      <Screen testID="admin-screen">
+        <StateView
+          kind="empty"
+          icon="tools"
+          title="Em breve"
+          detail="O painel administrativo ainda está em construção."
+          action={{ label: 'Sair', icon: 'logout', onPress: logout }}
+          testID="admin-soon"
+        />
+      </Screen>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: lightPalette.surfaceSoft,
+  },
+  brand: {
+    backgroundColor: lightPalette.brand,
     alignItems: 'center',
-    paddingHorizontal: 24,
-    gap: 16,
+    justifyContent: 'center',
+    paddingVertical: spacing.sectionGap,
+    paddingHorizontal: spacing.gutter,
   },
-  title: {
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  button: {
-    marginTop: 16,
+  wordmark: {
+    ...typography.headline,
+    color: lightPalette.onBrand,
+    marginTop: spacing[2],
   },
 })

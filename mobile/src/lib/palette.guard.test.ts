@@ -631,6 +631,13 @@ describe('locks de call-site (source-lock)', () => {
     expect(source).toMatch(/color=\{lightPalette\.textMuted\}/)
   })
 
+  it('admin: faixa de marca no amarelo com texto e ícone onBrand (6.13, D-UX-1)', () => {
+    const source = readSource('app/(admin)/home.tsx')
+    expect(source).toMatch(/brand: \{[^}]*backgroundColor: lightPalette\.brand,/)
+    expect(source).toMatch(/wordmark: \{[^}]*color: lightPalette\.onBrand,/)
+    expect(source).toMatch(/name="bus-school" size=\{BRAND_ICON_SIZE\} color=\{lightPalette\.onBrand\}/)
+  })
+
   it('app-header: fundo, divisória e tinta presos à paleta', () => {
     const source = readSource('lib/app-header.tsx')
     expect(source).toMatch(/headerTintColor: lightPalette\.text,/)
