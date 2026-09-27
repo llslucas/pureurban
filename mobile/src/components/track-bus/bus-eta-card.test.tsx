@@ -48,6 +48,7 @@ describe('BusEtaCard', () => {
     expect(screen.getByText('Ônibus da sua rota')).toBeTruthy()
 
     expect(screen.getByTestId('bus-eta-value').props.children).toBe('~8 min')
+    expect(screen.getByLabelText('Tempo estimado de chegada: ~8 min')).toBeTruthy()
     expect(style('bus-eta-value')).toMatchObject({
       fontSize: typography.displayCount.fontSize,
       fontVariant: ['tabular-nums'],

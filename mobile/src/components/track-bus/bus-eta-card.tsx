@@ -113,7 +113,9 @@ export function BusEtaCard({
       <Text
         style={styles.eta}
         maxFontSizeMultiplier={ETA_MAX_FONT_SCALE}
-        accessibilityLabel={eta === null ? 'Tempo estimado indisponível' : undefined}
+        accessibilityLabel={
+          eta === null ? 'Tempo estimado indisponível' : `Tempo estimado de chegada: ${eta}`
+        }
         testID="bus-eta-value"
       >
         {eta ?? '—'}
