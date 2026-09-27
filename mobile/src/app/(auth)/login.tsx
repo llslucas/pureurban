@@ -1,4 +1,5 @@
 import { router } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import React, { useEffect, useState } from 'react'
 import {
   Keyboard,
@@ -159,6 +160,8 @@ export default function LoginScreen() {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* The brand hero runs under the status bar: ink icons in both schemes. */}
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
