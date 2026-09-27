@@ -662,7 +662,14 @@ action_items:
     epic: 6
     action: "Regenerar o dev build e verificar em device: tema escuro seguindo o SO (StatusBar, troca com o app aberto, flash de fundo nativo), háptico do scan e do Não vou voltar, inset duplicado com OfflineBanner; remedir o NFR4 (pw:api) após a migração useThemedStyles"
     owner: "Lucas (device) + Dev (NFR4)"
-    status: backlog
+    # DONE em 27/09/2026 (branch chore/epic-6-item-22-dev-build; plan-epic-6-item-22).
+    # Dev build EAS 487dcec2 do merge do PR #73, instalado nos 2 AVDs a partir de
+    # Downloads. Escuro segue o SO (cold start sem flash, troca com o app aberto,
+    # StatusBar invertendo); impactAsync do scan chega ao vibrador (dumpsys);
+    # NFR4 via pw:api = 25 ms. R7d CONFIRMADO (inset duplicado com OfflineBanner).
+    # Rastreados em deferred-work.md: R7d, R7e (render do roster no mobile não
+    # medido), notificationAsync ("Não vou voltar") e StatusBar no login em escuro.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
   - id: "epic-6-retro-item-23-correcoes-de-comportamento"
     epic: 6
