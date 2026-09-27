@@ -680,8 +680,8 @@ describe('locks de call-site (source-lock)', () => {
 
   it('routes: fundo da tela e legenda presos à paleta (6.13)', () => {
     const source = readSource('app/(driver)/routes.tsx')
-    expect(source).toMatch(/root: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
-    expect(source).toMatch(/legend: \{[^}]*color: lightPalette\.textMuted,/)
+    expect(source).toMatch(/root: \{[^}]*backgroundColor: palette\.surfaceSoft,/)
+    expect(source).toMatch(/legend: \{[^}]*color: palette\.textMuted,/)
   })
 
   it('route-card: fundo do cartão e papéis de texto presos à paleta (6.13)', () => {
@@ -695,9 +695,9 @@ describe('locks de call-site (source-lock)', () => {
 
   it('admin: faixa de marca no amarelo com texto e ícone onBrand (6.13, D-UX-1)', () => {
     const source = readSource('app/(admin)/home.tsx')
-    expect(source).toMatch(/brand: \{[^}]*backgroundColor: lightPalette\.brand,/)
-    expect(source).toMatch(/wordmark: \{[^}]*color: lightPalette\.onBrand,/)
-    expect(source).toMatch(/name="bus-school" size=\{BRAND_ICON_SIZE\} color=\{lightPalette\.onBrand\}/)
+    expect(source).toMatch(/brand: \{[^}]*backgroundColor: palette\.brand,/)
+    expect(source).toMatch(/wordmark: \{[^}]*color: palette\.onBrand,/)
+    expect(source).toMatch(/name="bus-school" size=\{BRAND_ICON_SIZE\} color=\{palette\.onBrand\}/)
   })
 
   it('app-header: fundo, divisória e tinta presos à paleta', () => {
@@ -709,7 +709,7 @@ describe('locks de call-site (source-lock)', () => {
 
   it('student-list: fundo da tela preso à paleta', () => {
     const source = readSource('app/(driver)/student-list.tsx')
-    expect(source).toMatch(/container: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
+    expect(source).toMatch(/container: \{[^}]*backgroundColor: palette\.surfaceSoft,/)
   })
 
   it('roster-header: fundo, divisória e legenda presos à paleta', () => {

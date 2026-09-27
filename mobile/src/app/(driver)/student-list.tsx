@@ -10,7 +10,7 @@ import { Banner } from '@/components/ui/banner'
 import { StudentListSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import { ApiClientError } from '@/services/api-client'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing } from '@/lib/tokens'
 import {
   connectBoardingEvents,
@@ -78,6 +78,7 @@ function applyAbsenceCancelledToRoster(
 }
 
 export default function StudentListScreen() {
+  const styles = useThemedStyles(createStyles)
   const { user, logout } = useAuthStore()
   const queryClient = useQueryClient()
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' })
@@ -358,16 +359,17 @@ export default function StudentListScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  bannerSlot: {
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing[3],
-  },
-  listFill: {
-    flexGrow: 1,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    bannerSlot: {
+      paddingHorizontal: spacing.gutter,
+      paddingTop: spacing[3],
+    },
+    listFill: {
+      flexGrow: 1,
+    },
+  })

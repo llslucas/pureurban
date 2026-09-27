@@ -23,9 +23,9 @@ import { Banner } from '@/components/ui/banner'
 import { MdiIcon } from '@/components/ui/mdi-icon'
 import { PrimaryAction } from '@/components/ui/primary-action'
 import { consumeDiscardNotice } from '@/lib/offline-discard-notice'
-import { lightPalette } from '@/lib/palette'
 import { tokenStorage } from '@/lib/storage'
-import { elevation, motion, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { motion, radius, spacing, typography } from '@/lib/tokens'
 import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { homeForRole } from '@/utils/role-routes'
@@ -58,6 +58,8 @@ function useKeyboardOpen() {
 }
 
 export default function LoginScreen() {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
@@ -162,7 +164,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View style={[styles.hero, { paddingTop: insets.top }, heroStyle]} testID="login-hero">
-          <MdiIcon name="bus-school" size={HERO_ICON_SIZE} color={lightPalette.onBrand} />
+          <MdiIcon name="bus-school" size={HERO_ICON_SIZE} color={palette.onBrand} />
           <Text style={styles.wordmark} accessibilityRole="header">
             PureUrban
           </Text>
@@ -225,46 +227,47 @@ export default function LoginScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: spacing.sectionGap,
-  },
-  hero: {
-    backgroundColor: lightPalette.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.gutter,
-    overflow: 'hidden',
-  },
-  wordmark: {
-    ...typography.headline,
-    color: lightPalette.onBrand,
-    marginTop: spacing[2],
-  },
-  taglineSlot: {
-    overflow: 'hidden',
-  },
-  tagline: {
-    ...typography.body,
-    color: lightPalette.onBrand,
-    marginTop: spacing[1],
-  },
-  cardSlot: {
-    width: '100%',
-    maxWidth: spacing.contentMaxWidth,
-    alignSelf: 'center',
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.sectionGap,
-  },
-  card: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[3],
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: spacing.sectionGap,
+    },
+    hero: {
+      backgroundColor: palette.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.gutter,
+      overflow: 'hidden',
+    },
+    wordmark: {
+      ...typography.headline,
+      color: palette.onBrand,
+      marginTop: spacing[2],
+    },
+    taglineSlot: {
+      overflow: 'hidden',
+    },
+    tagline: {
+      ...typography.body,
+      color: palette.onBrand,
+      marginTop: spacing[1],
+    },
+    cardSlot: {
+      width: '100%',
+      maxWidth: spacing.contentMaxWidth,
+      alignSelf: 'center',
+      paddingHorizontal: spacing.gutter,
+      paddingTop: spacing.sectionGap,
+    },
+    card: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      gap: spacing[3],
+    },
+  })
