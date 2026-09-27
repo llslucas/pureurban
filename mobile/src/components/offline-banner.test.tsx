@@ -3,8 +3,9 @@ import React from 'react'
 import { StyleSheet } from 'react-native'
 
 import { OfflineBanner } from '@/components/offline-banner'
-import type { TestNode } from '@/components/ui/test-utils'
-import { lightPalette } from '@/lib/palette'
+import { renderUi, type TestNode } from '@/components/ui/test-utils'
+import { darkPalette, lightPalette } from '@/lib/palette'
+import { darkTheme } from '@/lib/theme'
 import { spacing } from '@/lib/tokens'
 
 const hidden = { includeHiddenElements: true }
@@ -117,5 +118,19 @@ describe('OfflineBanner', () => {
         expect(StyleSheet.flatten(text.props.style).opacity).toBeUndefined()
       }
     })
+  })
+})
+
+describe('OfflineBanner under darkTheme', () => {
+  it('paints the strips and their text from the dark palette', async () => {
+    await renderUi(<OfflineBanner pendingCount={1} failedCount={1} onDismissFailed={() => {}} />, darkTheme)
+    expect(StyleSheet.flatten(screen.getByTestId('offline-banner-pending').props.style).backgroundColor).toBe(
+      darkPalette.textBody,
+    )
+    expect(StyleSheet.flatten(screen.getByTestId('offline-banner-failed').props.style).backgroundColor).toBe(
+      darkPalette.error,
+    )
+    expect(StyleSheet.flatten(screen.getByText(/Modo Offline/).props.style).color).toBe(darkPalette.onPrimary)
+    expect(StyleSheet.flatten(screen.getByText('Dispensar').props.style).color).toBe(darkPalette.onPrimary)
   })
 })

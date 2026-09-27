@@ -3,19 +3,20 @@ import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
-import { STATUS_PRESENTATION } from '@/lib/boarding-status'
-import { lightPalette, statusTints } from '@/lib/palette'
+import { type ChipTone, presentationOf, toneColors, type ToneColors } from '@/lib/boarding-status'
+import type { SemanticColors, StatusTints } from '@/lib/palette'
+import { useAppTheme } from '@/lib/theme'
 import { radius, spacing, typography } from '@/lib/tokens'
 import type { BoardingStatus } from '@/services/trip.service'
 
-export type ChipTone = 'success' | 'warning' | 'error' | 'info' | 'neutral'
+export type { ChipTone }
 
-export const CHIP_TONES: Record<ChipTone, { color: string; background: string }> = {
-  success: { color: lightPalette.success, background: statusTints.success },
-  warning: { color: lightPalette.warning, background: statusTints.warning },
-  error: { color: lightPalette.error, background: statusTints.error },
-  info: { color: lightPalette.info, background: statusTints.info },
-  neutral: { color: lightPalette.textBody, background: statusTints.neutral },
+export const CHIP_TONE_NAMES: readonly ChipTone[] = ['success', 'warning', 'error', 'info', 'neutral']
+
+export function chipTones(palette: SemanticColors, tints: StatusTints): Record<ChipTone, ToneColors> {
+  return Object.fromEntries(
+    CHIP_TONE_NAMES.map((tone) => [tone, toneColors(tone, palette, tints)]),
+  ) as Record<ChipTone, ToneColors>
 }
 
 export type StatusChipProps =
@@ -30,23 +31,20 @@ interface ChipLook {
   accessibilityLabel: string
 }
 
-function resolve(props: StatusChipProps): ChipLook {
+function resolve(props: StatusChipProps, palette: SemanticColors, tints: StatusTints): ChipLook {
   if ('status' in props) {
-    // A status from an older contract rehydrated from the cache falls back like
-    // the StudentRow does instead of crashing the row.
-    const p = STATUS_PRESENTATION[props.status] ?? STATUS_PRESENTATION.NOT_CHECKED_IN
+    const p = presentationOf(props.status)
     return {
       label: p.label,
       icon: p.mdiIcon,
-      color: p.color,
-      background: p.background,
+      ...toneColors(p.tone, palette, tints),
       accessibilityLabel: p.accessibilityLabel,
     }
   }
   return {
     label: props.label,
     icon: props.icon,
-    ...CHIP_TONES[props.tone],
+    ...toneColors(props.tone, palette, tints),
     accessibilityLabel: props.accessibilityLabel ?? props.label,
   }
 }
@@ -55,7 +53,8 @@ const CHIP_HEIGHT = 32
 const ICON_SIZE = 18
 
 export function StatusChip(props: StatusChipProps) {
-  const look = resolve(props)
+  const { custom } = useAppTheme()
+  const look = resolve(props, custom.palette, custom.tints)
   const testID = props.testID ?? 'status-chip'
 
   return (

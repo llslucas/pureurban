@@ -2,7 +2,8 @@ import React, { type ReactNode, useEffect, useState } from 'react'
 import { Keyboard, Platform, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { elevation, spacing } from '@/lib/tokens'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
+import { spacing } from '@/lib/tokens'
 
 export interface StickyActionBarProps {
   /** One or two PrimaryActions; the primary goes last, closest to the thumb. */
@@ -15,6 +16,7 @@ const SHOW_EVENT = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow
 const HIDE_EVENT = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
 
 export function StickyActionBar({ children, testID = 'sticky-action-bar' }: StickyActionBarProps) {
+  const styles = useThemedStyles(createStyles)
   const insets = useSafeAreaInsets()
   const [keyboardOpen, setKeyboardOpen] = useState(() => Keyboard.isVisible())
 
@@ -37,16 +39,17 @@ export function StickyActionBar({ children, testID = 'sticky-action-bar' }: Stic
   )
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    ...elevation.level2,
-    paddingTop: spacing[4],
-    paddingHorizontal: spacing[4],
-  },
-  stack: {
-    width: '100%',
-    maxWidth: spacing.contentMaxWidth,
-    alignSelf: 'center',
-    gap: spacing[3],
-  },
-})
+const createStyles = ({ custom: { elevation } }: AppTheme) =>
+  StyleSheet.create({
+    bar: {
+      ...elevation.level2,
+      paddingTop: spacing[4],
+      paddingHorizontal: spacing[4],
+    },
+    stack: {
+      width: '100%',
+      maxWidth: spacing.contentMaxWidth,
+      alignSelf: 'center',
+      gap: spacing[3],
+    },
+  })

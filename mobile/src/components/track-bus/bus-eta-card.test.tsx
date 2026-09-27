@@ -4,9 +4,9 @@ import { StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 
 import { BusEtaCard, type BusEtaCardProps, signalLossLabel } from '@/components/track-bus/bus-eta-card'
-import { CHIP_TONES } from '@/components/ui/status-chip'
+import { chipTones } from '@/components/ui/status-chip'
 import { renderUi } from '@/components/ui/test-utils'
-import { lightPalette } from '@/lib/palette'
+import { lightPalette, lightStatusTints } from '@/lib/palette'
 import { radius, typography } from '@/lib/tokens'
 
 const BASE: BusEtaCardProps = {
@@ -18,6 +18,7 @@ const BASE: BusEtaCardProps = {
 }
 
 const hidden = { includeHiddenElements: true }
+const CHIP_TONES = chipTones(lightPalette, lightStatusTints)
 
 function style(testID: string) {
   return StyleSheet.flatten(screen.getByTestId(testID, hidden).props.style)

@@ -24,7 +24,7 @@ import {
   studentBoardingStatusKey,
   studentBoardingStatusOptions,
 } from '@/lib/trip-queries'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -60,6 +60,7 @@ const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 export default function StudentHomeScreen() {
+  const styles = useThemedStyles(createStyles)
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
@@ -387,20 +388,21 @@ export default function StudentHomeScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  content: {
-    gap: spacing.sectionGap,
-  },
-  greeting: {
-    ...typography.titleLg,
-    color: lightPalette.text,
-  },
-  shortcuts: {
-    flexDirection: 'row',
-    gap: spacing[3],
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    content: {
+      gap: spacing.sectionGap,
+    },
+    greeting: {
+      ...typography.titleLg,
+      color: palette.text,
+    },
+    shortcuts: {
+      flexDirection: 'row',
+      gap: spacing[3],
+    },
+  })

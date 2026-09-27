@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { motion, radius, spacing, typography } from '@/lib/tokens'
 
 export interface BoardingSummary {
@@ -32,6 +32,7 @@ function ratioOf(summary: BoardingSummary | undefined): number {
 }
 
 export function BoardingCounter({ summary, testID = 'boarding-counter' }: BoardingCounterProps) {
+  const styles = useThemedStyles(createStyles)
   const reducedMotion = useReducedMotion()
   const ratio = ratioOf(summary)
   const hasSummary = summary !== undefined
@@ -79,37 +80,38 @@ export function BoardingCounter({ summary, testID = 'boarding-counter' }: Boardi
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    gap: spacing[2],
-  },
-  countRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-    columnGap: spacing[2],
-  },
-  count: {
-    ...typography.displayCount,
-    color: lightPalette.text,
-    fontVariant: ['tabular-nums'],
-  },
-  denominator: {
-    color: lightPalette.textMuted,
-  },
-  caption: {
-    ...typography.bodyLg,
-    color: lightPalette.textMuted,
-  },
-  track: {
-    height: BAR_HEIGHT,
-    borderRadius: radius.full,
-    backgroundColor: lightPalette.surfaceStrong,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: radius.full,
-    backgroundColor: lightPalette.success,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      gap: spacing[2],
+    },
+    countRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      flexWrap: 'wrap',
+      columnGap: spacing[2],
+    },
+    count: {
+      ...typography.displayCount,
+      color: palette.text,
+      fontVariant: ['tabular-nums'],
+    },
+    denominator: {
+      color: palette.textMuted,
+    },
+    caption: {
+      ...typography.bodyLg,
+      color: palette.textMuted,
+    },
+    track: {
+      height: BAR_HEIGHT,
+      borderRadius: radius.full,
+      backgroundColor: palette.surfaceStrong,
+      overflow: 'hidden',
+    },
+    fill: {
+      height: '100%',
+      borderRadius: radius.full,
+      backgroundColor: palette.success,
+    },
+  })

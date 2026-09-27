@@ -4,8 +4,8 @@ import { Text } from 'react-native-paper'
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
 import { PrimaryAction } from '@/components/ui/primary-action'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { radius, spacing, typography } from '@/lib/tokens'
 
 export interface PermissionCardProps {
   icon: MdiIconName
@@ -37,9 +37,11 @@ export function PermissionCard({
   testID = 'permission-card',
   actionTestID = `${testID}-action`,
 }: PermissionCardProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   return (
     <View style={[styles.card, style]} testID={testID}>
-      <MdiIcon name={icon} size={ICON_SIZE} color={lightPalette.text} testID={`${testID}-icon`} />
+      <MdiIcon name={icon} size={ICON_SIZE} color={palette.text} testID={`${testID}-icon`} />
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
@@ -56,23 +58,24 @@ export function PermissionCard({
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[3],
-  },
-  title: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-  body: {
-    ...typography.bodyLg,
-    color: lightPalette.textBody,
-  },
-  note: {
-    ...typography.bodyLg,
-    color: lightPalette.error,
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    card: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      gap: spacing[3],
+    },
+    title: {
+      ...typography.title,
+      color: palette.text,
+    },
+    body: {
+      ...typography.bodyLg,
+      color: palette.textBody,
+    },
+    note: {
+      ...typography.bodyLg,
+      color: palette.error,
+    },
+  })

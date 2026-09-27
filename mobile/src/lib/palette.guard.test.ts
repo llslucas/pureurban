@@ -7,18 +7,20 @@ import { render, screen, cleanup } from '@testing-library/react-native'
 
 import { OfflineBanner } from '@/components/offline-banner'
 import { StudentRow } from '@/components/student-row'
-import { STATUS_PRESENTATION } from '@/lib/boarding-status'
+import { STATUS_PRESENTATION, statusColors } from '@/lib/boarding-status'
 import {
   appExtensions,
   darkMapping,
   darkPalette,
+  darkStatusTints,
   designTokens,
   lightPalette,
+  lightStatusTints,
+  makeStatusTints,
   STATUS_TINT_ALPHA,
-  statusTints,
 } from '@/lib/palette'
-import { darkTheme, lightTheme, navigationTheme } from '@/lib/theme'
-import { fontFamily, typography } from '@/lib/tokens'
+import { darkNavigationTheme, darkTheme, lightNavigationTheme, lightTheme } from '@/lib/theme'
+import { fontFamily, makeElevation, typography } from '@/lib/tokens'
 import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 
 // Tranca a paleta única da Story 1.11 por quatro camadas:
@@ -30,10 +32,13 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 // (3) contraste — pares texto×fundo dos dois temas em AA (âmbar no piso 3:1,
 //     renegociado no loopback de 13/09/2026 — D3) + gate não-texto de borda;
 // (4) locks de binding — os papéis sobrescritos dos temas Paper (incluída a
-//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1) e o
-//     provider travado em lightTheme no _layout, o mapa de status do StudentRow, as faixas do OfflineBanner e os
-//     call-sites das telas presos aos papéis da paleta (a migração manual não
-//     pode trocar tokens silenciosamente).
+//     `elevation`, 1.11b; fundo, fontes, marca e tema de navegação, 6.1), o
+//     provider escolhido pelo esquema do SO no _layout (6.14), o mapa de status
+//     do StudentRow, as faixas do OfflineBanner e os call-sites das telas presos
+//     aos papéis da paleta (a migração manual não pode trocar tokens
+//     silenciosamente);
+// (5) consumo do tema (6.14) — fora de `lib/`, só as superfícies de identidade
+//     fixa leem `lightPalette`; o resto do app lê a paleta do tema ativo.
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
 // varredura: o teste contém os hexes de referência por definição.
 
@@ -138,6 +143,7 @@ const DOCUMENTED_TOKENS: Record<keyof typeof designTokens, string> = {
 const DOCUMENTED_EXTENSIONS: Record<keyof typeof appExtensions, string> = {
   error: '#B3261E', // D2 — único vermelho
   warning: '#B26A00', // D3 — âmbar 3.5b, piso 3:1 (loopback 13/09/2026)
+  errorOnDark: '#f2b8b5', // 6.14 — erro baseline MD3 dark, único hex novo do tema escuro
 }
 
 const DOCUMENTED_DARK_MAPPING: Record<keyof typeof darkMapping, string> = {
@@ -201,8 +207,8 @@ function contrastOverTint(fgHex: string, tint: string, canvasHex: string): numbe
   return ratioPair(luminance(colorToRgb(fgHex)), luminance(bg))
 }
 
-function pairRatio(fg: string, bg: string): number {
-  return bg.startsWith('#') ? contrastHexes(fg, bg) : contrastOverTint(fg, bg, lightPalette.canvas)
+function pairRatio(fg: string, bg: string, backdrop: string = lightPalette.canvas): number {
+  return bg.startsWith('#') ? contrastHexes(fg, bg) : contrastOverTint(fg, bg, backdrop)
 }
 
 interface ColorPair {
@@ -211,6 +217,8 @@ interface ColorPair {
   bg: string
   min: number
   note?: string
+  /** Opaque surface under a translucent tint (default: the light canvas). */
+  backdrop?: string
 }
 
 const AMBER_NOTE = 'D3: piso 3:1 (AA texto grande/UI) renegociado no loopback de 13/09/2026 para badges/overlays'
@@ -224,11 +232,11 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'erro × canvas', fg: lightPalette.error, bg: lightPalette.canvas, min: 4.5 },
   { desc: 'onSurfaceVariant × surfaceVariant (chips/labels Paper)', fg: lightPalette.textMuted, bg: lightPalette.surfaceStrong, min: 4.5 },
   { desc: 'títulos (ink) × superfície elevada (elevation 3–5)', fg: lightPalette.text, bg: lightPalette.surfaceStrong, min: 4.5 },
-  { desc: 'sucesso × tinte de sucesso', fg: lightPalette.success, bg: statusTints.success, min: 4.5 },
-  { desc: 'info × tinte de info (chip Concluída)', fg: lightPalette.info, bg: statusTints.info, min: 4.5 },
-  { desc: 'erro × tinte de erro', fg: lightPalette.error, bg: statusTints.error, min: 4.5 },
-  { desc: 'body × tinte neutro (chip Não embarcou)', fg: lightPalette.textBody, bg: statusTints.neutral, min: 4.5 },
-  { desc: 'aviso × tinte de aviso (chip Não vai voltar)', fg: lightPalette.warning, bg: statusTints.warning, min: 3, note: AMBER_NOTE },
+  { desc: 'sucesso × tinte de sucesso', fg: lightPalette.success, bg: lightStatusTints.success, min: 4.5 },
+  { desc: 'info × tinte de info (chip Concluída)', fg: lightPalette.info, bg: lightStatusTints.info, min: 4.5 },
+  { desc: 'erro × tinte de erro', fg: lightPalette.error, bg: lightStatusTints.error, min: 4.5 },
+  { desc: 'body × tinte neutro (chip Não embarcou)', fg: lightPalette.textBody, bg: lightStatusTints.neutral, min: 4.5 },
+  { desc: 'aviso × tinte de aviso (chip Não vai voltar)', fg: lightPalette.warning, bg: lightStatusTints.warning, min: 3, note: AMBER_NOTE },
   { desc: 'aviso × superfície clara (texto âmbar sobre botão branco do overlay)', fg: lightPalette.warning, bg: lightPalette.onPrimary, min: 3, note: AMBER_NOTE },
   { desc: 'onPrimary × overlay de sucesso', fg: lightPalette.onPrimary, bg: lightPalette.success, min: 4.5 },
   { desc: 'onPrimary × overlay de aviso', fg: lightPalette.onPrimary, bg: lightPalette.warning, min: 3, note: AMBER_NOTE },
@@ -237,6 +245,15 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × faixa offline (body)', fg: lightPalette.onPrimary, bg: lightPalette.textBody, min: 4.5 },
   { desc: 'onBrand × brand (superfície full-bleed, D-UX-1)', fg: lightPalette.onBrand, bg: lightPalette.brand, min: 4.5 },
 ]
+
+const ON_DARK_ROLES = ['success', 'successBorder', 'warning', 'error', 'link', 'linkActive', 'info', 'infoBorder'] as const
+
+const DARK_CHIP_TONES = [
+  ['success', 'success'],
+  ['warning', 'warning'],
+  ['error', 'error'],
+  ['neutral', 'textBody'],
+] as const
 
 const DARK_PAIRS: ColorPair[] = [
   { desc: 'texto × canvas escuro', fg: darkPalette.text, bg: darkPalette.canvas, min: 4.5 },
@@ -247,6 +264,27 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'onBrand × brand em dark', fg: darkPalette.onBrand, bg: darkPalette.brand, min: 4.5 },
+  // Faixas e botões "branco sobre cor" invertem no escuro: texto tinta sobre o papel claro.
+  { desc: 'onPrimary × erro em dark (faixa de falha, Banner de erro, danger)', fg: darkPalette.onPrimary, bg: darkPalette.error, min: 4.5 },
+  { desc: 'onPrimary × faixa offline (body) em dark', fg: darkPalette.onPrimary, bg: darkPalette.textBody, min: 4.5 },
+  // Variantes on-dark (6.14): todo papel de status/link/info ≥ 4.5 sobre canvas
+  // e surface escuros, e o chip de cada tom sobre o próprio tinte.
+  ...ON_DARK_ROLES.flatMap((role) => [
+    { desc: `${role} on-dark × canvas escuro`, fg: darkPalette[role], bg: darkPalette.canvas, min: 4.5 },
+    { desc: `${role} on-dark × surface escuro`, fg: darkPalette[role], bg: darkPalette.surface, min: 4.5 },
+  ]),
+  ...DARK_CHIP_TONES.flatMap(([tone, role]) =>
+    [darkPalette.canvas, darkPalette.surface].map((backdrop) => ({
+      desc: `chip ${tone} × tinte on-dark sobre ${backdrop === darkPalette.canvas ? 'canvas' : 'surface'}`,
+      fg: darkPalette[role],
+      bg: darkStatusTints[tone],
+      backdrop,
+      min: 4.5,
+    })),
+  ),
+  // O chip Concluída (info) só vive no TripCard, cartão nível 1 = canvas; sobre
+  // o surface escuro o tinte de info dá ~4.42:1 — por isso travado só aqui.
+  { desc: 'chip info × tinte on-dark sobre canvas (TripCard)', fg: darkPalette.info, bg: darkStatusTints.info, backdrop: darkPalette.canvas, min: 4.5 },
 ]
 
 // ---- Helpers dos render-probes ----
@@ -305,6 +343,40 @@ const readSource = (rel: string) => readFileSync(join(SRC_ROOT, rel), 'utf8')
 
 // ---- Suíte ----
 
+// ---- (5) Consumo do tema ----
+
+// Superfícies de identidade fixa: não mudam com o esquema do SO, então leem a
+// paleta clara direto. Qualquer outro arquivo fora de `lib/` lê a paleta do
+// tema ativo (`useAppTheme().custom.palette` / `useThemedStyles`).
+const LIGHT_PALETTE_ALLOWLIST: Record<string, string> = {
+  'components/scan/scan-frame.tsx': 'chrome de câmera sobre o feed — overlay branco à noite seria ofuscamento',
+  'components/scan/scan-hud.tsx': 'chrome de câmera sobre o feed',
+  'components/scan/scan-result-overlay.tsx': 'overlay chapado sobre a câmera; ações em ThemeProvider claro',
+  'components/student-qr/qr-pass.tsx': 'passe do QR: amarelo de marca + quiet zone branca (leitura óptica)',
+}
+
+const isTestFile = (rel: string) => /\.test\.tsx?$/.test(rel) || rel === 'components/ui/test-utils.tsx'
+
+describe('consumo do tema — lightPalette só em lib/ e nas superfícies fixas (6.14)', () => {
+  it('nenhum arquivo de produção fora de lib/ e da allowlist lê lightPalette', () => {
+    const readers = walkSourceFiles(SRC_ROOT).filter(
+      (file) => !file.startsWith('lib/') && !isTestFile(file) && /\blightPalette\b/.test(readSource(file)),
+    )
+    expect(readers.sort()).toEqual(Object.keys(LIGHT_PALETTE_ALLOWLIST).sort())
+  })
+
+  it('nenhum arquivo de produção fora de lib/ lê os tintes ou a elevation claros direto', () => {
+    const readers = walkSourceFiles(SRC_ROOT).filter(
+      (file) =>
+        !file.startsWith('lib/') &&
+        !isTestFile(file) &&
+        !(file in LIGHT_PALETTE_ALLOWLIST) &&
+        /\b(lightStatusTints|lightElevation|lightTheme)\b/.test(readSource(file)),
+    )
+    expect(readers).toEqual([])
+  })
+})
+
 describe('guarda — nenhuma cor fora do módulo de paleta', () => {
   it('todo hex/rgb() em src/ está na paleta ou na allowlist (falha apontando arquivo:linha)', () => {
     const offenders: string[] = []
@@ -359,11 +431,29 @@ describe('token-pin — valores fixados ao DESIGN.md e à matriz D1–D7', () =>
 
   it('tinte de status usa o alfa congelado de 12%', () => {
     expect(STATUS_TINT_ALPHA).toBe(0.12)
-    expect(statusTints.success).toBe('rgba(0, 100, 0, 0.12)')
-    expect(statusTints.warning).toBe('rgba(178, 106, 0, 0.12)')
-    expect(statusTints.error).toBe('rgba(179, 38, 30, 0.12)')
-    expect(statusTints.info).toBe('rgba(37, 79, 173, 0.12)')
-    expect(statusTints.neutral).toBe('rgba(51, 56, 64, 0.12)')
+    expect(lightStatusTints.success).toBe('rgba(0, 100, 0, 0.12)')
+    expect(lightStatusTints.warning).toBe('rgba(178, 106, 0, 0.12)')
+    expect(lightStatusTints.error).toBe('rgba(179, 38, 30, 0.12)')
+    expect(lightStatusTints.info).toBe('rgba(37, 79, 173, 0.12)')
+    expect(lightStatusTints.neutral).toBe('rgba(51, 56, 64, 0.12)')
+    expect(lightStatusTints).toEqual(makeStatusTints(lightPalette))
+    expect(darkStatusTints).toEqual(makeStatusTints(darkPalette))
+  })
+
+  it('variantes on-dark reusam tokens registrados; só o erro é hex novo (6.14)', () => {
+    expect(darkPalette.success).toBe(designTokens.successBorder)
+    expect(darkPalette.successBorder).toBe(designTokens.successBorder)
+    expect(darkPalette.info).toBe(designTokens.infoBorder)
+    expect(darkPalette.infoBorder).toBe(designTokens.infoBorder)
+    expect(darkPalette.link).toBe(designTokens.infoBorder)
+    expect(darkPalette.linkActive).toBe(darkMapping.text)
+    expect(darkPalette.warning).toBe(designTokens.signatureMustard)
+    expect(darkPalette.error).toBe(appExtensions.errorOnDark)
+  })
+
+  it('fundo de tela escuro é o tom mais escuro e casa com o background do Paper (6.14)', () => {
+    expect(darkPalette.surfaceSoft).toBe(darkMapping.canvas)
+    expect(darkTheme.colors.background).toBe(darkPalette.surfaceSoft)
   })
 })
 
@@ -371,7 +461,7 @@ describe('contraste AA dos pares dos temas', () => {
   for (const pair of [...LIGHT_PAIRS, ...DARK_PAIRS]) {
     const theme = LIGHT_PAIRS.includes(pair) ? 'claro' : 'escuro'
     it(`${theme}: ${pair.desc} ≥ ${pair.min}:1${pair.note ? ` — ${pair.note}` : ''}`, () => {
-      expect(pairRatio(pair.fg, pair.bg)).toBeGreaterThanOrEqual(pair.min)
+      expect(pairRatio(pair.fg, pair.bg, pair.backdrop)).toBeGreaterThanOrEqual(pair.min)
     })
   }
 
@@ -472,19 +562,33 @@ describe('lock de binding dos temas Paper', () => {
       expect(actual).toEqual({ ...md3, fontFamily: expectedFamily })
     }
     expect(darkTheme.fonts).toBe(lightTheme.fonts)
-    expect(darkTheme.custom).toBe(lightTheme.custom)
   })
 
-  it('navigationTheme: fundo do React Navigation unificado no surface-soft, header canvas, Inter (6.1)', () => {
-    expect(navigationTheme.dark).toBe(false)
-    expect(navigationTheme.colors).toMatchObject({
-      primary: lightPalette.primary,
-      background: lightPalette.surfaceSoft,
-      card: lightPalette.canvas,
-      text: lightPalette.text,
-      border: lightPalette.hairline,
+  it('custom: tokens de layout compartilhados, paleta/tintes/elevation do próprio esquema (6.14)', () => {
+    for (const key of ['spacing', 'radius', 'motion'] as const) {
+      expect(darkTheme.custom[key]).toBe(lightTheme.custom[key])
+    }
+    expect(lightTheme.custom.palette).toBe(lightPalette)
+    expect(lightTheme.custom.tints).toBe(lightStatusTints)
+    expect(lightTheme.custom.elevation).toEqual(makeElevation(lightPalette))
+    expect(darkTheme.custom.palette).toBe(darkPalette)
+    expect(darkTheme.custom.tints).toBe(darkStatusTints)
+    expect(darkTheme.custom.elevation).toEqual(makeElevation(darkPalette))
+  })
+
+  it.each([
+    ['claro', lightNavigationTheme, lightPalette, false],
+    ['escuro', darkNavigationTheme, darkPalette, true],
+  ] as const)('navigation theme %s: fundo no surface-soft, header canvas, Inter (6.1, 6.14)', (_, nav, palette, dark) => {
+    expect(nav.dark).toBe(dark)
+    expect(nav.colors).toMatchObject({
+      primary: palette.primary,
+      background: palette.surfaceSoft,
+      card: palette.canvas,
+      text: palette.text,
+      border: palette.hairline,
     })
-    expect(Object.values(navigationTheme.fonts).map((f) => f.fontFamily)).toEqual([
+    expect(Object.values(nav.fonts).map((f) => f.fontFamily)).toEqual([
       fontFamily.regular,
       fontFamily.medium,
       fontFamily.semiBold,
@@ -492,26 +596,28 @@ describe('lock de binding dos temas Paper', () => {
     ])
   })
 
-  it('_layout: PaperProvider travado em lightTheme, sem flip por esquema do SO (trava da trava, 1.11b)', () => {
+  it('_layout: tema escolhido pelo esquema do SO, sem trava em lightTheme (6.14; a trava da 1.11b saiu)', () => {
     const source = readSource('app/_layout.tsx')
-    expect(source).not.toContain('useColorScheme')
-    expect(source).not.toContain('darkTheme')
-    expect(source.match(/<PaperProvider theme=\{lightTheme\}>/g)).toHaveLength(2)
+    expect(source).toMatch(/const theme = themeFor\(useColorScheme\(\)\)/)
+    expect(source).not.toMatch(/theme=\{lightTheme\}/)
+    expect(source).not.toContain('lightTheme')
+    expect(source.match(/<PaperProvider theme=\{theme\.paper\}>/g)).toHaveLength(2)
+    expect(source).toContain('<StatusBar style="auto" />')
   })
 
-  it('_layout: navegador envolto no navigationTheme e Inter no gate de boot (6.1)', () => {
+  it('_layout: navegador envolto no tema de navegação do esquema e Inter no gate de boot (6.1)', () => {
     const source = readSource('app/_layout.tsx')
-    expect(source.match(/<ThemeProvider value=\{navigationTheme\}>/g)).toHaveLength(1)
+    expect(source.match(/<ThemeProvider value=\{theme\.navigation\}>/g)).toHaveLength(1)
     expect(source).toMatch(/useFonts\(\{[^}]*Inter_400Regular,[^}]*Inter_500Medium,[^}]*Inter_600SemiBold,[^}]*Inter_700Bold,/)
     expect(source).toMatch(/const isFontReady = isFontGateOpen\(fontsLoaded, fontError\)/)
     expect(source).toMatch(/const isBooting = [^\n]*!isFontReady/)
   })
 
-  it('app.json: chrome nativo travado em light, splash e ícone no amarelo de marca (1.11b, D-UX-1)', () => {
+  it('app.json: chrome nativo segue o SO, splash e ícone no amarelo de marca (6.14, D-UX-1)', () => {
     // A varredura de hex cobre só src/: o chrome nativo (headers, status bar,
-    // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, a
-    // metade nativa da trava light reverteria em silêncio (era o azul #208AEF
-    // da paleta antiga).
+    // splash, ícone adaptativo) é dirigido pelo app.json — sem este lock, o
+    // esquema nativo poderia voltar a travar em silêncio (e o azul #208AEF da
+    // paleta antiga reaparecer).
     const appConfig = JSON.parse(
       readFileSync(join(SRC_ROOT, '..', 'app.json'), 'utf8'),
     ) as {
@@ -524,7 +630,7 @@ describe('lock de binding dos temas Paper', () => {
         plugins: [string, Record<string, unknown>][]
       }
     }
-    expect(appConfig.expo.userInterfaceStyle).toBe('light')
+    expect(appConfig.expo.userInterfaceStyle).toBe('automatic')
     expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(designTokens.signatureYellow)
     const splash = appConfig.expo.plugins.find(([name]) => name === 'expo-splash-screen')
     expect(splash?.[1].backgroundColor).toBe(designTokens.signatureYellow)
@@ -544,13 +650,18 @@ describe('lock de binding dos temas Paper', () => {
 })
 
 describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', () => {
-  it('STATUS_PRESENTATION vale exatamente os papéis da paleta', () => {
-    expect(STATUS_PRESENTATION.CHECKED_IN.color).toBe(lightPalette.success)
-    expect(STATUS_PRESENTATION.CHECKED_IN.background).toBe(statusTints.success)
-    expect(STATUS_PRESENTATION.NOT_CHECKED_IN.color).toBe(lightPalette.textBody)
-    expect(STATUS_PRESENTATION.NOT_CHECKED_IN.background).toBe(statusTints.neutral)
-    expect(STATUS_PRESENTATION.NOT_RETURNING.color).toBe(lightPalette.warning)
-    expect(STATUS_PRESENTATION.NOT_RETURNING.background).toBe(statusTints.warning)
+  it('STATUS_PRESENTATION: cada status num tom; cores resolvidas contra a paleta do esquema', () => {
+    expect(STATUS_PRESENTATION.CHECKED_IN.tone).toBe('success')
+    expect(STATUS_PRESENTATION.NOT_CHECKED_IN.tone).toBe('neutral')
+    expect(STATUS_PRESENTATION.NOT_RETURNING.tone).toBe('warning')
+    for (const [palette, tints] of [
+      [lightPalette, lightStatusTints],
+      [darkPalette, darkStatusTints],
+    ] as const) {
+      expect(statusColors('CHECKED_IN', palette, tints)).toEqual({ color: palette.success, background: tints.success })
+      expect(statusColors('NOT_CHECKED_IN', palette, tints)).toEqual({ color: palette.textBody, background: tints.neutral })
+      expect(statusColors('NOT_RETURNING', palette, tints)).toEqual({ color: palette.warning, background: tints.warning })
+    }
   })
 
   it.each([
@@ -561,10 +672,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
     // Um probe por teste: o cleanup automático entre testes desmonta a árvore —
     // cleanup manual + render no mesmo tick quebra o renderer do RNTL.
     const colors = chipColorsFor(status)
-    expect(colors).toEqual({
-      color: STATUS_PRESENTATION[status].color,
-      background: STATUS_PRESENTATION[status].background,
-    })
+    expect(colors).toEqual(statusColors(status, lightPalette, lightStatusTints))
   })
 
   it('render-probe do OfflineBanner: faixa pendente na família ink/body', () => {
@@ -601,7 +709,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
 
 describe('locks de call-site (source-lock)', () => {
   it('trip: encerrar no vermelho único e chips nos tons de status', () => {
-    expect(readSource('components/trip/active-trip-actions.tsx')).toMatch(/color=\{lightPalette\.error\}/)
+    expect(readSource('components/trip/active-trip-actions.tsx')).toMatch(/color=\{palette\.error\}/)
     const card = readSource('components/trip/trip-card.tsx')
     expect(card).toMatch(/icon="progress-clock" tone="success"/)
     expect(card).toMatch(/icon="flag-checkered" tone="info"/)
@@ -618,53 +726,53 @@ describe('locks de call-site (source-lock)', () => {
 
   it('routes: fundo da tela e legenda presos à paleta (6.13)', () => {
     const source = readSource('app/(driver)/routes.tsx')
-    expect(source).toMatch(/root: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
-    expect(source).toMatch(/legend: \{[^}]*color: lightPalette\.textMuted,/)
+    expect(source).toMatch(/root: \{[^}]*backgroundColor: palette\.surfaceSoft,/)
+    expect(source).toMatch(/legend: \{[^}]*color: palette\.textMuted,/)
   })
 
   it('route-card: fundo do cartão e papéis de texto presos à paleta (6.13)', () => {
     const source = readSource('components/routes/route-card.tsx')
-    expect(source).toMatch(/card: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/name: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/city: \{[^}]*color: lightPalette\.textBody,/)
-    expect(source).toMatch(/description: \{[^}]*color: lightPalette\.textMuted,/)
-    expect(source).toMatch(/color=\{lightPalette\.textMuted\}/)
+    expect(source).toMatch(/card: \{[^}]*backgroundColor: palette\.surface,/)
+    expect(source).toMatch(/name: \{[^}]*color: palette\.text,/)
+    expect(source).toMatch(/city: \{[^}]*color: palette\.textBody,/)
+    expect(source).toMatch(/description: \{[^}]*color: palette\.textMuted,/)
+    expect(source).toMatch(/color=\{palette\.textMuted\}/)
   })
 
   it('admin: faixa de marca no amarelo com texto e ícone onBrand (6.13, D-UX-1)', () => {
     const source = readSource('app/(admin)/home.tsx')
-    expect(source).toMatch(/brand: \{[^}]*backgroundColor: lightPalette\.brand,/)
-    expect(source).toMatch(/wordmark: \{[^}]*color: lightPalette\.onBrand,/)
-    expect(source).toMatch(/name="bus-school" size=\{BRAND_ICON_SIZE\} color=\{lightPalette\.onBrand\}/)
+    expect(source).toMatch(/brand: \{[^}]*backgroundColor: palette\.brand,/)
+    expect(source).toMatch(/wordmark: \{[^}]*color: palette\.onBrand,/)
+    expect(source).toMatch(/name="bus-school" size=\{BRAND_ICON_SIZE\} color=\{palette\.onBrand\}/)
   })
 
   it('app-header: fundo, divisória e tinta presos à paleta', () => {
     const source = readSource('lib/app-header.tsx')
-    expect(source).toMatch(/headerTintColor: lightPalette\.text,/)
-    expect(source).toMatch(/background: \{[^}]*backgroundColor: lightPalette\.canvas,/)
-    expect(source).toMatch(/background: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
+    expect(source).toMatch(/headerTintColor: palette\.text,/)
+    expect(source).toMatch(/background: \{[^}]*backgroundColor: palette\.canvas,/)
+    expect(source).toMatch(/background: \{[^}]*borderBottomColor: palette\.hairline,/)
   })
 
   it('student-list: fundo da tela preso à paleta', () => {
     const source = readSource('app/(driver)/student-list.tsx')
-    expect(source).toMatch(/container: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
+    expect(source).toMatch(/container: \{[^}]*backgroundColor: palette\.surfaceSoft,/)
   })
 
   it('roster-header: fundo, divisória e legenda presos à paleta', () => {
     const source = readSource('components/student-list/roster-header.tsx')
-    expect(source).toMatch(/header: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/header: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
-    expect(source).toMatch(/legend: \{[^}]*color: lightPalette\.textMuted,/)
+    expect(source).toMatch(/header: \{[^}]*backgroundColor: palette\.surface,/)
+    expect(source).toMatch(/header: \{[^}]*borderBottomColor: palette\.hairline,/)
+    expect(source).toMatch(/legend: \{[^}]*color: palette\.textMuted,/)
   })
 
   it('student-row: linha, avatar, nome, hora e divisória presos à paleta (chip é coberto pelo render-probe)', () => {
     const source = readSource('components/student-row.tsx')
-    expect(source).toMatch(/row: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/avatar: \{[^}]*backgroundColor: lightPalette\.surfaceStrong,/)
-    expect(source).toMatch(/initials: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/name: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/time: \{[^}]*color: lightPalette\.textMuted,/)
-    expect(source).toMatch(/body: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
-    expect(source).toMatch(/backgroundColor: presentation\.background \}, pulseStyle/)
+    expect(source).toMatch(/row: \{[^}]*backgroundColor: palette\.surface,/)
+    expect(source).toMatch(/avatar: \{[^}]*backgroundColor: palette\.surfaceStrong,/)
+    expect(source).toMatch(/initials: \{[^}]*color: palette\.text,/)
+    expect(source).toMatch(/name: \{[^}]*color: palette\.text,/)
+    expect(source).toMatch(/time: \{[^}]*color: palette\.textMuted,/)
+    expect(source).toMatch(/body: \{[^}]*borderBottomColor: palette\.hairline,/)
+    expect(source).toMatch(/backgroundColor: colors\.background \}, pulseStyle/)
   })
 })

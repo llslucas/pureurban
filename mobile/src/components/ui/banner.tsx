@@ -10,7 +10,8 @@ import Animated, {
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
 import { PrimaryAction } from '@/components/ui/primary-action'
-import { lightPalette, statusTints } from '@/lib/palette'
+import type { SemanticColors, StatusTints } from '@/lib/palette'
+import { useAppTheme } from '@/lib/theme'
 import { motion, radius, spacing, typography } from '@/lib/tokens'
 
 export type BannerTone = 'warning' | 'info' | 'error'
@@ -31,25 +32,27 @@ interface BannerLook {
 }
 
 // DESIGN.md → banner-warning / banner-error; info mirrors warning on its own tint.
-export const BANNER_TONES: Record<BannerTone, BannerLook> = {
-  warning: {
-    icon: 'alert',
-    iconColor: lightPalette.warning,
-    textColor: lightPalette.text,
-    background: statusTints.warning,
-  },
-  info: {
-    icon: 'information-outline',
-    iconColor: lightPalette.info,
-    textColor: lightPalette.text,
-    background: statusTints.info,
-  },
-  error: {
-    icon: 'alert-circle',
-    iconColor: lightPalette.onPrimary,
-    textColor: lightPalette.onPrimary,
-    background: lightPalette.error,
-  },
+export function bannerTones(palette: SemanticColors, tints: StatusTints): Record<BannerTone, BannerLook> {
+  return {
+    warning: {
+      icon: 'alert',
+      iconColor: palette.warning,
+      textColor: palette.text,
+      background: tints.warning,
+    },
+    info: {
+      icon: 'information-outline',
+      iconColor: palette.info,
+      textColor: palette.text,
+      background: tints.info,
+    },
+    error: {
+      icon: 'alert-circle',
+      iconColor: palette.onPrimary,
+      textColor: palette.onPrimary,
+      background: palette.error,
+    },
+  }
 }
 
 const ICON_SIZE = 22
@@ -57,7 +60,8 @@ const SLIDE_DISTANCE = spacing[3]
 
 export function Banner({ tone, title, message, action, testID = 'banner' }: BannerProps) {
   const reducedMotion = useReducedMotion()
-  const look = BANNER_TONES[tone]
+  const { custom } = useAppTheme()
+  const look = bannerTones(custom.palette, custom.tints)[tone]
   const progress = useSharedValue(0)
   // Reduced motion keeps a short fade and drops the slide.
   const distance = reducedMotion ? 0 : SLIDE_DISTANCE

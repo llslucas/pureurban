@@ -5,12 +5,15 @@ import { Keyboard, Platform, StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 
 import LoginScreen from '@/app/(auth)/login'
-import { BANNER_TONES } from '@/components/ui/banner'
+import { bannerTones } from '@/components/ui/banner'
 import { renderUi } from '@/components/ui/test-utils'
 import { setDiscardNotice } from '@/lib/offline-discard-notice'
+import { lightPalette, lightStatusTints } from '@/lib/palette'
 import { tokenStorage } from '@/lib/storage'
 import { motion } from '@/lib/tokens'
 import { authService } from '@/services/auth.service'
+
+const BANNER_TONES = bannerTones(lightPalette, lightStatusTints)
 
 // Metade de UI do AC7 (D5): o aviso de "N embarques não sincronizados
 // descartados" aparece no login — a única superfície que toda saída de sessão

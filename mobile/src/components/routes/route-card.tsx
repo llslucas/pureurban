@@ -3,8 +3,8 @@ import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
 import { MdiIcon } from '@/components/ui/mdi-icon'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { radius, spacing, typography } from '@/lib/tokens'
 import type { AssignedRoute } from '@/services/routes.service'
 
 export interface RouteCardProps {
@@ -27,6 +27,8 @@ export function routeAccessibilityLabel({
 }
 
 export function RouteCard({ route, testID = 'route-card' }: RouteCardProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   return (
     <View style={styles.card} testID={testID} accessible accessibilityLabel={routeAccessibilityLabel(route)}>
       <Text style={styles.name} numberOfLines={2}>
@@ -34,7 +36,7 @@ export function RouteCard({ route, testID = 'route-card' }: RouteCardProps) {
       </Text>
       <View style={styles.path} testID={`${testID}-path`}>
         <Text style={styles.city}>{route.originCity}</Text>
-        <MdiIcon name="arrow-right" size={ARROW_SIZE} color={lightPalette.textMuted} testID={`${testID}-arrow`} />
+        <MdiIcon name="arrow-right" size={ARROW_SIZE} color={palette.textMuted} testID={`${testID}-arrow`} />
         <Text style={styles.city}>{route.destinationCity}</Text>
       </View>
       {route.description ? (
@@ -46,31 +48,32 @@ export function RouteCard({ route, testID = 'route-card' }: RouteCardProps) {
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    ...elevation.level1,
-    backgroundColor: lightPalette.surface,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[2],
-  },
-  name: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-  // Wraps so long city names break onto a second line instead of truncating.
-  path: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
-  city: {
-    ...typography.bodyLg,
-    color: lightPalette.textBody,
-  },
-  description: {
-    ...typography.body,
-    color: lightPalette.textMuted,
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    card: {
+      ...elevation.level1,
+      backgroundColor: palette.surface,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      gap: spacing[2],
+    },
+    name: {
+      ...typography.title,
+      color: palette.text,
+    },
+    // Wraps so long city names break onto a second line instead of truncating.
+    path: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: spacing[2],
+    },
+    city: {
+      ...typography.bodyLg,
+      color: palette.textBody,
+    },
+    description: {
+      ...typography.body,
+      color: palette.textMuted,
+    },
+  })

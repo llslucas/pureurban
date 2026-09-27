@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
 import { MdiIcon } from '@/components/ui/mdi-icon'
-import { lightPalette, statusTints } from '@/lib/palette'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { fontFamily, radius, spacing, typography } from '@/lib/tokens'
 
 export interface CountdownPillProps {
@@ -25,6 +25,8 @@ export function formatCountdown(ms: number): string {
 }
 
 export function CountdownPill({ remainingMs, label, testID = 'countdown-pill' }: CountdownPillProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   const urgent = remainingMs <= COUNTDOWN_URGENT_MS
   // The label changes once a minute, so the live region announces per minute
   // instead of every tick.
@@ -38,7 +40,7 @@ export function CountdownPill({ remainingMs, label, testID = 'countdown-pill' }:
       accessibilityLiveRegion="polite"
       testID={testID}
     >
-      <MdiIcon name="timer-sand" size={ICON_SIZE} color={lightPalette.warning} testID={`${testID}-icon`} />
+      <MdiIcon name="timer-sand" size={ICON_SIZE} color={palette.warning} testID={`${testID}-icon`} />
       <Text style={[styles.text, urgent && styles.urgent]} testID={`${testID}-text`}>
         {`${label} ${formatCountdown(remainingMs)}`}
       </Text>
@@ -46,25 +48,26 @@ export function CountdownPill({ remainingMs, label, testID = 'countdown-pill' }:
   )
 }
 
-const styles = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    minHeight: PILL_HEIGHT,
-    paddingHorizontal: spacing[3],
-    gap: spacing[1],
-    borderRadius: radius.full,
-    backgroundColor: statusTints.warning,
-  },
-  text: {
-    ...typography.label,
-    color: lightPalette.text,
-    fontVariant: ['tabular-nums'],
-  },
-  urgent: {
-    color: lightPalette.warning,
-    fontFamily: fontFamily.bold,
-    fontWeight: '700',
-  },
-})
+const createStyles = ({ custom: { palette, tints } }: AppTheme) =>
+  StyleSheet.create({
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      minHeight: PILL_HEIGHT,
+      paddingHorizontal: spacing[3],
+      gap: spacing[1],
+      borderRadius: radius.full,
+      backgroundColor: tints.warning,
+    },
+    text: {
+      ...typography.label,
+      color: palette.text,
+      fontVariant: ['tabular-nums'],
+    },
+    urgent: {
+      color: palette.warning,
+      fontFamily: fontFamily.bold,
+      fontWeight: '700',
+    },
+  })

@@ -7,9 +7,9 @@ import { useReducedMotion } from 'react-native-reanimated'
 
 import { initialsOf, StudentRow } from '@/components/student-row'
 import { type TestNode } from '@/components/ui/test-utils'
-import { STATUS_PRESENTATION } from '@/lib/boarding-status'
-import { lightPalette } from '@/lib/palette'
-import { lightTheme } from '@/lib/theme'
+import { STATUS_PRESENTATION, statusColors } from '@/lib/boarding-status'
+import { darkPalette, darkStatusTints, lightPalette, lightStatusTints } from '@/lib/palette'
+import { darkTheme, lightTheme } from '@/lib/theme'
 import { motion, radius } from '@/lib/tokens'
 import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 
@@ -176,7 +176,7 @@ describe('StudentRow', () => {
       expect(withSequence).toHaveBeenCalledTimes(2)
       expect(withSequence).toHaveBeenCalledWith(1, 0)
       expect(withSequence).toHaveBeenCalledWith(0, 1)
-      expect(pulseBackground()).toBe(STATUS_PRESENTATION.NOT_RETURNING.background)
+      expect(pulseBackground()).toBe(statusColors('NOT_RETURNING', lightPalette, lightStatusTints).background)
       expect(screen.getByText('Não vai voltar')).toBeTruthy()
     })
 
@@ -187,7 +187,7 @@ describe('StudentRow', () => {
       rerender(<StudentRow student={makeStudent({ status: 'NOT_CHECKED_IN' })} />)
 
       expect(withTiming).toHaveBeenCalledWith(0, { duration: motion.pulse })
-      expect(pulseBackground()).toBe(STATUS_PRESENTATION.NOT_CHECKED_IN.background)
+      expect(pulseBackground()).toBe(statusColors('NOT_CHECKED_IN', lightPalette, lightStatusTints).background)
     })
 
     it('a re-render with the same status does not pulse', async () => {
@@ -219,5 +219,27 @@ describe('StudentRow', () => {
       expect(StyleSheet.flatten(layer.props.style)).toMatchObject({ position: 'absolute', opacity: 0 })
       expect(layer.props.pointerEvents).toBe('none')
     })
+  })
+})
+
+describe('StudentRow under darkTheme', () => {
+  it.each([
+    ['CHECKED_IN', 'Embarcou'],
+    ['NOT_CHECKED_IN', 'Não embarcou'],
+    ['NOT_RETURNING', 'Não vai voltar'],
+  ] as [BoardingStatus, string][])('%s: dark row and on-dark chip', async (status, label) => {
+    render(
+      <PaperProvider theme={darkTheme}>
+        <StudentRow student={makeStudent({ status })} />
+      </PaperProvider>,
+    )
+    await act(async () => {})
+    const expected = statusColors(status, darkPalette, darkStatusTints)
+    expect(StyleSheet.flatten(screen.getByText(label).props.style).color).toBe(expected.color)
+    expect(StyleSheet.flatten(screen.getByTestId('student-row-chip').props.style).backgroundColor).toBe(
+      expected.background,
+    )
+    expect(StyleSheet.flatten(screen.getByTestId('student-row').props.style).backgroundColor).toBe(darkPalette.surface)
+    expect(StyleSheet.flatten(screen.getByText('AS').props.style).color).toBe(darkPalette.text)
   })
 })

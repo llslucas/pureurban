@@ -8,12 +8,13 @@ import { QrPass, QrPassRouteLine } from '@/components/student-qr/qr-pass'
 import { Screen } from '@/components/ui/screen'
 import { StateView } from '@/components/ui/state-view'
 import { qrSessionStorage } from '@/lib/storage'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { routesService } from '@/services/routes.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { buildQrPayload, encodeQrPayload } from '@/utils/qr-payload'
 
 export default function QrCodeScreen() {
+  const styles = useThemedStyles(createStyles)
   const { user, logout } = useAuthStore()
   const sessionId = qrSessionStorage.getSessionId()
 
@@ -131,13 +132,14 @@ export default function QrCodeScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  center: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    center: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+  })

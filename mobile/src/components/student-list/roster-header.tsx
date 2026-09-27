@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
 import { BoardingCounter, type BoardingSummary } from '@/components/ui/boarding-counter'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 import type { TripStudentItem } from '@/services/trip.service'
 
@@ -30,6 +30,7 @@ interface RosterHeaderProps {
 }
 
 export function RosterHeader({ summary, students }: RosterHeaderProps) {
+  const styles = useThemedStyles(createStyles)
   return (
     <View style={styles.header}>
       <BoardingCounter summary={summary} testID="roster-counter" />
@@ -40,18 +41,19 @@ export function RosterHeader({ summary, students }: RosterHeaderProps) {
   )
 }
 
-const styles = StyleSheet.create({
-  header: {
-    gap: spacing[2],
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing[4],
-    paddingBottom: spacing[3],
-    backgroundColor: lightPalette.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
-  },
-  legend: {
-    ...typography.body,
-    color: lightPalette.textMuted,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    header: {
+      gap: spacing[2],
+      paddingHorizontal: spacing.gutter,
+      paddingTop: spacing[4],
+      paddingBottom: spacing[3],
+      backgroundColor: palette.surface,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.hairline,
+    },
+    legend: {
+      ...typography.body,
+      color: palette.textMuted,
+    },
+  })

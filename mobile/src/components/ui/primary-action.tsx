@@ -10,7 +10,8 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
-import { lightPalette } from '@/lib/palette'
+import type { SemanticColors } from '@/lib/palette'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { motion, radius, spacing, typography } from '@/lib/tokens'
 
 export type PrimaryActionVariant = 'primary' | 'secondary' | 'danger' | 'on-color' | 'quiet'
@@ -40,19 +41,19 @@ interface VariantStyle {
   height: number
 }
 
-function variantStyle(variant: PrimaryActionVariant, color?: string): VariantStyle {
+function variantStyle(variant: PrimaryActionVariant, palette: SemanticColors, color?: string): VariantStyle {
   switch (variant) {
     case 'secondary':
-      return { mode: 'outlined', buttonColor: lightPalette.canvas, textColor: color ?? lightPalette.text, height: spacing.actionHeight }
+      return { mode: 'outlined', buttonColor: palette.canvas, textColor: color ?? palette.text, height: spacing.actionHeight }
     case 'danger':
-      return { mode: 'contained', buttonColor: lightPalette.error, textColor: lightPalette.onPrimary, height: spacing.actionHeight }
+      return { mode: 'contained', buttonColor: palette.error, textColor: palette.onPrimary, height: spacing.actionHeight }
     case 'on-color':
-      return { mode: 'contained', buttonColor: lightPalette.onPrimary, textColor: color ?? lightPalette.text, height: spacing.actionHeight }
+      return { mode: 'contained', buttonColor: palette.onPrimary, textColor: color ?? palette.text, height: spacing.actionHeight }
     case 'quiet':
-      return { mode: 'text', textColor: color ?? lightPalette.text, height: spacing.touchMin }
+      return { mode: 'text', textColor: color ?? palette.text, height: spacing.touchMin }
     case 'primary':
     default:
-      return { mode: 'contained', buttonColor: lightPalette.primary, textColor: lightPalette.onPrimary, height: spacing.actionHeight }
+      return { mode: 'contained', buttonColor: palette.primary, textColor: palette.onPrimary, height: spacing.actionHeight }
   }
 }
 
@@ -71,7 +72,9 @@ export function PrimaryAction({
   const reducedMotion = useReducedMotion()
   const scale = useSharedValue(1)
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
-  const look = variantStyle(variant, color)
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
+  const look = variantStyle(variant, palette, color)
   const inert = loading || disabled
 
   const pressTo = useCallback(
@@ -122,22 +125,23 @@ export function PrimaryAction({
   )
 }
 
-const styles = StyleSheet.create({
-  stretch: {
-    alignSelf: 'stretch',
-  },
-  button: {
-    borderRadius: radius.md,
-  },
-  // `hairline` doesn't reach 3:1 against the canvas (WCAG 1.4.11).
-  secondary: {
-    borderColor: lightPalette.borderStrong,
-  },
-  label: {
-    fontFamily: typography.button.fontFamily,
-    fontSize: typography.button.fontSize,
-    fontWeight: typography.button.fontWeight,
-    lineHeight: typography.button.lineHeight,
-    letterSpacing: typography.button.letterSpacing,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    stretch: {
+      alignSelf: 'stretch',
+    },
+    button: {
+      borderRadius: radius.md,
+    },
+    // `hairline` doesn't reach 3:1 against the canvas (WCAG 1.4.11).
+    secondary: {
+      borderColor: palette.borderStrong,
+    },
+    label: {
+      fontFamily: typography.button.fontFamily,
+      fontSize: typography.button.fontSize,
+      fontWeight: typography.button.fontWeight,
+      lineHeight: typography.button.lineHeight,
+      letterSpacing: typography.button.letterSpacing,
+    },
+  })

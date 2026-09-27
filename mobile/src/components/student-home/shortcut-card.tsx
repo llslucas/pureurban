@@ -9,8 +9,8 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
-import { lightPalette } from '@/lib/palette'
-import { elevation, motion, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { motion, radius, spacing, typography } from '@/lib/tokens'
 
 export interface ShortcutCardProps {
   label: string
@@ -23,6 +23,8 @@ export const SHORTCUT_HEIGHT = 112
 const ICON_SIZE = 32
 
 export function ShortcutCard({ label, icon, onPress, testID = 'shortcut-card' }: ShortcutCardProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   const reducedMotion = useReducedMotion()
   const scale = useSharedValue(1)
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
@@ -49,29 +51,30 @@ export function ShortcutCard({ label, icon, onPress, testID = 'shortcut-card' }:
         style={styles.card}
         testID={testID}
       >
-        <MdiIcon name={icon} size={ICON_SIZE} color={lightPalette.text} testID={`${testID}-icon`} />
+        <MdiIcon name={icon} size={ICON_SIZE} color={palette.text} testID={`${testID}-icon`} />
         <Text style={styles.label}>{label}</Text>
       </Pressable>
     </Animated.View>
   )
 }
 
-const styles = StyleSheet.create({
-  slot: {
-    flex: 1,
-  },
-  // Grows with the slot so a label wrapping in one card keeps both the same height.
-  card: {
-    ...elevation.level1,
-    flexGrow: 1,
-    minHeight: SHORTCUT_HEIGHT,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    justifyContent: 'space-between',
-    gap: spacing[2],
-  },
-  label: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    slot: {
+      flex: 1,
+    },
+    // Grows with the slot so a label wrapping in one card keeps both the same height.
+    card: {
+      ...elevation.level1,
+      flexGrow: 1,
+      minHeight: SHORTCUT_HEIGHT,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      justifyContent: 'space-between',
+      gap: spacing[2],
+    },
+    label: {
+      ...typography.title,
+      color: palette.text,
+    },
+  })

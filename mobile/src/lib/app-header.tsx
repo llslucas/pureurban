@@ -2,10 +2,11 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
 
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { typography } from '@/lib/tokens'
 
 function HeaderBackground() {
+  const styles = useThemedStyles(createStyles)
   return <View style={styles.background} />
 }
 
@@ -15,22 +16,29 @@ function HeaderBackground() {
 // here: the driver and student layouts wire their own AccountMenu, so the driver
 // can't silently lose the pending-queue count that gates the logout warning;
 // (admin) has none because "Sair" is already on its only screen.
-export const appHeaderOptions: NativeStackNavigationOptions = {
-  headerShadowVisible: false,
-  headerBackground: HeaderBackground,
-  headerTintColor: lightPalette.text,
-  headerTitleStyle: {
-    fontFamily: typography.title.fontFamily,
-    fontSize: typography.title.fontSize,
-    fontWeight: typography.title.fontWeight,
-  },
+function makeAppHeaderOptions({ custom: { palette } }: AppTheme): NativeStackNavigationOptions {
+  return {
+    headerShadowVisible: false,
+    headerBackground: HeaderBackground,
+    headerTintColor: palette.text,
+    headerTitleStyle: {
+      fontFamily: typography.title.fontFamily,
+      fontSize: typography.title.fontSize,
+      fontWeight: typography.title.fontWeight,
+    },
+  }
 }
 
-const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    backgroundColor: lightPalette.canvas,
-    borderBottomWidth: 1,
-    borderBottomColor: lightPalette.hairline,
-  },
-})
+export function useAppHeaderOptions(): NativeStackNavigationOptions {
+  return useThemedStyles(makeAppHeaderOptions)
+}
+
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    background: {
+      flex: 1,
+      backgroundColor: palette.canvas,
+      borderBottomColor: palette.hairline,
+      borderBottomWidth: 1,
+    },
+  })

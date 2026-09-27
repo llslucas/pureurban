@@ -1,4 +1,6 @@
-import { DefaultTheme, type Theme as NavigationTheme } from '@react-navigation/native'
+import { DarkTheme, DefaultTheme, type Theme as NavigationTheme } from '@react-navigation/native'
+import { useMemo } from 'react'
+import type { ColorSchemeName } from 'react-native'
 import {
   configureFonts,
   MD3DarkTheme,
@@ -7,11 +9,20 @@ import {
   useTheme,
 } from 'react-native-paper'
 
-import { darkMapping, darkPalette, lightPalette } from '@/lib/palette'
+import {
+  darkMapping,
+  darkPalette,
+  darkStatusTints,
+  lightPalette,
+  lightStatusTints,
+  type SemanticColors,
+  type StatusTints,
+} from '@/lib/palette'
 import {
   fontFamily,
   fontFamilyByWeight,
   type FontWeightToken,
+  makeElevation,
   motion,
   radius,
   spacing,
@@ -55,7 +66,11 @@ const fonts = {
   default: { ...MD3LightTheme.fonts.default, fontFamily: fontFamily.regular },
 }
 
-const custom = { spacing, radius, motion } as const
+// Per-scheme: the semantic palette, status tints and elevation presets travel
+// with the Paper theme so components restyle when the OS scheme flips.
+function makeCustom(palette: SemanticColors, tints: StatusTints) {
+  return { spacing, radius, motion, palette, tints, elevation: makeElevation(palette) }
+}
 
 // Os papéis abaixo são os ÚNICOS sobrescritos sobre o default MD3, todos
 // derivados da paleta (Story 1.11; `elevation` na 1.11b — fim do resíduo
@@ -65,7 +80,7 @@ const custom = { spacing, radius, motion } as const
 export const lightTheme = {
   ...MD3LightTheme,
   fonts,
-  custom,
+  custom: makeCustom(lightPalette, lightStatusTints),
   colors: {
     ...MD3LightTheme.colors,
     // The MD3 default background leaked into the outlined TextInput fill.
@@ -97,11 +112,10 @@ export const lightTheme = {
   },
 }
 
-// The app is locked to light: fonts/custom here only keep the AppTheme type.
 export const darkTheme: AppTheme = {
   ...MD3DarkTheme,
   fonts,
-  custom,
+  custom: makeCustom(darkPalette, darkStatusTints),
   colors: {
     ...MD3DarkTheme.colors,
     // D6: botão primário em dark = branco com texto tinta.
@@ -134,22 +148,47 @@ export const darkTheme: AppTheme = {
 
 export type AppTheme = typeof lightTheme
 
-export const useAppTheme = () => useTheme<AppTheme>()
+// Outside a PaperProvider (screens rendered bare in tests) Paper hands back
+// MD3LightTheme, which has no `custom`: fall back to the app's light theme.
+export function useAppTheme(): AppTheme {
+  const theme = useTheme<AppTheme>()
+  return (theme as Partial<AppTheme>).custom ? theme : lightTheme
+}
 
-export const navigationTheme: NavigationTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: lightPalette.primary,
-    background: lightPalette.surfaceSoft,
-    card: lightPalette.canvas,
-    text: lightPalette.text,
-    border: lightPalette.hairline,
-  },
-  fonts: {
-    regular: { fontFamily: fontFamily.regular, fontWeight: '400' },
-    medium: { fontFamily: fontFamily.medium, fontWeight: '500' },
-    bold: { fontFamily: fontFamily.semiBold, fontWeight: '600' },
-    heavy: { fontFamily: fontFamily.bold, fontWeight: '700' },
-  },
+/** Styles derived from the active theme, rebuilt only when the theme changes. */
+export function useThemedStyles<T>(factory: (theme: AppTheme) => T): T {
+  const theme = useAppTheme()
+  return useMemo(() => factory(theme), [factory, theme])
+}
+
+const navigationFonts: NavigationTheme['fonts'] = {
+  regular: { fontFamily: fontFamily.regular, fontWeight: '400' },
+  medium: { fontFamily: fontFamily.medium, fontWeight: '500' },
+  bold: { fontFamily: fontFamily.semiBold, fontWeight: '600' },
+  heavy: { fontFamily: fontFamily.bold, fontWeight: '700' },
+}
+
+function makeNavigationTheme(base: NavigationTheme, palette: SemanticColors): NavigationTheme {
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: palette.primary,
+      background: palette.surfaceSoft,
+      card: palette.canvas,
+      text: palette.text,
+      border: palette.hairline,
+    },
+    fonts: navigationFonts,
+  }
+}
+
+export const lightNavigationTheme = makeNavigationTheme(DefaultTheme, lightPalette)
+export const darkNavigationTheme = makeNavigationTheme(DarkTheme, darkPalette)
+
+/** Paper + navigation themes for the OS scheme; anything but `dark` is light. */
+export function themeFor(scheme: ColorSchemeName | null | undefined): { paper: AppTheme; navigation: NavigationTheme } {
+  return scheme === 'dark'
+    ? { paper: darkTheme, navigation: darkNavigationTheme }
+    : { paper: lightTheme, navigation: lightNavigationTheme }
 }

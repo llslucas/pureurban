@@ -5,8 +5,9 @@
  * `palette.guard.test.ts` falha em qualquer hex/rgba() em `src/` que não esteja
  * na allowlist documentada (quiet zone do QR e chrome de câmera).
  *
- * As extensões além do DESIGN.md são as duas aprovadas na matriz D1–D7 da story:
- * erro (D2) e aviso (D3). Nova cor = nova entrada aqui com decisão registrada.
+ * As extensões além do DESIGN.md são as duas aprovadas na matriz D1–D7 da story,
+ * erro (D2) e aviso (D3), mais o erro on-dark da Story 6.14. Nova cor = nova
+ * entrada aqui com decisão registrada.
  */
 
 /** Alfa dos tintes de fundo de status (chips/faixas): 12% da cor base. */
@@ -77,10 +78,15 @@ export const designTokens = {
  *   loopback de 13/09/2026: piso 3:1 (AA texto grande/UI) para badges/overlays —
  *   ~4.24:1 sobre branco e ~3.67:1 sobre o próprio tinte, abaixo do 4.5:1 de
  *   texto normal por decisão deliberada (matriz frozen D3).
+ * - errorOnDark (Story 6.14): `#f2b8b5`, o erro baseline do MD3 dark. Único hex
+ *   novo do consumo do tema escuro: nenhum token registrado é um vermelho legível
+ *   sobre o canvas escuro (~9.9:1 sobre `#181d26`). Os demais papéis on-dark
+ *   reusam tokens do DESIGN.md.
  */
 export const appExtensions = {
   error: '#B3261E',
   warning: '#B26A00',
+  errorOnDark: '#f2b8b5',
 } as const
 
 /**
@@ -158,44 +164,59 @@ export const lightPalette: SemanticColors = {
 }
 
 // D6 define só dois tons de texto no escuro: `textBody` e `textMuted` colapsam
-// no `textSecondary` de propósito (a hierarquia de 3 tons é decisão da story de
-// consumo de tema). Os papéis de status/link/info mantêm o tom claro — nenhuma
-// tela os consome sobre canvas escuro hoje; a story de consumo de tema
-// negociará variantes on-dark.
+// no `textSecondary` de propósito. Os papéis de status/link/info são as
+// variantes on-dark da Story 6.14, todas ≥ 4.5:1 sobre canvas e surface escuros
+// (travado na guarda): tokens já registrados, exceto o erro (`errorOnDark`). O
+// mostarda resolve no escuro o piso 3:1 que o âmbar claro tem (D3).
 export const darkPalette: SemanticColors = {
   // Botão primário em dark = branco com texto tinta (D6).
   primary: darkMapping.text,
   onPrimary: darkMapping.canvas,
   canvas: darkMapping.canvas,
   surface: darkMapping.element,
-  surfaceSoft: darkMapping.element,
+  // Screens take the darkest tone so level-1 cards (canvas + hairline) sit flush
+  // and `surface` rows lift slightly above; matches Paper's dark background.
+  surfaceSoft: darkMapping.canvas,
   surfaceStrong: darkMapping.hairline,
   text: darkMapping.text,
   textBody: darkMapping.textSecondary,
   textMuted: darkMapping.textSecondary,
   hairline: darkMapping.hairline,
   borderStrong: darkMapping.borderStrong,
-  success: designTokens.success,
+  success: designTokens.successBorder,
   successBorder: designTokens.successBorder,
-  warning: appExtensions.warning,
-  error: appExtensions.error,
-  link: designTokens.link,
-  linkActive: designTokens.linkActive,
-  info: designTokens.info,
+  warning: designTokens.signatureMustard,
+  error: appExtensions.errorOnDark,
+  link: designTokens.infoBorder,
+  linkActive: darkMapping.text,
+  info: designTokens.infoBorder,
   infoBorder: designTokens.infoBorder,
   brand: designTokens.signatureYellow,
   onBrand: designTokens.ink,
 }
 
+export interface StatusTints {
+  success: string
+  warning: string
+  error: string
+  info: string
+  /** Neutro da família ink/body (era o slate `#ECEFF1` do template). */
+  neutral: string
+}
+
 /**
  * Fundos de status derivados por alpha da cor base (zero pastéis avulsos):
- * era `#E8F5E9`/`#E3F2FD`/`#FFF4E5`/`#ECEFF1` — agora tinte 12% do próprio papel.
+ * tinte 12% do próprio papel, por esquema — no escuro, da variante on-dark.
  */
-export const statusTints = {
-  success: withAlpha(lightPalette.success, STATUS_TINT_ALPHA),
-  warning: withAlpha(lightPalette.warning, STATUS_TINT_ALPHA),
-  error: withAlpha(lightPalette.error, STATUS_TINT_ALPHA),
-  info: withAlpha(lightPalette.info, STATUS_TINT_ALPHA),
-  /** Neutro da família ink/body (era o slate `#ECEFF1` do template). */
-  neutral: withAlpha(lightPalette.textBody, STATUS_TINT_ALPHA),
-} as const
+export function makeStatusTints(p: SemanticColors): StatusTints {
+  return {
+    success: withAlpha(p.success, STATUS_TINT_ALPHA),
+    warning: withAlpha(p.warning, STATUS_TINT_ALPHA),
+    error: withAlpha(p.error, STATUS_TINT_ALPHA),
+    info: withAlpha(p.info, STATUS_TINT_ALPHA),
+    neutral: withAlpha(p.textBody, STATUS_TINT_ALPHA),
+  }
+}
+
+export const lightStatusTints = makeStatusTints(lightPalette)
+export const darkStatusTints = makeStatusTints(darkPalette)

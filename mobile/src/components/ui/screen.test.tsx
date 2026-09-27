@@ -5,7 +5,8 @@ import { Text } from 'react-native-paper'
 
 import { Screen } from '@/components/ui/screen'
 import { renderUi } from '@/components/ui/test-utils'
-import { lightPalette } from '@/lib/palette'
+import { darkPalette, lightPalette } from '@/lib/palette'
+import { darkTheme } from '@/lib/theme'
 import { spacing } from '@/lib/tokens'
 
 describe('Screen', () => {
@@ -60,5 +61,19 @@ describe('Screen', () => {
       maxWidth: spacing.contentMaxWidth,
     })
     expect(screen.getByText('Lista')).toBeTruthy()
+  })
+})
+
+describe('Screen under darkTheme', () => {
+  it('uses the dark surface-soft background', async () => {
+    await renderUi(
+      <Screen>
+        <Text>Conteúdo</Text>
+      </Screen>,
+      darkTheme,
+    )
+    expect(StyleSheet.flatten(screen.getByTestId('screen').props.style).backgroundColor).toBe(
+      darkPalette.surfaceSoft,
+    )
   })
 })

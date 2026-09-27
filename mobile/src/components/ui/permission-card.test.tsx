@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native'
 import { PermissionCard } from '@/components/ui/permission-card'
 import { renderUi, type TestNode } from '@/components/ui/test-utils'
 import { lightPalette } from '@/lib/palette'
-import { elevation, radius } from '@/lib/tokens'
+import { lightElevation as elevation, radius } from '@/lib/tokens'
 
 const hidden = { includeHiddenElements: true }
 

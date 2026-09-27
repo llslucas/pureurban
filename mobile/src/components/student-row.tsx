@@ -10,8 +10,8 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { StatusChip } from '@/components/ui/status-chip'
-import { STATUS_PRESENTATION } from '@/lib/boarding-status'
-import { lightPalette } from '@/lib/palette'
+import { presentationOf, statusColors } from '@/lib/boarding-status'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { motion, radius, spacing, typography } from '@/lib/tokens'
 import type { TripStudentItem } from '@/services/trip.service'
 
@@ -46,9 +46,12 @@ interface StudentRowProps {
 
 function StudentRowComponent({ student, testID = 'student-row' }: StudentRowProps) {
   const reducedMotion = useReducedMotion()
+  const theme = useAppTheme()
+  const styles = useThemedStyles(createStyles)
   // A status from an older contract rehydrated from the cache, or a future one,
   // must not take down the whole FlatList.
-  const presentation = STATUS_PRESENTATION[student.status] ?? STATUS_PRESENTATION.NOT_CHECKED_IN
+  const presentation = presentationOf(student.status)
+  const colors = statusColors(student.status, theme.custom.palette, theme.custom.tints)
 
   const pulse = useSharedValue(0)
   const chipOpacity = useSharedValue(1)
@@ -96,7 +99,7 @@ function StudentRowComponent({ student, testID = 'student-row' }: StudentRowProp
           stays the nearest colored surface under its label. */}
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: presentation.background }, pulseStyle]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }, pulseStyle]}
         testID={`${testID}-pulse`}
       />
       <View style={styles.avatar} testID={`${testID}-avatar`}>
@@ -122,58 +125,59 @@ function StudentRowComponent({ student, testID = 'student-row' }: StudentRowProp
 // SSE events swap only the affected student's object, so the other rows skip re-rendering.
 export const StudentRow = React.memo(StudentRowComponent)
 
-const styles = StyleSheet.create({
-  row: {
-    minHeight: ROW_MIN_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: spacing.gutter,
-    gap: spacing.gutter,
-    backgroundColor: lightPalette.surface,
-  },
-  avatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: lightPalette.surfaceStrong,
-  },
-  initials: {
-    ...typography.label,
-    color: lightPalette.text,
-  },
-  // The divider lives on the body, not the row: gutter + avatar + gap = the 72dp inset.
-  body: {
-    flex: 1,
-    alignSelf: 'stretch',
-    minHeight: ROW_MIN_HEIGHT,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    columnGap: spacing[3],
-    rowGap: spacing[2],
-    paddingVertical: spacing[3],
-    paddingRight: spacing.gutter,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
-  },
-  info: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: NAME_MIN_WIDTH,
-    gap: spacing[1] / 2,
-  },
-  name: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-  time: {
-    ...typography.caption,
-    color: lightPalette.textMuted,
-  },
-  chipSlot: {
-    maxWidth: '100%',
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    row: {
+      minHeight: ROW_MIN_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingLeft: spacing.gutter,
+      gap: spacing.gutter,
+      backgroundColor: palette.surface,
+    },
+    avatar: {
+      width: AVATAR_SIZE,
+      height: AVATAR_SIZE,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.surfaceStrong,
+    },
+    initials: {
+      ...typography.label,
+      color: palette.text,
+    },
+    // The divider lives on the body, not the row: gutter + avatar + gap = the 72dp inset.
+    body: {
+      flex: 1,
+      alignSelf: 'stretch',
+      minHeight: ROW_MIN_HEIGHT,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      columnGap: spacing[3],
+      rowGap: spacing[2],
+      paddingVertical: spacing[3],
+      paddingRight: spacing.gutter,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.hairline,
+    },
+    info: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: NAME_MIN_WIDTH,
+      gap: spacing[1] / 2,
+    },
+    name: {
+      ...typography.title,
+      color: palette.text,
+    },
+    time: {
+      ...typography.caption,
+      color: palette.textMuted,
+    },
+    chipSlot: {
+      maxWidth: '100%',
+    },
+  })

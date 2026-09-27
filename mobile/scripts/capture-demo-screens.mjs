@@ -118,10 +118,9 @@ const loginShots = (scheme) => [
   },
 ]
 
-const CAPTURES = [
+const LIGHT_AND_LOGIN_CAPTURES = [
   ...loginShots('light'),
-  // The OS in dark mode: the app is locked to light (D-UX-4), so these must
-  // match their light twins.
+  // The OS in dark mode: the app follows the scheme since story 6.14.
   ...loginShots('dark'),
   {
     name: 'light-11-trip-ativa',
@@ -309,6 +308,21 @@ const CAPTURES = [
     },
   },
 ]
+
+// P0 screens re-shot with the OS in dark mode (story 6.14): same flow as the
+// light twin, only the context's color scheme changes.
+const DARK_P0 = ['11', '12', '13', '14', '30', '31', '32', '33']
+
+const darkTwins = LIGHT_AND_LOGIN_CAPTURES.filter((shot) =>
+  DARK_P0.some((id) => shot.name.startsWith(`light-${id}-`)),
+).map((shot) => ({ ...shot, name: shot.name.replace(/^light-/, 'dark-'), colorScheme: 'dark' }))
+
+// A DARK_P0 id without a light twin would otherwise vanish from the run.
+if (darkTwins.length !== DARK_P0.length) {
+  throw new Error(`DARK_P0 has ${DARK_P0.length} ids but ${darkTwins.length} light twins were found`)
+}
+
+const CAPTURES = [...LIGHT_AND_LOGIN_CAPTURES, ...darkTwins]
 
 async function capture(browser, shot) {
   const context = await browser.newContext({

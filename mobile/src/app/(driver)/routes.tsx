@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RouteCard } from '@/components/routes/route-card'
 import { Screen } from '@/components/ui/screen'
 import { StateView } from '@/components/ui/state-view'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
 
@@ -15,6 +15,7 @@ function countLabel(count: number): string {
 }
 
 export default function DriverRoutesScreen() {
+  const styles = useThemedStyles(createStyles)
   const [snackbarVisible, setSnackbarVisible] = React.useState(false)
 
   const {
@@ -107,16 +108,17 @@ export default function DriverRoutesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  list: {
-    gap: spacing[3],
-  },
-  legend: {
-    ...typography.bodyLg,
-    color: lightPalette.textMuted,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    list: {
+      gap: spacing[3],
+    },
+    legend: {
+      ...typography.bodyLg,
+      color: palette.textMuted,
+    },
+  })

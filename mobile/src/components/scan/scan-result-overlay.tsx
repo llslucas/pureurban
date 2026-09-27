@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { router } from 'expo-router'
 import React, { useEffect, useRef } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
-import { ActivityIndicator, Text } from 'react-native-paper'
+import { ActivityIndicator, Text, ThemeProvider } from 'react-native-paper'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -15,6 +15,7 @@ import Animated, {
 import { MdiIcon } from '@/components/ui/mdi-icon'
 import { PrimaryAction } from '@/components/ui/primary-action'
 import { lightPalette, withAlpha } from '@/lib/palette'
+import { lightTheme } from '@/lib/theme'
 import { fontFamily, motion, spacing, typography } from '@/lib/tokens'
 import {
   feedbackHaptic,
@@ -113,8 +114,12 @@ export function ScanResultOverlay({ result, onResume, onRetry, autoResumeMs }: S
       </View>
     )
   }
+  // Fixed identity: the overlay paints over the camera feed and must look the
+  // same in both schemes, so its PrimaryActions resolve against the light theme.
   return (
-    <SettledOverlay result={result} onResume={onResume} onRetry={onRetry} autoResumeMs={autoResumeMs} />
+    <ThemeProvider theme={lightTheme}>
+      <SettledOverlay result={result} onResume={onResume} onRetry={onRetry} autoResumeMs={autoResumeMs} />
+    </ThemeProvider>
   )
 }
 

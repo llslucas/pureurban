@@ -2,9 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react-native'
 import React from 'react'
 
 import RootLayout from '@/app/_layout'
-import { lightPalette } from '@/lib/palette'
+import { darkPalette, lightPalette } from '@/lib/palette'
 
 const mockUseFonts = jest.fn<[boolean, Error | null], []>()
+const mockColorScheme = jest.fn<'light' | 'dark' | null, []>(() => 'light')
+
+jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
+  __esModule: true,
+  default: () => mockColorScheme(),
+}))
 
 jest.mock('@expo-google-fonts/inter', () => ({
   useFonts: () => mockUseFonts(),
@@ -47,9 +53,18 @@ jest.mock('@/stores/auth.store', () => ({
 jest.mock('expo-router', () => {
   const { Text: RNText } = jest.requireActual('react-native')
   const { useTheme: useNavTheme } = jest.requireActual('@react-navigation/native')
+  const { useTheme: usePaperTheme } = jest.requireActual('react-native-paper')
   function Probe() {
     const { colors } = useNavTheme()
-    return <RNText testID="nav-probe">{`${colors.background}|${colors.card}`}</RNText>
+    const paper = usePaperTheme()
+    const { darkPalette, lightPalette } = jest.requireActual('@/lib/palette')
+    const scheme = paper.custom?.palette === darkPalette ? 'dark' : paper.custom?.palette === lightPalette ? 'light' : 'none'
+    return (
+      <>
+        <RNText testID="nav-probe">{`${colors.background}|${colors.card}`}</RNText>
+        <RNText testID="paper-probe">{scheme}</RNText>
+      </>
+    )
   }
   const Stack = Object.assign(() => <Probe />, {
     Protected: () => null,
@@ -59,7 +74,10 @@ jest.mock('expo-router', () => {
 })
 
 describe('RootLayout — font boot gate and navigation theme', () => {
-  afterEach(() => jest.restoreAllMocks())
+  afterEach(() => {
+    jest.restoreAllMocks()
+    mockColorScheme.mockReturnValue('light')
+  })
 
   it('keeps the spinner while fonts are loading', async () => {
     mockUseFonts.mockReturnValue([false, null])
@@ -79,5 +97,18 @@ describe('RootLayout — font boot gate and navigation theme', () => {
     render(<RootLayout />)
     const probe = await screen.findByTestId('nav-probe')
     expect(probe).toHaveTextContent(`${lightPalette.surfaceSoft}|${lightPalette.canvas}`)
+  })
+
+  it.each([
+    ['light', lightPalette],
+    ['dark', darkPalette],
+    [null, lightPalette],
+  ] as const)('OS scheme %s picks the matching navigation and Paper themes', async (scheme, palette) => {
+    mockUseFonts.mockReturnValue([true, null])
+    mockColorScheme.mockReturnValue(scheme)
+    render(<RootLayout />)
+    const probe = await screen.findByTestId('nav-probe')
+    expect(probe).toHaveTextContent(`${palette.surfaceSoft}|${palette.canvas}`)
+    expect(screen.getByTestId('paper-probe')).toHaveTextContent(palette === darkPalette ? 'dark' : 'light')
   })
 })

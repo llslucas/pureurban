@@ -5,8 +5,8 @@ import { Text } from 'react-native-paper'
 import { MdiIcon } from '@/components/ui/mdi-icon'
 import { RouteSelectorSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { radius, spacing, typography } from '@/lib/tokens'
 import type { AssignedRoute } from '@/services/routes.service'
 
 export type StartOutboundPhase = 'loading' | 'error' | 'no-routes' | 'ready'
@@ -52,6 +52,8 @@ export function StartOutboundSection({
   onSelectRoute,
   disabled,
 }: StartOutboundSectionProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   if (phase === 'loading') {
     return <RouteSelectorSkeleton label="Carregando rotas..." testID="start-outbound-state" />
   }
@@ -111,7 +113,7 @@ export function StartOutboundSection({
                   <MdiIcon
                     name={checked ? 'radiobox-marked' : 'radiobox-blank'}
                     size={24}
-                    color={checked ? lightPalette.primary : lightPalette.textMuted}
+                    color={checked ? palette.primary : palette.textMuted}
                   />
                   <Text style={styles.optionLabel}>{route.name}</Text>
                 </Pressable>
@@ -124,37 +126,38 @@ export function StartOutboundSection({
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flexGrow: 1,
-    gap: spacing.sectionGap,
-  },
-  selector: {
-    gap: spacing[2],
-  },
-  selectorLabel: {
-    ...typography.label,
-    color: lightPalette.textBody,
-  },
-  list: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: spacing.actionHeight,
-    paddingHorizontal: spacing[4],
-    gap: spacing[3],
-  },
-  divider: {
-    borderTopWidth: 1,
-    borderTopColor: lightPalette.hairline,
-  },
-  optionLabel: {
-    ...typography.bodyLg,
-    color: lightPalette.text,
-    flexShrink: 1,
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      flexGrow: 1,
+      gap: spacing.sectionGap,
+    },
+    selector: {
+      gap: spacing[2],
+    },
+    selectorLabel: {
+      ...typography.label,
+      color: palette.textBody,
+    },
+    list: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: spacing.actionHeight,
+      paddingHorizontal: spacing[4],
+      gap: spacing[3],
+    },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: palette.hairline,
+    },
+    optionLabel: {
+      ...typography.bodyLg,
+      color: palette.text,
+      flexShrink: 1,
+    },
+  })

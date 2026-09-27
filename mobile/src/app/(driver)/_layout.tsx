@@ -5,20 +5,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AccountMenu } from '@/components/account-menu'
 import { OfflineBanner } from '@/components/offline-banner'
 import { useOfflineSync } from '@/hooks/use-offline-sync'
-import { appHeaderOptions } from '@/lib/app-header'
+import { useAppHeaderOptions } from '@/lib/app-header'
 
 export default function DriverLayout() {
   // Montado no LAYOUT, não na tela de scan: o dreno precisa continuar enquanto o
   // motorista navega para Viagem ou Rotas, e o banner precisa aparecer nas três.
   const { pendingCount, failedCount, dismissFailed } = useOfflineSync()
   const insets = useSafeAreaInsets()
+  const headerOptions = useAppHeaderOptions()
 
   return (
     <View style={styles.container}>
       <Stack
         initialRouteName="trip"
         screenOptions={{
-          ...appHeaderOptions,
+          ...headerOptions,
           headerRight: () => <AccountMenu pendingCount={pendingCount} />,
         }}
       >

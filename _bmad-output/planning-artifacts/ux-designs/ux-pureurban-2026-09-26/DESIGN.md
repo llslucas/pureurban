@@ -41,7 +41,7 @@ colors:
   # Câmera (allowlist da guarda de paleta — não são cores de UI)
   camera-black: '#000000'
   qr-quiet-zone: '#ffffff'
-  # Mapeamento escuro (D6 da 1.11 — documentado, NÃO consumido até decisão D-UX-4)
+  # Mapeamento escuro (D6 da 1.11 — consumido desde a Story 6.14, D-UX-4)
   canvas-dark: '#181d26'
   surface-dark: '#1d1f25'
   ink-dark: '#ffffff'
@@ -217,7 +217,8 @@ components:
 > Proposta autônoma da UX (Sally), 26/09/2026. Tudo o que depende de aprovação está marcado
 > **[DECISÃO D-UX-n]** e consolidado em `EXPERIENCE.md` → *Decisões que precisam de aprovação*.
 > Este documento vence qualquer mock ou captura em caso de conflito. As capturas "antes" estão em
-> [`audit/`](audit/) — prefixo `light-` (claro) e `dark-` (SO em escuro; o app trava em claro).
+> [`audit/`](audit/) — prefixo `light-` (claro) e `dark-` (SO em escuro; na auditoria o app travava em claro — o
+> consumo do escuro entrou na Story 6.14, ver `after/dark-*`).
 
 ## Brand & Style
 
@@ -272,9 +273,15 @@ introduzido; os tintes (`*-tint`) são o equivalente opaco sobre branco do `with
 - **Brand yellow `#f4d35e`** — só full-bleed, sempre com texto `{colors.ink}` (11.5:1). Nunca em
   texto, borda, ícone ou chip. Nunca na tela do motorista em operação (compete com o âmbar de status).
 - **Câmera** — preto puro e branco da quiet zone seguem na allowlist da guarda; não são cores de UI.
-- **Escuro** — o mapeamento D6 fica documentado (`*-dark`), mas o app segue travado em claro
-  (spec-1-11b). Recomendação: **manter a trava até a defesa** — luz do sol favorece o claro, e o
-  consumo real exige variantes on-dark de status que ainda não existem. **[DECISÃO D-UX-4]**
+- **Escuro** — desde a Story 6.14 o app segue o esquema do SO (sem toggle próprio) e consome o
+  mapeamento D6 (`*-dark`). Os papéis de status/link/info ganharam variantes on-dark, todas
+  ≥ 4.5:1 sobre o canvas e o surface escuros, reusando tokens registrados: embarcou/sucesso =
+  `successBorder` `#39bf45`, info/link = `infoBorder` `#458fff`, não vai voltar = mostarda
+  `#d9a441` (7.5:1 — no escuro o âmbar sai do piso 3:1 da D3). O único hex novo é o erro on-dark
+  `#f2b8b5` (baseline MD3 dark), porque nenhum token registrado é um vermelho legível no escuro.
+  Tintes de chip = 12% da variante on-dark. Chrome de câmera (scan) e passe do QR não mudam com
+  o esquema: sobre o feed, um overlay branco à noite ofuscaria, e o QR precisa da quiet zone
+  branca. **[DECISÃO D-UX-4 — entregue na 6.14]**
 
 ## Typography
 

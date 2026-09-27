@@ -5,7 +5,7 @@ import { ActivityIndicator, Text } from 'react-native-paper'
 import { StudentQrCode } from '@/components/student-qr-code'
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
 import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { lightElevation, radius, spacing, typography } from '@/lib/tokens'
 
 export interface QrPassProps {
   name: string
@@ -88,7 +88,7 @@ export function QrPassRouteLine({
 
 const styles = StyleSheet.create({
   card: {
-    ...elevation.level1,
+    ...lightElevation.level1,
     width: '100%',
     borderRadius: radius.xl,
     overflow: 'hidden',

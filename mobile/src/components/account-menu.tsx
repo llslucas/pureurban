@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native'
 import { IconButton, Menu } from 'react-native-paper'
 
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -20,6 +20,8 @@ function discardMessage(count: number): string {
 }
 
 export function AccountMenu({ pendingCount = 0 }: AccountMenuProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   const logout = useAuthStore((state) => state.logout)
   const [menuVisible, setMenuVisible] = useState(false)
   // Frozen when the dialog opens: the drain may empty the queue meanwhile, and a
@@ -52,7 +54,7 @@ export function AccountMenu({ pendingCount = 0 }: AccountMenuProps) {
         anchor={
           <IconButton
             icon="dots-vertical"
-            iconColor={lightPalette.text}
+            iconColor={palette.text}
             accessibilityLabel="Mais opções"
             onPress={() => setMenuVisible(true)}
             style={styles.anchor}
@@ -85,20 +87,21 @@ export function AccountMenu({ pendingCount = 0 }: AccountMenuProps) {
   )
 }
 
-const styles = StyleSheet.create({
-  anchor: {
-    width: spacing.touchMin,
-    height: spacing.touchMin,
-    margin: 0,
-  },
-  menu: {
-    backgroundColor: lightPalette.canvas,
-  },
-  item: {
-    minHeight: spacing.touchMin,
-  },
-  itemTitle: {
-    ...typography.body,
-    color: lightPalette.text,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    anchor: {
+      width: spacing.touchMin,
+      height: spacing.touchMin,
+      margin: 0,
+    },
+    menu: {
+      backgroundColor: palette.canvas,
+    },
+    item: {
+      minHeight: spacing.touchMin,
+    },
+    itemTitle: {
+      ...typography.body,
+      color: palette.text,
+    },
+  })
