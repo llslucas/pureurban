@@ -2,7 +2,7 @@ import React from 'react'
 import { useWindowDimensions, View, StyleSheet } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
 
-import { elevation, spacing } from '@/lib/tokens'
+import { ELEVATION_BORDER_WIDTH, spacing } from '@/lib/tokens'
 
 interface StudentQrCodeProps {
   value: string
@@ -14,7 +14,7 @@ interface StudentQrCodeProps {
 // (its body padding is spacing[4]). Reserving less makes the pass wider than
 // narrow screens (iPhone SE, the 320–360dp Android class); the ScrollView does
 // not scroll horizontally, so the card edge gets clipped.
-const HORIZONTAL_CHROME = (spacing.gutter + elevation.level1.borderWidth + spacing[4]) * 2
+const HORIZONTAL_CHROME = (spacing.gutter + ELEVATION_BORDER_WIDTH + spacing[4]) * 2
 const MAX_SIZE = 288
 const MIN_SIZE = 120
 
