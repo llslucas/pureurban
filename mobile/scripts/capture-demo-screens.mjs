@@ -11,14 +11,14 @@
 // Playwright comes from api/node_modules: mobile/ does not depend on it.
 
 import { createRequire } from 'node:module'
-import { mkdirSync, statSync } from 'node:fs'
+import { mkdirSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../..')
 const require = createRequire(path.join(repoRoot, 'api/package.json'))
-const { chromium } = require('playwright')
+const { chromium } = require('@playwright/test')
 
 const BASE_URL = process.env.CAPTURE_BASE_URL ?? 'http://localhost:8081'
 const OUT_DIR =
@@ -166,7 +166,13 @@ const CAPTURES = [
       await loginDriver(page)
       await scanAnaAndResume(page)
       await injectScan(page, ANA_QR)
+      // A discarded repeat leaves no signal to wait for: give it time, then
+      // assert the scanner is still idle on the first check-in.
       await page.waitForTimeout(1500)
+      await page.getByText('1 embarque nesta sessão').waitFor({ timeout: STEP_TIMEOUT_MS })
+      if (await page.getByRole('button', { name: 'Escanear próximo' }).count()) {
+        throw new Error('repeat scan opened an overlay instead of being discarded')
+      }
     },
   },
   {
@@ -280,7 +286,10 @@ const CAPTURES = [
       await page.getByTestId('home-not-returning-dialog').waitFor({ timeout: STEP_TIMEOUT_MS })
       await page.getByRole('button', { name: 'Avisar motorista' }).click()
       await page.getByTestId('home-not-returning-dialog').waitFor({ state: 'hidden', timeout: STEP_TIMEOUT_MS })
-      await page.waitForTimeout(1500)
+      await page
+        .getByText(/Não foi possível registrar a ausência|Motorista avisado/)
+        .first()
+        .waitFor({ timeout: STEP_TIMEOUT_MS })
     },
   },
   {
@@ -306,10 +315,12 @@ async function capture(browser, shot) {
     geolocation: { latitude: -23.5505, longitude: -46.6333 },
   })
   const page = await context.newPage()
+  const file = path.join(OUT_DIR, `${shot.name}.png`)
+  // A failed capture must not leave an earlier run's PNG looking current.
+  rmSync(file, { force: true })
   try {
     await shot.run(page)
     await page.waitForTimeout(SETTLE_MS)
-    const file = path.join(OUT_DIR, `${shot.name}.png`)
     await page.screenshot({ path: file })
     if (statSync(file).size === 0) throw new Error('empty PNG')
     return file
