@@ -200,6 +200,19 @@ describe('ScanScreen — states before the camera', () => {
     expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
   })
 
+  it('camera not granted: PermissionCard asks for access with the primary action (story 6.11)', async () => {
+    mockPermission({ granted: false, canAskAgain: true })
+    requestPermission.mockResolvedValue({ granted: true, canAskAgain: true })
+    await renderScreen()
+    expect(screen.getByTestId('camera-permission-card')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Permissão da câmera' })).toBeTruthy()
+    expect(
+      screen.getByText('O PureUrban precisa da câmera para ler o QR code dos alunos.'),
+    ).toBeTruthy()
+    fireEvent.press(screen.getByTestId('camera-permission-action'))
+    expect(requestPermission).toHaveBeenCalledTimes(1)
+  })
+
   it('a rejected permission request shows the note', async () => {
     mockPermission({ granted: false, canAskAgain: true })
     requestPermission.mockRejectedValue(new Error('boom'))
@@ -217,6 +230,7 @@ describe('ScanScreen — states before the camera', () => {
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue()
     await renderScreen()
     expect(screen.getByText('Câmera bloqueada')).toBeTruthy()
+    expect(screen.getByTestId('camera-permission-card')).toBeTruthy()
     fireEvent.press(screen.getByText('Abrir configurações'))
     expect(openSettings).toHaveBeenCalledTimes(1)
   })

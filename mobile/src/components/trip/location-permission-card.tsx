@@ -1,12 +1,8 @@
 import React, { useState } from 'react'
-import { Linking, StyleSheet, View } from 'react-native'
-import { Text } from 'react-native-paper'
+import { Linking } from 'react-native'
 import type { LocationPermissionResponse } from 'expo-location'
 
-import { MdiIcon } from '@/components/ui/mdi-icon'
-import { PrimaryAction } from '@/components/ui/primary-action'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { PermissionCard } from '@/components/ui/permission-card'
 
 interface LocationPermissionCardProps {
   permission: Pick<LocationPermissionResponse, 'canAskAgain'>
@@ -17,8 +13,6 @@ interface LocationPermissionCardProps {
 const DRIVER_DESCRIPTION =
   'O PureUrban usa sua localização para transmitir a posição do ônibus aos alunos enquanto a ' +
   'viagem está em andamento. Nada é coletado fora da viagem ativa.'
-
-const ICON_SIZE = 40
 
 // For the driver, GPS capture is automatic, so this card is the ONLY way in to
 // grant location — shown before the first trip and during a trip without
@@ -48,43 +42,19 @@ export function LocationPermissionCard({
         )
       }
 
+  // Secondary: during a trip the bar's "Escanear" stays the only contained action.
   return (
-    <View style={styles.card} testID="location-permission-card">
-      <MdiIcon name="map-marker-radius" size={ICON_SIZE} color={lightPalette.text} />
-      <Text style={styles.title} accessibilityRole="header">
-        Permissão de localização
-      </Text>
-      <Text style={styles.body}>{description}</Text>
-      {/* Secondary: during a trip the bar's "Escanear" stays the only contained action. */}
-      <PrimaryAction
-        variant="secondary"
-        label={permission.canAskAgain ? 'Permitir acesso à localização' : 'Abrir configurações'}
-        icon={permission.canAskAgain ? 'map-marker-radius' : 'cog'}
-        onPress={handlePress}
-        testID="location-permission-action"
-      />
-      {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
-    </View>
+    <PermissionCard
+      icon="map-marker-radius"
+      title="Permissão de localização"
+      description={description}
+      actionLabel={permission.canAskAgain ? 'Permitir acesso à localização' : 'Abrir configurações'}
+      actionIcon={permission.canAskAgain ? 'map-marker-radius' : 'cog'}
+      onPress={handlePress}
+      variant="secondary"
+      note={actionError}
+      testID="location-permission-card"
+      actionTestID="location-permission-action"
+    />
   )
 }
-
-const styles = StyleSheet.create({
-  card: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[3],
-  },
-  title: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-  body: {
-    ...typography.bodyLg,
-    color: lightPalette.textBody,
-  },
-  error: {
-    ...typography.bodyLg,
-    color: lightPalette.error,
-  },
-})

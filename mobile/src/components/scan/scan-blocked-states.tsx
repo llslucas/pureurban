@@ -1,8 +1,11 @@
 import { router } from 'expo-router'
 import React, { useState } from 'react'
-import { Linking } from 'react-native'
+import { Linking, StyleSheet, View } from 'react-native'
 
+import { PermissionCard } from '@/components/ui/permission-card'
 import { StateView } from '@/components/ui/state-view'
+import { lightPalette } from '@/lib/palette'
+import { spacing } from '@/lib/tokens'
 
 // Role guard: a student who lands on this route must not scan anyone.
 export function RoleGuardState({ logout }: { logout: () => void }) {
@@ -39,44 +42,43 @@ export function CameraPermissionState({ canAskAgain, requestPermission }: Camera
   // button just looked dead.
   const [actionError, setActionError] = useState<string | null>(null)
 
-  return canAskAgain ? (
-    <StateView
-      kind="blocked"
-      icon="camera"
-      title="Permissão da câmera"
-      detail="O PureUrban precisa da câmera para ler o QR code dos alunos."
-      note={actionError}
-      action={{
-        label: 'Permitir acesso à câmera',
-        onPress: () => {
-          setActionError(null)
-          requestPermission().catch(() =>
-            setActionError(
-              'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
-            ),
-          )
-        },
-      }}
-    />
-  ) : (
-    <StateView
-      kind="blocked"
-      icon="camera-off"
-      title="Câmera bloqueada"
-      detail="A permissão foi negada. Libere o acesso à câmera nas configurações do sistema."
-      note={actionError}
-      action={{
-        label: 'Abrir configurações',
-        onPress: () => {
-          setActionError(null)
-          Linking.openSettings().catch(() =>
-            setActionError(
-              'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
-            ),
-          )
-        },
-      }}
-    />
+  const onPress = canAskAgain
+    ? () => {
+        setActionError(null)
+        requestPermission().catch(() =>
+          setActionError(
+            'Não foi possível pedir a permissão. Libere a câmera nas configurações do sistema.',
+          ),
+        )
+      }
+    : () => {
+        setActionError(null)
+        Linking.openSettings().catch(() =>
+          setActionError(
+            'Não foi possível abrir as configurações. Abra manualmente e libere a câmera para o PureUrban.',
+          ),
+        )
+      }
+
+  return (
+    <View style={styles.permissionScreen}>
+      <PermissionCard
+        icon={canAskAgain ? 'camera' : 'camera-off'}
+        title={canAskAgain ? 'Permissão da câmera' : 'Câmera bloqueada'}
+        description={
+          canAskAgain
+            ? 'O PureUrban precisa da câmera para ler o QR code dos alunos.'
+            : 'A permissão foi negada. Libere o acesso à câmera nas configurações do sistema.'
+        }
+        actionLabel={canAskAgain ? 'Permitir acesso à câmera' : 'Abrir configurações'}
+        actionIcon={canAskAgain ? 'camera' : 'cog'}
+        onPress={onPress}
+        note={actionError}
+        style={styles.permissionCard}
+        testID="camera-permission-card"
+        actionTestID="camera-permission-action"
+      />
+    </View>
   )
 }
 
@@ -95,3 +97,17 @@ export function NoActiveTripState() {
     />
   )
 }
+
+const styles = StyleSheet.create({
+  permissionScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.gutter,
+    backgroundColor: lightPalette.surfaceSoft,
+  },
+  permissionCard: {
+    width: '100%',
+    maxWidth: spacing.contentMaxWidth,
+  },
+})
