@@ -4,10 +4,12 @@ import { StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 import { useReducedMotion } from 'react-native-reanimated'
 
-import { Banner, BANNER_TONES, type BannerTone } from '@/components/ui/banner'
+import { Banner, bannerTones, type BannerTone } from '@/components/ui/banner'
 import { contrastRatio, renderUi, type TestNode } from '@/components/ui/test-utils'
-import { lightPalette } from '@/lib/palette'
+import { darkPalette, darkStatusTints, lightPalette, lightStatusTints } from '@/lib/palette'
 import { motion, spacing, typography } from '@/lib/tokens'
+
+const BANNER_TONES = bannerTones(lightPalette, lightStatusTints)
 
 const TONES = Object.keys(BANNER_TONES) as BannerTone[]
 const hidden = { includeHiddenElements: true }
@@ -113,6 +115,16 @@ describe('Banner', () => {
     it.each(TONES)('%s icon ≥ 3:1 (non-text, amber included — D3)', (tone) => {
       const { iconColor, background } = BANNER_TONES[tone]
       expect(contrastRatio(iconColor, background, lightPalette.canvas)).toBeGreaterThanOrEqual(3)
+    })
+  })
+
+  describe('dark scheme: text × background over the dark screen', () => {
+    const DARK_TONES = bannerTones(darkPalette, darkStatusTints)
+
+    it.each(TONES)('%s text ≥ 4.5:1 and icon ≥ 3:1', (tone) => {
+      const { textColor, iconColor, background } = DARK_TONES[tone]
+      expect(contrastRatio(textColor, background, darkPalette.surfaceSoft)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(iconColor, background, darkPalette.surfaceSoft)).toBeGreaterThanOrEqual(3)
     })
   })
 })

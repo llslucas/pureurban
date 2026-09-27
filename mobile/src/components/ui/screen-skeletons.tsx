@@ -2,8 +2,8 @@ import React from 'react'
 import { StyleSheet, useWindowDimensions, View } from 'react-native'
 
 import { Skeleton, SkeletonGroup } from '@/components/ui/skeleton'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
+import { radius, spacing, typography } from '@/lib/tokens'
 
 // Loading placeholders shaped like each screen's final content (EXPERIENCE.md →
 // State Patterns). Block heights follow the line height of the text they stand in for.
@@ -25,6 +25,7 @@ const RADIO_SIZE = 24
 const SCAN_WINDOW_RATIO = 0.7
 
 function CounterSkeleton() {
+  const styles = useThemedStyles(createStyles)
   return (
     <View style={styles.counter}>
       <Skeleton height={COUNT_HEIGHT} width="45%" />
@@ -34,6 +35,7 @@ function CounterSkeleton() {
 }
 
 export function TripCardSkeleton({ label, testID = 'trip-skeleton' }: ScreenSkeletonProps) {
+  const styles = useThemedStyles(createStyles)
   return (
     <SkeletonGroup label={label} testID={testID} style={styles.card}>
       <Skeleton height={typography.overline.lineHeight} width="35%" />
@@ -50,6 +52,7 @@ export function TripCardSkeleton({ label, testID = 'trip-skeleton' }: ScreenSkel
 // The ready state of the no-trip section: the "Nenhuma viagem" block over a
 // route picker, drawn with two 56dp options.
 export function RouteSelectorSkeleton({ label, testID = 'route-selector-skeleton' }: ScreenSkeletonProps) {
+  const styles = useThemedStyles(createStyles)
   return (
     <SkeletonGroup label={label} testID={testID} style={styles.routeRoot}>
       <View style={styles.stateBlock}>
@@ -73,6 +76,7 @@ export function RouteSelectorSkeleton({ label, testID = 'route-selector-skeleton
 }
 
 export function StudentListSkeleton({ label, testID = 'student-list-skeleton' }: ScreenSkeletonProps) {
+  const styles = useThemedStyles(createStyles)
   return (
     <SkeletonGroup label={label} testID={testID} style={styles.listRoot}>
       <View style={styles.rosterHeader}>
@@ -96,6 +100,7 @@ export function StudentListSkeleton({ label, testID = 'student-list-skeleton' }:
 }
 
 export function BusEtaCardSkeleton({ label, testID = 'bus-eta-card-skeleton' }: ScreenSkeletonProps) {
+  const styles = useThemedStyles(createStyles)
   return (
     <SkeletonGroup label={label} testID={testID} style={[styles.card, styles.etaCard]}>
       <View style={styles.headerRow}>
@@ -111,6 +116,7 @@ export function BusEtaCardSkeleton({ label, testID = 'bus-eta-card-skeleton' }: 
 
 // The HUD strip over a square window the size ScanFrame draws.
 export function ScanSkeleton({ label, testID = 'scan-skeleton' }: ScreenSkeletonProps) {
+  const styles = useThemedStyles(createStyles)
   const { width, height } = useWindowDimensions()
   const windowSize = Math.min(width, height) * SCAN_WINDOW_RATIO
 
@@ -128,112 +134,113 @@ export function ScanSkeleton({ label, testID = 'scan-skeleton' }: ScreenSkeleton
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[3],
-  },
-  etaCard: {
-    gap: spacing[2],
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing[2],
-  },
-  counter: {
-    gap: spacing[2],
-  },
-  routeRoot: {
-    flexGrow: 1,
-    gap: spacing.sectionGap,
-  },
-  stateBlock: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[3],
-    padding: spacing.sectionGap,
-  },
-  selector: {
-    gap: spacing[2],
-  },
-  list: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: spacing.actionHeight,
-    paddingHorizontal: spacing[4],
-    gap: spacing[3],
-  },
-  divider: {
-    borderTopWidth: 1,
-    borderTopColor: lightPalette.hairline,
-  },
-  listRoot: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  rosterHeader: {
-    gap: spacing[2],
-    paddingHorizontal: spacing.gutter,
-    paddingTop: spacing[4],
-    paddingBottom: spacing[3],
-    backgroundColor: lightPalette.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
-  },
-  row: {
-    minHeight: ROW_MIN_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: spacing.gutter,
-    gap: spacing.gutter,
-    backgroundColor: lightPalette.surface,
-  },
-  rowBody: {
-    flex: 1,
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-    paddingVertical: spacing[3],
-    paddingRight: spacing.gutter,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
-  },
-  rowInfo: {
-    flex: 1,
-    gap: spacing[1],
-  },
-  scanRoot: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  hud: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing[3],
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing.gutter,
-    backgroundColor: lightPalette.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightPalette.hairline,
-  },
-  scanBody: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[5],
-    padding: spacing.gutter,
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    card: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      gap: spacing[3],
+    },
+    etaCard: {
+      gap: spacing[2],
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing[2],
+    },
+    counter: {
+      gap: spacing[2],
+    },
+    routeRoot: {
+      flexGrow: 1,
+      gap: spacing.sectionGap,
+    },
+    stateBlock: {
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing[3],
+      padding: spacing.sectionGap,
+    },
+    selector: {
+      gap: spacing[2],
+    },
+    list: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: spacing.actionHeight,
+      paddingHorizontal: spacing[4],
+      gap: spacing[3],
+    },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: palette.hairline,
+    },
+    listRoot: {
+      flex: 1,
+      overflow: 'hidden',
+      backgroundColor: palette.surfaceSoft,
+    },
+    rosterHeader: {
+      gap: spacing[2],
+      paddingHorizontal: spacing.gutter,
+      paddingTop: spacing[4],
+      paddingBottom: spacing[3],
+      backgroundColor: palette.surface,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.hairline,
+    },
+    row: {
+      minHeight: ROW_MIN_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingLeft: spacing.gutter,
+      gap: spacing.gutter,
+      backgroundColor: palette.surface,
+    },
+    rowBody: {
+      flex: 1,
+      alignSelf: 'stretch',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[3],
+      paddingVertical: spacing[3],
+      paddingRight: spacing.gutter,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.hairline,
+    },
+    rowInfo: {
+      flex: 1,
+      gap: spacing[1],
+    },
+    scanRoot: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    hud: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing[3],
+      paddingVertical: spacing[3],
+      paddingHorizontal: spacing.gutter,
+      backgroundColor: palette.surface,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.hairline,
+    },
+    scanBody: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing[5],
+      padding: spacing.gutter,
+    },
+  })

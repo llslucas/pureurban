@@ -17,7 +17,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { radius } from '@/lib/tokens'
 
 export interface SkeletonProps {
@@ -32,6 +32,7 @@ const SHIMMER_MS = 1200
 const HIGHLIGHT_OPACITY = 0.5
 
 export function Skeleton({ width = '100%', height, borderRadius = radius.sm, style, testID = 'skeleton' }: SkeletonProps) {
+  const styles = useThemedStyles(createStyles)
   const reducedMotion = useReducedMotion()
   const [blockWidth, setBlockWidth] = useState(0)
   const progress = useSharedValue(0)
@@ -92,14 +93,15 @@ export function SkeletonGroup({ label, children, style, testID = 'skeleton-group
   )
 }
 
-const styles = StyleSheet.create({
-  block: {
-    overflow: 'hidden',
-    backgroundColor: lightPalette.surfaceStrong,
-  },
-  highlight: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: lightPalette.canvas,
-    opacity: HIGHLIGHT_OPACITY,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    block: {
+      overflow: 'hidden',
+      backgroundColor: palette.surfaceStrong,
+    },
+    highlight: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: palette.canvas,
+      opacity: HIGHLIGHT_OPACITY,
+    },
+  })

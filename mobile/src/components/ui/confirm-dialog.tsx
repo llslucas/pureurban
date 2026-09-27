@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native'
 import { Dialog, Portal, Text } from 'react-native-paper'
 
 import { PrimaryAction } from '@/components/ui/primary-action'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 
 export interface ConfirmDialogProps {
@@ -30,6 +30,7 @@ export function ConfirmDialog({
   loading = false,
   testID = 'confirm-dialog',
 }: ConfirmDialogProps) {
+  const styles = useThemedStyles(createStyles)
   // While the request is in flight, backing out would leave its outcome unseen.
   const dismiss = loading ? () => {} : onDismiss
 
@@ -62,21 +63,22 @@ export function ConfirmDialog({
   )
 }
 
-const styles = StyleSheet.create({
-  dialog: {
-    backgroundColor: lightPalette.canvas,
-  },
-  title: {
-    ...typography.titleLg,
-    color: lightPalette.text,
-  },
-  message: {
-    ...typography.body,
-    color: lightPalette.textBody,
-  },
-  actions: {
-    gap: spacing[2],
-    paddingHorizontal: spacing[4],
-    paddingBottom: spacing[4],
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    dialog: {
+      backgroundColor: palette.canvas,
+    },
+    title: {
+      ...typography.titleLg,
+      color: palette.text,
+    },
+    message: {
+      ...typography.body,
+      color: palette.textBody,
+    },
+    actions: {
+      gap: spacing[2],
+      paddingHorizontal: spacing[4],
+      paddingBottom: spacing[4],
+    },
+  })

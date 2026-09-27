@@ -2,7 +2,7 @@ import React, { type ReactElement, type ReactNode } from 'react'
 import { type RefreshControlProps, ScrollView, StyleSheet, View } from 'react-native'
 import { type Edge, SafeAreaView } from 'react-native-safe-area-context'
 
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing } from '@/lib/tokens'
 
 export interface ScreenProps {
@@ -15,6 +15,7 @@ export interface ScreenProps {
 }
 
 export function Screen({ variant = 'fixed', children, footer, refreshControl, testID = 'screen' }: ScreenProps) {
+  const styles = useThemedStyles(createStyles)
   // No top edge: the native stack header already clears the status bar. The
   // bottom edge belongs to the footer when there is one.
   const edges: Edge[] = footer ? ['left', 'right'] : ['left', 'right', 'bottom']
@@ -41,21 +42,22 @@ export function Screen({ variant = 'fixed', children, footer, refreshControl, te
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  fill: {
-    flex: 1,
-  },
-  content: {
-    width: '100%',
-    maxWidth: spacing.contentMaxWidth,
-    alignSelf: 'center',
-    padding: spacing.gutter,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: palette.surfaceSoft,
+    },
+    fill: {
+      flex: 1,
+    },
+    content: {
+      width: '100%',
+      maxWidth: spacing.contentMaxWidth,
+      alignSelf: 'center',
+      padding: spacing.gutter,
+    },
+    scrollContent: {
+      flexGrow: 1,
+    },
+  })
