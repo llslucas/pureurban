@@ -311,7 +311,9 @@ export const boardingHandlers = [
         students: roster,
         summary: {
           boarded: roster.filter((s) => s.status === 'CHECKED_IN').length,
-          total: roster.length,
+          // Mirrors `get-trip-students.use-case`: a not-returning student leaves
+          // the expected total, so the legend's three terms add up to it.
+          total: roster.filter((s) => s.status !== 'NOT_RETURNING').length,
         },
       },
       meta: { timestamp: new Date().toISOString() },
