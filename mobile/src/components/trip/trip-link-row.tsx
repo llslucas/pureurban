@@ -34,7 +34,7 @@ export function TripLinkRow({ label, icon, onPress, disabled = false, testID = '
   )
 }
 
-const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+const createStyles = ({ custom: { palette, elevation, layers } }: AppTheme) =>
   StyleSheet.create({
     row: {
       ...elevation.level1,
@@ -46,7 +46,7 @@ const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
       borderRadius: radius.lg,
     },
     pressed: {
-      backgroundColor: palette.surfaceSoft,
+      backgroundColor: layers.pressed,
     },
     disabled: {
       opacity: 0.5,

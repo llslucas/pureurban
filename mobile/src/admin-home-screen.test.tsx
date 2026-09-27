@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react-native'
+import { router } from 'expo-router'
 import React from 'react'
 import { StyleSheet } from 'react-native'
 
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/auth.store'
 // (same reason as trip-screen.test.tsx).
 
 jest.mock('@/stores/auth.store', () => ({ useAuthStore: jest.fn() }))
+jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }))
 
 const mockAuthStore = jest.mocked(useAuthStore)
 const logout = jest.fn()
@@ -36,11 +38,16 @@ describe('AdminHome (story 6.13)', () => {
     expect(screen.queryByText('Painel Administrativo')).toBeNull()
   })
 
-  it('"Sair" logs out', async () => {
+  it('"Sair" logs out, then replaces the stack with the login (same order as the account menu)', async () => {
+    const calls: string[] = []
+    logout.mockImplementation(() => calls.push('logout'))
+    jest.mocked(router.replace).mockImplementation(() => calls.push('replace'))
     await renderUi(<AdminHome />)
 
     fireEvent.press(screen.getByTestId('admin-soon-action'))
 
     expect(logout).toHaveBeenCalledTimes(1)
+    expect(router.replace).toHaveBeenCalledWith('/(auth)/login')
+    expect(calls).toEqual(['logout', 'replace'])
   })
 })

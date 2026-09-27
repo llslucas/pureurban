@@ -1,3 +1,4 @@
+import { router } from 'expo-router'
 import React from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
@@ -16,6 +17,13 @@ export default function AdminHome() {
   const styles = useThemedStyles(createStyles)
   const logout = useAuthStore((state) => state.logout)
 
+  // Same sequence as the account menu: dropping the session first lets the
+  // `(auth)` group back into the tree before navigating to it.
+  const signOut = () => {
+    logout()
+    router.replace('/(auth)/login')
+  }
+
   return (
     <View style={styles.root} testID="admin-home">
       <View style={styles.brand} testID="admin-brand">
@@ -30,7 +38,7 @@ export default function AdminHome() {
           icon="tools"
           title="Em breve"
           detail="O painel administrativo ainda está em construção."
-          action={{ label: 'Sair', icon: 'logout', onPress: logout }}
+          action={{ label: 'Sair', icon: 'logout', onPress: signOut }}
           testID="admin-soon"
         />
       </Screen>

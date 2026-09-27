@@ -15,6 +15,7 @@ import { TEST_INSETS } from '@/components/ui/test-utils'
 import { lightPalette } from '@/lib/palette'
 import { lightTheme } from '@/lib/theme'
 import { activeTripKey } from '@/lib/trip-queries'
+import { ApiClientError } from '@/services/api-error'
 
 // Lives at src/ root, not src/app/: Expo Router turns every file under src/app/
 // into a navigable route, so a test file there pollutes typedRoutes/_sitemap and
@@ -278,11 +279,13 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
     await waitFor(() => expect(startButton).not.toBeDisabled())
   })
 
-  it('DRIVER_NOT_ASSIGNED: alert with the API message and the screen stays on the start state', async () => {
+  it('DRIVER_NOT_ASSIGNED: on-screen error banner with the API message and the screen stays on the start state', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
     mockTrip.getActiveTrip.mockResolvedValue(null)
     mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
-    mockTrip.startTrip.mockRejectedValue(new Error('Motorista não vinculado a esta rota'))
+    mockTrip.startTrip.mockRejectedValue(
+      new ApiClientError('DRIVER_NOT_ASSIGNED', 'Motorista não vinculado a esta rota', 403),
+    )
 
     renderScreen()
 
@@ -290,11 +293,81 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
     await waitFor(() => expect(startButton).not.toBeDisabled())
     fireEvent.press(startButton)
 
-    await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith('Erro', 'Motorista não vinculado a esta rota'),
-    )
+    const banner = await screen.findByTestId('trip-action-error')
+    expect(within(banner).getByText('Não foi possível iniciar a viagem')).toBeTruthy()
+    expect(within(banner).getByText('Motorista não vinculado a esta rota')).toBeTruthy()
+    expect(alertSpy).not.toHaveBeenCalled()
     expect(screen.getByText('Iniciar Viagem')).toBeTruthy()
     expect(screen.queryByText('Escanear QR Code')).toBeNull()
+  })
+
+  it('start fails offline: pt-BR network copy instead of the raw fetch error; a retry that succeeds clears it', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+    mockTrip.startTrip
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockResolvedValueOnce(makeTrip())
+
+    renderScreen()
+
+    const startButton = await screen.findByText('Iniciar Viagem')
+    await waitFor(() => expect(startButton).not.toBeDisabled())
+    fireEvent.press(startButton)
+
+    expect(
+      await screen.findByText('Sem conexão com o servidor. Verifique a internet e tente de novo.'),
+    ).toBeTruthy()
+    expect(screen.queryByText(/Network request failed/)).toBeNull()
+    // The button is usable again after the failure.
+    await waitFor(() => expect(screen.getByText('Iniciar Viagem')).not.toBeDisabled())
+
+    fireEvent.press(screen.getByText('Iniciar Viagem'))
+
+    expect(await screen.findByText('Escanear QR Code')).toBeTruthy()
+    expect(screen.queryByTestId('trip-action-error')).toBeNull()
+  })
+
+  it('a failed start does not follow the screen once a refetch brings an ACTIVE trip', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+    mockTrip.startTrip.mockRejectedValue(new TypeError('Network request failed'))
+
+    renderScreen()
+
+    const startButton = await screen.findByText('Iniciar Viagem')
+    await waitFor(() => expect(startButton).not.toBeDisabled())
+    fireEvent.press(startButton)
+    expect(await screen.findByTestId('trip-action-error')).toBeTruthy()
+
+    // The request did reach the server: the next /trips/active shows the trip.
+    await act(async () => {
+      queryClient.setQueryData(activeTripKey, makeTrip())
+    })
+
+    expect(await screen.findByText('Escanear QR Code')).toBeTruthy()
+    expect(screen.queryByTestId('trip-action-error')).toBeNull()
+  })
+
+  it('start in flight: the button keeps its color and reports busy instead of disabled (R5)', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+    mockTrip.startTrip.mockReturnValue(new Promise<Trip>(() => {}))
+
+    renderScreen()
+
+    const startButton = await screen.findByText('Iniciar Viagem')
+    await waitFor(() => expect(startButton).not.toBeDisabled())
+    const idleColor = StyleSheet.flatten(
+      screen.getByTestId('start-trip-action-container').props.style,
+    ).backgroundColor
+    fireEvent.press(startButton)
+
+    const action = await screen.findByRole('button', { name: 'Iniciar Viagem' })
+    await waitFor(() => expect(action.props.accessibilityState).toEqual({ busy: true, disabled: true }))
+    expect(
+      StyleSheet.flatten(screen.getByTestId('start-trip-action-container').props.style).backgroundColor,
+    ).toBe(idleColor)
+    expect(idleColor).toBe(lightPalette.primary)
   })
 })
 
@@ -523,18 +596,37 @@ describe('TripScreen — redesign (story 6.5)', () => {
     expect(mockTrip.endTrip).not.toHaveBeenCalled()
   })
 
-  it('end trip error: current Alert and the dialog closes', async () => {
+  it('end trip error: the dialog closes, the trip stays active and the error banner shows', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
     mockTrip.getActiveTrip.mockResolvedValue(makeTrip())
-    mockTrip.endTrip.mockRejectedValue(new Error('Falha ao encerrar'))
+    mockTrip.endTrip.mockRejectedValue(new ApiClientError('TRIP_NOT_ACTIVE', 'Viagem não está ativa', 409))
 
     renderScreen()
 
     await confirmEnd()
 
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Erro', 'Falha ao encerrar'))
+    const banner = await screen.findByTestId('trip-action-error')
+    expect(within(banner).getByText('Não foi possível encerrar a viagem')).toBeTruthy()
+    expect(within(banner).getByText('Viagem não está ativa')).toBeTruthy()
     await waitFor(() => expect(endDialogVisible()).toBe(false))
     expect(screen.getByText('Encerrar Viagem')).toBeTruthy()
+    expect(alertSpy).not.toHaveBeenCalled()
+  })
+
+  it('end trip error: a new attempt clears the banner while it runs', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(makeTrip())
+    mockTrip.endTrip
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockReturnValueOnce(new Promise<Trip>(() => {}))
+
+    renderScreen()
+
+    await confirmEnd()
+    expect(await screen.findByTestId('trip-action-error')).toBeTruthy()
+
+    await confirmEnd()
+    await waitFor(() => expect(mockTrip.endTrip).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByTestId('trip-action-error')).toBeNull())
   })
 
   it('outbound completed: "Concluída" card with the final count and "Iniciar Retorno" in the bar', async () => {

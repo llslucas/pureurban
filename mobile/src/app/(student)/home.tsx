@@ -339,7 +339,7 @@ export default function StudentHomeScreen() {
                   variant="secondary"
                   label="Desfazer"
                   icon="undo-variant"
-                  disabled={!tripId || cancelMutation.isPending}
+                  disabled={!tripId}
                   loading={cancelMutation.isPending}
                   onPress={handleCancel}
                   testID="home-undo-absence"

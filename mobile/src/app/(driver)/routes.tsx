@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RouteCard } from '@/components/routes/route-card'
 import { Screen } from '@/components/ui/screen'
 import { StateView } from '@/components/ui/state-view'
-import { type AppTheme, useThemedStyles } from '@/lib/theme'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
 
@@ -16,6 +16,7 @@ function countLabel(count: number): string {
 
 export default function DriverRoutesScreen() {
   const styles = useThemedStyles(createStyles)
+  const { layers } = useAppTheme().custom
   const [snackbarVisible, setSnackbarVisible] = React.useState(false)
 
   const {
@@ -89,7 +90,7 @@ export default function DriverRoutesScreen() {
     <View style={styles.root}>
       <Screen
         variant="scroll"
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />}
+        refreshControl={<RefreshControl {...layers.refresh} refreshing={isRefetching} onRefresh={() => void refetch()} />}
         testID="driver-routes"
       >
         {content}

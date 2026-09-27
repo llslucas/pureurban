@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { router } from 'expo-router'
-import { Alert, AppState, StyleSheet, View } from 'react-native'
+import { AppState, StyleSheet, View } from 'react-native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForegroundPermissions } from 'expo-location'
 import { ActiveTripActions } from '@/components/trip/active-trip-actions'
@@ -8,6 +8,8 @@ import { LocationPermissionCard } from '@/components/trip/location-permission-ca
 import { StartOutboundSection, startOutboundPhase } from '@/components/trip/start-outbound-section'
 import { TripCard } from '@/components/trip/trip-card'
 import { TripLinkRow } from '@/components/trip/trip-link-row'
+import { type TripActionErrorCopy, tripActionErrorMessage } from '@/components/trip/trip-error'
+import { Banner } from '@/components/ui/banner'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PrimaryAction } from '@/components/ui/primary-action'
 import { Screen } from '@/components/ui/screen'
@@ -38,6 +40,11 @@ export default function TripScreen() {
   // Keyed by trip id: a refetch that swaps the trip must not carry the dialog
   // over to the next ACTIVE trip.
   const [confirmEndTripId, setConfirmEndTripId] = useState<string | null>(null)
+  // On screen rather than Alert.alert, which is a no-op on web. Tied to the trip
+  // state it failed on, so a refetch that moves the trip on drops a stale banner.
+  const [actionError, setActionError] = useState<(TripActionErrorCopy & { tripKey: string | null }) | null>(
+    null,
+  )
 
   const {
     data: activeTrip,
@@ -121,6 +128,8 @@ export default function TripScreen() {
       />
     ) : null
 
+  const tripKey = activeTrip ? `${activeTrip.id}:${activeTrip.status}` : null
+
   const startMutation = useMutation({
     mutationFn: ({
       routeId,
@@ -131,22 +140,20 @@ export default function TripScreen() {
       type: TripType
       relatedTripId?: string
     }) => tripService.startTrip(routeId, type, relatedTripId),
+    onMutate: () => setActionError(null),
     onSuccess: (trip) => {
       queryClient.setQueryData(activeTripKey, trip)
     },
-    onError: (error: Error) => {
-      Alert.alert('Erro', error.message ?? 'Não foi possível iniciar a viagem')
-    },
+    onError: (error: Error) => setActionError({ ...tripActionErrorMessage(error, 'start'), tripKey }),
   })
 
   const endMutation = useMutation({
     mutationFn: (tripId: string) => tripService.endTrip(tripId),
+    onMutate: () => setActionError(null),
     onSuccess: (completedTrip) => {
       queryClient.setQueryData(activeTripKey, completedTrip)
     },
-    onError: (error: Error) => {
-      Alert.alert('Erro', error.message ?? 'Não foi possível encerrar a viagem')
-    },
+    onError: (error: Error) => setActionError({ ...tripActionErrorMessage(error, 'end'), tripKey }),
   })
 
   const handleStartOutbound = useCallback(() => {
@@ -164,7 +171,7 @@ export default function TripScreen() {
     }
   }, [startMutation, activeTrip])
 
-  // The dialog closes on both outcomes: on error the Alert takes over.
+  // The dialog closes on both outcomes: on error the banner takes over.
   const handleEnd = useCallback(() => {
     if (activeTrip) {
       endMutation.mutate(activeTrip.id, {
@@ -200,6 +207,10 @@ export default function TripScreen() {
 
   const isMutating = startMutation.isPending || endMutation.isPending
 
+  const errorBanner = actionError && actionError.tripKey === tripKey ? (
+    <Banner tone="error" title={actionError.title} message={actionError.message} testID="trip-action-error" />
+  ) : null
+
   // `routes` still holds the cached list while the query is disabled during a
   // trip, so the name shows up without calling /routes/mine. Never the UUID.
   const routeName =
@@ -224,7 +235,6 @@ export default function TripScreen() {
             label="Iniciar Retorno"
             onPress={handleStartReturn}
             loading={isMutating}
-            disabled={isMutating}
             impact
             testID="start-return-action"
           />
@@ -238,7 +248,7 @@ export default function TripScreen() {
             label="Iniciar Viagem"
             onPress={handleStartOutbound}
             loading={isMutating}
-            disabled={isMutating || !resolvedRouteId}
+            disabled={!resolvedRouteId}
             impact
             testID="start-trip-action"
           />
@@ -249,6 +259,7 @@ export default function TripScreen() {
     return (
       <Screen variant="scroll" footer={footer} testID="trip-screen">
         <View style={styles.stack}>
+          {errorBanner}
           {activeTrip && activeTrip.status === 'COMPLETED' && (
             <TripCard
               type={activeTrip.type}
@@ -294,6 +305,7 @@ export default function TripScreen() {
       }
     >
       <View style={styles.stack}>
+        {errorBanner}
         <TripCard
           type={activeTrip.type}
           status={activeTrip.status}

@@ -63,10 +63,10 @@ export function ConfirmDialog({
   )
 }
 
-const createStyles = ({ custom: { palette } }: AppTheme) =>
+const createStyles = ({ custom: { palette, layers } }: AppTheme) =>
   StyleSheet.create({
     dialog: {
-      backgroundColor: palette.canvas,
+      ...layers.overlay,
     },
     title: {
       ...typography.titleLg,

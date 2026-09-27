@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, type Theme as NavigationTheme } from '@react-navigation/native'
 import { useMemo } from 'react'
-import type { ColorSchemeName } from 'react-native'
+import type { ColorSchemeName, ViewStyle } from 'react-native'
 import {
   configureFonts,
   MD3DarkTheme,
@@ -19,6 +19,7 @@ import {
   type StatusTints,
 } from '@/lib/palette'
 import {
+  ELEVATION_BORDER_WIDTH,
   fontFamily,
   fontFamilyByWeight,
   type FontWeightToken,
@@ -68,21 +69,73 @@ const fonts = {
 
 // Per-scheme: the semantic palette, status tints and elevation presets travel
 // with the Paper theme so components restyle when the OS scheme flips.
-function makeCustom(palette: SemanticColors, tints: StatusTints) {
-  return { spacing, radius, motion, palette, tints, elevation: makeElevation(palette) }
+function makeCustom(palette: SemanticColors, tints: StatusTints, scheme: 'light' | 'dark') {
+  return {
+    spacing,
+    radius,
+    motion,
+    palette,
+    tints,
+    elevation: makeElevation(palette),
+    layers: makeLayers(palette, scheme),
+  }
 }
 
-// Os papéis abaixo são os ÚNICOS sobrescritos sobre o default MD3, todos
-// derivados da paleta (Story 1.11; `elevation` na 1.11b — fim do resíduo
-// violeta do <Banner>/Surface). `outline`/`outlineVariant` permanecem no
-// default MD3 de propósito: hairline dá ~1.36:1 no branco e não atinge o 3:1
-// de borda de componente interativo (WCAG 1.4.11).
+// In dark, canvas, surfaceSoft and the level-2 shadow all read as the screen
+// background, so floating surfaces (menu, dialog) and pressed rows need their
+// own tone plus the hairline — the only dark tone that stands out from canvas.
+// Light keeps the pre-6.14 look.
+function makeLayers(palette: SemanticColors, scheme: 'light' | 'dark') {
+  const overlay: ViewStyle =
+    scheme === 'dark'
+      ? { backgroundColor: palette.surface, borderColor: palette.hairline, borderWidth: ELEVATION_BORDER_WIDTH }
+      : { backgroundColor: palette.canvas }
+  return {
+    overlay,
+    pressed: scheme === 'dark' ? palette.surfaceStrong : palette.surfaceSoft,
+    // The skeleton block is surfaceStrong; the shimmer must be lighter than it.
+    shimmer: scheme === 'dark' ? palette.borderStrong : palette.canvas,
+    // Spread onto <RefreshControl>: iOS reads tintColor, Android the other two.
+    refresh: {
+      tintColor: palette.text,
+      colors: [palette.text],
+      progressBackgroundColor: palette.surface,
+    },
+  }
+}
+
+// Roles MD3 hardcodes to its violet template, mapped onto the palette. Paper
+// only renders a few of them (Snackbar reads inverse*, disabled buttons the
+// container/disabled roles), but none may fall back to the template. Inverse
+// roles take the OPPOSITE scheme's palette: that is what "inverse" means.
+function paletteRoles(palette: SemanticColors, tints: StatusTints, inverse: SemanticColors) {
+  return {
+    primaryContainer: palette.surfaceStrong,
+    onPrimaryContainer: palette.text,
+    tertiary: palette.info,
+    onTertiary: palette.onPrimary,
+    tertiaryContainer: palette.surfaceStrong,
+    onTertiaryContainer: palette.text,
+    errorContainer: tints.error,
+    onErrorContainer: palette.error,
+    inverseSurface: inverse.canvas,
+    inverseOnSurface: inverse.text,
+    inversePrimary: inverse.link,
+  }
+}
+
+// Every color role comes from the palette (Story 1.11; `elevation` in 1.11b;
+// the remaining template roles in the epic 6 hardening). Only neutral overlays
+// stay on the MD3 default — shadow, scrim, backdrop and the disabled alphas —
+// plus `outline`/`outlineVariant` on purpose: hairline gives ~1.36:1 on white
+// and misses the 3:1 of an interactive component border (WCAG 1.4.11).
 export const lightTheme = {
   ...MD3LightTheme,
   fonts,
-  custom: makeCustom(lightPalette, lightStatusTints),
+  custom: makeCustom(lightPalette, lightStatusTints, 'light'),
   colors: {
     ...MD3LightTheme.colors,
+    ...paletteRoles(lightPalette, lightStatusTints, darkPalette),
     // The MD3 default background leaked into the outlined TextInput fill.
     background: lightPalette.surfaceSoft,
     primary: lightPalette.primary,
@@ -115,9 +168,10 @@ export const lightTheme = {
 export const darkTheme: AppTheme = {
   ...MD3DarkTheme,
   fonts,
-  custom: makeCustom(darkPalette, darkStatusTints),
+  custom: makeCustom(darkPalette, darkStatusTints, 'dark'),
   colors: {
     ...MD3DarkTheme.colors,
+    ...paletteRoles(darkPalette, darkStatusTints, lightPalette),
     // D6: botão primário em dark = branco com texto tinta.
     primary: darkPalette.primary,
     onPrimary: darkPalette.onPrimary,
@@ -125,7 +179,7 @@ export const darkTheme: AppTheme = {
     onSecondary: darkPalette.text,
     secondaryContainer: darkPalette.surfaceStrong,
     onSecondaryContainer: darkPalette.text,
-    surface: darkPalette.canvas,
+    surface: darkPalette.surface,
     onSurface: darkPalette.text,
     background: darkPalette.canvas,
     onBackground: darkPalette.text,

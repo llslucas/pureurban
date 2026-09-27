@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 
 import { PrimaryAction, type PrimaryActionVariant } from '@/components/ui/primary-action'
@@ -104,6 +104,52 @@ describe('PrimaryAction', () => {
     fireEvent.press(screen.getByText('Tentar novamente'))
     fireEvent.press(screen.getByText('Tentar novamente'))
     expect(onPress).not.toHaveBeenCalled()
+  })
+
+  it('loading keeps the idle fill (no grey flash) and exposes busy to assistive tech (R5)', async () => {
+    await renderAction()
+    const idleFill = containerStyle().backgroundColor
+    const idle = screen.getByRole('button', { name: 'Tentar novamente' })
+    expect(idle.props.accessibilityState).toEqual({ busy: false, disabled: false })
+
+    await renderAction({ loading: true })
+    expect(containerStyle().backgroundColor).toBe(idleFill)
+    expect(idleFill).toBe(lightPalette.primary)
+    const busy = screen.getByRole('button', { name: 'Tentar novamente' })
+    expect(busy.props.accessibilityState).toEqual({ busy: true, disabled: true })
+  })
+
+  it('the accessible button is the only one and activates like a tap', async () => {
+    const onPress = await renderAction()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    fireEvent(screen.getByRole('button', { name: 'Tentar novamente' }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    })
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('web: Paper keeps the button role; the wrapper only carries aria-busy', async () => {
+    const original = Platform.OS
+    Platform.OS = 'web'
+    try {
+      await renderAction({ loading: true })
+      const wrapper = screen.getByTestId('primary-action-container').parent
+      let node = wrapper
+      while (node && node.props['aria-busy'] === undefined) node = node.parent
+      expect(node?.props['aria-busy']).toBe(true)
+      expect(node?.props.accessibilityRole).toBeUndefined()
+      expect(screen.getAllByRole('button')).toHaveLength(1)
+    } finally {
+      Platform.OS = original
+    }
+  })
+
+  it('disabled reports disabled, not busy', async () => {
+    await renderAction({ disabled: true })
+    expect(screen.getByRole('button', { name: 'Tentar novamente' }).props.accessibilityState).toEqual({
+      busy: false,
+      disabled: true,
+    })
   })
 
   it('forwards id to the button container (the DOM id on web)', async () => {

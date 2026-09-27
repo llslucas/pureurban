@@ -98,7 +98,8 @@ _Este arquivo contem regras criticas e padroes que agentes de IA devem seguir ao
 - File-based routing em `src/app/`
 - Layout groups: `(auth)/`, `(driver)/`, `(student)/`
 - `typedRoutes: true` — rotas tipadas automaticamente
-- Theming via hook `useTheme()` consumindo constantes `ThemeColor`
+- Theming: o tema Paper ativo (claro/escuro, pelo esquema do SO) carrega em `custom` a paleta, os tintes, a elevation e as camadas (`layers`) do esquema. Leia via `useAppTheme().custom` ou `useThemedStyles(createStyles)` — nunca importe `lightPalette`/`lightStatusTints`/`lightElevation`/`lightTheme`, `designTokens`/`appExtensions`/`darkMapping` ou `MD3*Theme`/`DefaultTheme` fora de `lib/`
+- Exceção: só as 4 superfícies de identidade fixa leem `lightPalette` direto (`scan-frame`, `scan-hud`, `scan-result-overlay`, `qr-pass`); `palette.guard.test.ts` trava a allowlist
 - Arquivos platform-specific: sufixo `.web.tsx`
 
 **Offline-First (Tiers):**
@@ -244,4 +245,4 @@ domains/{context}/
 - Revisar trimestralmente para remover regras obsoletas
 - Remover regras que se tornem obvias com o tempo
 
-Ultima atualizacao: 2026-04-01
+Ultima atualizacao: 2026-09-27

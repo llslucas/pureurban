@@ -8,13 +8,14 @@ import { QrPass, QrPassRouteLine } from '@/components/student-qr/qr-pass'
 import { Screen } from '@/components/ui/screen'
 import { StateView } from '@/components/ui/state-view'
 import { qrSessionStorage } from '@/lib/storage'
-import { type AppTheme, useThemedStyles } from '@/lib/theme'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { routesService } from '@/services/routes.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { buildQrPayload, encodeQrPayload } from '@/utils/qr-payload'
 
 export default function QrCodeScreen() {
   const styles = useThemedStyles(createStyles)
+  const { layers } = useAppTheme().custom
   const { user, logout } = useAuthStore()
   const sessionId = qrSessionStorage.getSessionId()
 
@@ -112,7 +113,7 @@ export default function QrCodeScreen() {
     <View style={styles.root}>
       <Screen
         variant="scroll"
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+        refreshControl={<RefreshControl {...layers.refresh} refreshing={isRefetching} onRefresh={() => refetch()} />}
         testID="student-qr"
       >
         <View style={styles.center}>

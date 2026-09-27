@@ -10,7 +10,7 @@ import { Banner } from '@/components/ui/banner'
 import { StudentListSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import { ApiClientError } from '@/services/api-client'
-import { type AppTheme, useThemedStyles } from '@/lib/theme'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing } from '@/lib/tokens'
 import {
   connectBoardingEvents,
@@ -79,6 +79,7 @@ function applyAbsenceCancelledToRoster(
 
 export default function StudentListScreen() {
   const styles = useThemedStyles(createStyles)
+  const { layers } = useAppTheme().custom
   const { user, logout } = useAuthStore()
   const queryClient = useQueryClient()
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' })
@@ -328,6 +329,7 @@ export default function StudentListScreen() {
         renderItem={({ item }) => <StudentRow student={item} testID={`student-row-${item.studentId}`} />}
         refreshControl={
           <RefreshControl
+            {...layers.refresh}
             refreshing={roster.isFetching}
             onRefresh={() => {
               // Também a viagem: um `activeTrip` velho fica recuperável desta tela.

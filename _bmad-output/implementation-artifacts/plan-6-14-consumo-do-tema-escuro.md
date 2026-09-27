@@ -218,6 +218,8 @@ O guard-rail do épico (~15 arquivos) é excedido por causa da conversão mecân
 - O grep de `lightPalette|lightStatusTints` fora de testes retorna só os 4 arquivos fixos.
 - Metro web com mocks e `capture-demo-screens.mjs dark`: 11/11 capturadas; `dark-11` e `dark-30` inspecionadas; o Metro foi derrubado antes de outros processos.
 
+**Nota pós-fechamento (27/09/2026):** a revisão de follow-up recomendada acima (`followup_review_recommended: true`) não rodou antes do fechamento da story. A retro do épico 6 (`epic-6-retro-2026-09-27.md`, achados R1/R2) fez esse papel para as superfícies escuras, e os achados foram corrigidos no hardening do épico 6 (`plan-epic-6-hardening.md`, action items 21 e 25).
+
 **Riscos residuais:**
 - Nada verificado em device.
 - O chip info fica em ~4.42:1 se um dia for posto sobre `surface` escuro.
