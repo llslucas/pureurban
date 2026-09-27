@@ -447,6 +447,11 @@ describe('token-pin — valores fixados ao DESIGN.md e à matriz D1–D7', () =>
     expect(darkPalette.warning).toBe(designTokens.signatureMustard)
     expect(darkPalette.error).toBe(appExtensions.errorOnDark)
   })
+
+  it('fundo de tela escuro é o tom mais escuro e casa com o background do Paper (6.14)', () => {
+    expect(darkPalette.surfaceSoft).toBe(darkMapping.canvas)
+    expect(darkTheme.colors.background).toBe(darkPalette.surfaceSoft)
+  })
 })
 
 describe('contraste AA dos pares dos temas', () => {

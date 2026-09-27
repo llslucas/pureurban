@@ -174,7 +174,9 @@ export const darkPalette: SemanticColors = {
   onPrimary: darkMapping.canvas,
   canvas: darkMapping.canvas,
   surface: darkMapping.element,
-  surfaceSoft: darkMapping.element,
+  // Screens take the darkest tone so level-1 cards (canvas + hairline) sit flush
+  // and `surface` rows lift slightly above; matches Paper's dark background.
+  surfaceSoft: darkMapping.canvas,
   surfaceStrong: darkMapping.hairline,
   text: darkMapping.text,
   textBody: darkMapping.textSecondary,
