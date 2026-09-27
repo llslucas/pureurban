@@ -14,6 +14,7 @@ import {
 } from '@/components/scan/scan-blocked-states'
 import { ScanHud } from '@/components/scan/scan-hud'
 import { ScanResultOverlay, type ScanResult } from '@/components/scan/scan-result-overlay'
+import { ScanSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import { notifyQueueChanged } from '@/hooks/use-offline-sync'
 import { sqliteQueueStorage } from '@/lib/offline-queue-storage'
@@ -344,7 +345,7 @@ export default function ScanScreen() {
   // Estados 1 e 2 da Tabela de Verdade.
   if (!permission) {
     // O hook ainda não resolveu o estado da permissão.
-    return <StateView kind="loading" title="Preparando câmera..." />
+    return <ScanSkeleton label="Preparando câmera..." />
   }
 
   if (!permission.granted) {
@@ -360,7 +361,7 @@ export default function ScanScreen() {
   // (offline) `isLoading` é false e a tela afirmaria "sem viagem ativa" sem
   // nunca ter buscado. Finding literal do review da 3.2b.
   if (tripStatus === 'pending') {
-    return <StateView kind="loading" title="Carregando viagem..." />
+    return <ScanSkeleton label="Carregando viagem..." />
   }
 
   // Erro NÃO é vazio — sem esta guarda a query que terminou em `error` cai no

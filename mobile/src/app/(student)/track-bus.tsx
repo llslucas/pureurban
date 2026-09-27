@@ -7,6 +7,7 @@ import { BusEtaCard, type BusEtaFreshness } from '@/components/track-bus/bus-eta
 import { LocationPermissionCard } from '@/components/trip/location-permission-card'
 import { Banner } from '@/components/ui/banner'
 import { Screen } from '@/components/ui/screen'
+import { BusEtaCardSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import {
   activeTrackingTripKey,
@@ -285,7 +286,11 @@ export default function TrackBusScreen() {
   // ---- Render ----
 
   if (tripStatus === 'pending') {
-    return <StateView kind="loading" title="Carregando sua viagem..." />
+    return (
+      <Screen>
+        <BusEtaCardSkeleton label="Carregando sua viagem..." />
+      </Screen>
+    )
   }
 
   if (tripStatus === 'error' && activeTrip === undefined) {

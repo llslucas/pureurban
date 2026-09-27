@@ -2,7 +2,7 @@ import React from 'react'
 import { Alert, Linking, StyleSheet } from 'react-native'
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Provider as PaperProvider } from 'react-native-paper'
+import { ActivityIndicator, Provider as PaperProvider } from 'react-native-paper'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import TripScreen from '@/app/(driver)/trip'
@@ -156,6 +156,17 @@ afterEach(() => {
 })
 
 describe('TripScreen — route resolution (spec-3-1)', () => {
+  it('shows the TripCard skeleton, not a spinner, while the trip loads (story 6.11)', async () => {
+    mockTrip.getActiveTrip.mockReturnValue(new Promise<Trip | null>(() => {}))
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+
+    renderScreen()
+
+    const loading = await screen.findByLabelText('Carregando viagem...')
+    expect(loading.props.testID).toBe('trip-skeleton')
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
+
   it('shows the routes loading state while /routes/mine has not answered', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(null)
     let resolveRoutes: (routes: AssignedRoute[]) => void = () => {}
@@ -167,7 +178,10 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
 
     renderScreen()
 
-    expect(await screen.findByText('Carregando rotas...')).toBeTruthy()
+    const loading = await screen.findByLabelText('Carregando rotas...')
+    expect(loading.props.testID).toBe('start-outbound-state')
+    expect(screen.queryByText('Carregando rotas...')).toBeNull()
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
     // Gate do GPS (Story 5.1): sem viagem ativa, a captura fica desligada
     // mesmo com a permissão concedida.
     expect(mockCapture).toHaveBeenCalledWith(null, true)
@@ -176,7 +190,7 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
     resolveRoutes([ROUTE_A])
     // The first render after the routes resolve is heavy; under parallel suite
     // load it overran waitFor's 1s default and made this test flaky.
-    await waitFor(() => expect(screen.queryByText('Carregando rotas...')).toBeNull(), {
+    await waitFor(() => expect(screen.queryByLabelText('Carregando rotas...')).toBeNull(), {
       timeout: 3000,
     })
   })

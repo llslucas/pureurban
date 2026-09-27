@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { useCameraPermissions } from 'expo-camera'
+import { ActivityIndicator } from 'react-native-paper'
 
 import ScanScreen from '@/app/(driver)/scan'
 import { ApiClientError } from '@/services/api-error'
@@ -182,6 +183,21 @@ describe('ScanScreen — states before the camera', () => {
     fireEvent.press(screen.getByText('Entrar novamente'))
     expect(calls).toEqual(['logout', 'replace'])
     expect(mockRouter.replace).toHaveBeenCalledWith('/(auth)/login')
+  })
+
+  it('permission still resolving: scan skeleton named "Preparando câmera...", no spinner (story 6.11)', async () => {
+    mockPermission(null)
+    await renderScreen()
+    expect(screen.getByLabelText('Preparando câmera...').props.testID).toBe('scan-skeleton')
+    expect(screen.queryByText('Preparando câmera...')).toBeNull()
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
+
+  it('trip pending: scan skeleton named "Carregando viagem...", no spinner (story 6.11)', async () => {
+    mockTrip.getActiveTrip.mockReturnValue(new Promise<Trip | null>(() => {}))
+    await renderScreen()
+    expect(screen.getByLabelText('Carregando viagem...').props.testID).toBe('scan-skeleton')
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
   })
 
   it('a rejected permission request shows the note', async () => {

@@ -9,6 +9,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as Location from 'expo-location'
 import { AppState, type AppStateStatus } from 'react-native'
+import { ActivityIndicator } from 'react-native-paper'
 
 import TrackBusScreen from '@/app/(student)/track-bus'
 import { ApiClientError } from '@/services/api-error'
@@ -151,6 +152,17 @@ afterEach(() => {
 })
 
 describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
+  it('discovery pending: BusEtaCard skeleton named "Carregando sua viagem...", no spinner (story 6.11)', async () => {
+    mockTracking.getActiveTrackingTrip.mockReturnValue(new Promise(() => {}))
+
+    renderScreen()
+    await act(async () => {})
+
+    expect(screen.getByLabelText('Carregando sua viagem...').props.testID).toBe('bus-eta-card-skeleton')
+    expect(screen.queryByText('Carregando sua viagem...')).toBeNull()
+    expect(screen.UNSAFE_queryAllByType(ActivityIndicator)).toHaveLength(0)
+  })
+
   it('descoberta falha: "Não foi possível carregar sua viagem" e "Tentar novamente" consulta de novo', async () => {
     mockTracking.getActiveTrackingTrip.mockRejectedValue(new Error('offline'))
 

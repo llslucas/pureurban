@@ -11,6 +11,7 @@ import { TripLinkRow } from '@/components/trip/trip-link-row'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PrimaryAction } from '@/components/ui/primary-action'
 import { Screen } from '@/components/ui/screen'
+import { TripCardSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import { StickyActionBar } from '@/components/ui/sticky-action-bar'
 import { tripService } from '@/services/trip.service'
@@ -176,7 +177,7 @@ export default function TripScreen() {
   if (isLoadingTrip) {
     return (
       <Screen>
-        <StateView kind="loading" title="Carregando viagem..." />
+        <TripCardSkeleton label="Carregando viagem..." />
       </Screen>
     )
   }

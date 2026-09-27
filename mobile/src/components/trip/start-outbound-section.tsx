@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
 
 import { MdiIcon } from '@/components/ui/mdi-icon'
+import { RouteSelectorSkeleton } from '@/components/ui/screen-skeletons'
 import { StateView } from '@/components/ui/state-view'
 import { lightPalette } from '@/lib/palette'
 import { elevation, radius, spacing, typography } from '@/lib/tokens'
@@ -52,7 +53,7 @@ export function StartOutboundSection({
   disabled,
 }: StartOutboundSectionProps) {
   if (phase === 'loading') {
-    return <StateView kind="loading" title="Carregando rotas..." testID="start-outbound-state" />
+    return <RouteSelectorSkeleton label="Carregando rotas..." testID="start-outbound-state" />
   }
 
   if (phase === 'error') {
