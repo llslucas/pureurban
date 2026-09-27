@@ -3,7 +3,7 @@ title: 'Story 6.12: gate visual da demo (marco do Épico 6)'
 type: 'chore'
 ticket: '6-12-gate-visual-da-demo'
 created: '2026-09-27'
-status: 'built'
+status: 'done'
 route: 'full'
 route_source: 'auto'
 review: 'thorough'
@@ -175,3 +175,5 @@ deferred:
 - **Follow-up review:** `false` — só patches `low` (0 high, 0 medium).
 - **Verificação (orquestrador, após o subagente e após os patches):** nomes `after/` = `audit/`; todos 780×1688; recaptura completa em pasta do scratchpad 26/26 (duas vezes, antes e depois dos patches; `light-34` mostra o Snackbar); filtro sem correspondência sai com código 2; mobile `lint` limpo, Jest 58/731, `tsc` só os 3 erros da baseline; API unit 60/340; eslint e prettier limpos no spec alterado; lint da API 147 erros/56 warnings (baseline, a branch não toca `api/src`); busca de hex só com as 6 exceções da guarda. Supertest e2e (209), `pw:api` (2) e `pw:e2e` (10) rodados pelo subagente, não repetidos aqui.
 - **Riscos residuais:** lint da API vermelho; `lightPalette` em 5 telas (6.14); háptico sem verificação; nenhum spec toca "Iniciar Retorno" pela UI; evidências de device só no scratchpad da sessão.
+
+- **Fechamento (27/09/2026):** o usuário marcou a story como `done` aceitando as pendências acima (lint da API, `lightPalette` em 5 telas, háptico).
