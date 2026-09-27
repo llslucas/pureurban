@@ -9,8 +9,8 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { StatusChip, type StatusChipProps } from '@/components/ui/status-chip'
-import { lightPalette } from '@/lib/palette'
-import { elevation, motion, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
+import { motion, radius, spacing, typography } from '@/lib/tokens'
 
 export interface TripStatusCardProps {
   /** Changing it replays the entrance fade (a new state, not a new tick). */
@@ -35,6 +35,7 @@ export function TripStatusCard({
   children,
   testID = 'trip-status-card',
 }: TripStatusCardProps) {
+  const styles = useThemedStyles(createStyles)
   const reducedMotion = useReducedMotion()
   const progress = useSharedValue(0)
 
@@ -67,32 +68,33 @@ export function TripStatusCard({
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[2],
-  },
-  overline: {
-    ...typography.overline,
-    color: lightPalette.textMuted,
-    textTransform: 'uppercase',
-  },
-  title: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-  detail: {
-    ...typography.body,
-    color: lightPalette.textBody,
-  },
-  caption: {
-    ...typography.caption,
-    color: lightPalette.textMuted,
-  },
-  extra: {
-    marginTop: spacing[2],
-    gap: spacing[3],
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    card: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      gap: spacing[2],
+    },
+    overline: {
+      ...typography.overline,
+      color: palette.textMuted,
+      textTransform: 'uppercase',
+    },
+    title: {
+      ...typography.title,
+      color: palette.text,
+    },
+    detail: {
+      ...typography.body,
+      color: palette.textBody,
+    },
+    caption: {
+      ...typography.caption,
+      color: palette.textMuted,
+    },
+    extra: {
+      marginTop: spacing[2],
+      gap: spacing[3],
+    },
+  })

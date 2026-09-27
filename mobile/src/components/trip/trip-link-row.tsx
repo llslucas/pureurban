@@ -3,8 +3,8 @@ import { Pressable, StyleSheet } from 'react-native'
 import { Text } from 'react-native-paper'
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { radius, spacing, typography } from '@/lib/tokens'
 
 interface TripLinkRowProps {
   label: string
@@ -15,6 +15,8 @@ interface TripLinkRowProps {
 }
 
 export function TripLinkRow({ label, icon, onPress, disabled = false, testID = 'trip-link-row' }: TripLinkRowProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   return (
     <Pressable
       onPress={onPress}
@@ -25,34 +27,35 @@ export function TripLinkRow({ label, icon, onPress, disabled = false, testID = '
       style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && styles.disabled]}
       testID={testID}
     >
-      <MdiIcon name={icon} size={24} color={lightPalette.text} />
+      <MdiIcon name={icon} size={24} color={palette.text} />
       <Text style={styles.label}>{label}</Text>
-      <MdiIcon name="chevron-right" size={24} color={lightPalette.textMuted} />
+      <MdiIcon name="chevron-right" size={24} color={palette.textMuted} />
     </Pressable>
   )
 }
 
-const styles = StyleSheet.create({
-  row: {
-    ...elevation.level1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: spacing.actionHeight,
-    paddingHorizontal: spacing[4],
-    gap: spacing[3],
-    borderRadius: radius.lg,
-  },
-  pressed: {
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  label: {
-    ...typography.bodyLg,
-    fontFamily: typography.label.fontFamily,
-    fontWeight: typography.label.fontWeight,
-    color: lightPalette.text,
-    flex: 1,
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    row: {
+      ...elevation.level1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: spacing.actionHeight,
+      paddingHorizontal: spacing[4],
+      gap: spacing[3],
+      borderRadius: radius.lg,
+    },
+    pressed: {
+      backgroundColor: palette.surfaceSoft,
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    label: {
+      ...typography.bodyLg,
+      fontFamily: typography.label.fontFamily,
+      fontWeight: typography.label.fontWeight,
+      color: palette.text,
+      flex: 1,
+    },
+  })

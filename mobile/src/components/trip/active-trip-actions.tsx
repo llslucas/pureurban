@@ -2,7 +2,7 @@ import React from 'react'
 
 import { PrimaryAction } from '@/components/ui/primary-action'
 import { StickyActionBar } from '@/components/ui/sticky-action-bar'
-import { lightPalette } from '@/lib/palette'
+import { useAppTheme } from '@/lib/theme'
 
 interface ActiveTripActionsProps {
   onEnd: () => void
@@ -13,11 +13,12 @@ interface ActiveTripActionsProps {
 // "Encerrar" is secondary in red, above the primary and away from the thumb:
 // it's irreversible and used to sit 16px from "Escanear" (D-UX-7).
 export function ActiveTripActions({ onEnd, onScan, disabled }: ActiveTripActionsProps) {
+  const { palette } = useAppTheme().custom
   return (
     <StickyActionBar>
       <PrimaryAction
         variant="secondary"
-        color={lightPalette.error}
+        color={palette.error}
         icon="stop-circle"
         label="Encerrar Viagem"
         onPress={onEnd}

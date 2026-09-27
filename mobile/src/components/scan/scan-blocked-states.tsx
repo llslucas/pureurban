@@ -4,7 +4,7 @@ import { Linking, StyleSheet, View } from 'react-native'
 
 import { PermissionCard } from '@/components/ui/permission-card'
 import { StateView } from '@/components/ui/state-view'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing } from '@/lib/tokens'
 
 // Role guard: a student who lands on this route must not scan anyone.
@@ -37,6 +37,7 @@ interface CameraPermissionStateProps {
 // Truth Table state 2. One component for both branches, so `actionError`
 // survives the switch from "ask" to "blocked".
 export function CameraPermissionState({ canAskAgain, requestPermission }: CameraPermissionStateProps) {
+  const styles = useThemedStyles(createStyles)
   // Failure to open the permission prompt or the system settings. Both promises
   // used to be discarded with `void`: the rejection went unhandled and the
   // button just looked dead.
@@ -98,16 +99,17 @@ export function NoActiveTripState() {
   )
 }
 
-const styles = StyleSheet.create({
-  permissionScreen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.gutter,
-    backgroundColor: lightPalette.surfaceSoft,
-  },
-  permissionCard: {
-    width: '100%',
-    maxWidth: spacing.contentMaxWidth,
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    permissionScreen: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.gutter,
+      backgroundColor: palette.surfaceSoft,
+    },
+    permissionCard: {
+      width: '100%',
+      maxWidth: spacing.contentMaxWidth,
+    },
+  })

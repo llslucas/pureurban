@@ -663,7 +663,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
 
 describe('locks de call-site (source-lock)', () => {
   it('trip: encerrar no vermelho único e chips nos tons de status', () => {
-    expect(readSource('components/trip/active-trip-actions.tsx')).toMatch(/color=\{lightPalette\.error\}/)
+    expect(readSource('components/trip/active-trip-actions.tsx')).toMatch(/color=\{palette\.error\}/)
     const card = readSource('components/trip/trip-card.tsx')
     expect(card).toMatch(/icon="progress-clock" tone="success"/)
     expect(card).toMatch(/icon="flag-checkered" tone="info"/)
@@ -686,11 +686,11 @@ describe('locks de call-site (source-lock)', () => {
 
   it('route-card: fundo do cartão e papéis de texto presos à paleta (6.13)', () => {
     const source = readSource('components/routes/route-card.tsx')
-    expect(source).toMatch(/card: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/name: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/city: \{[^}]*color: lightPalette\.textBody,/)
-    expect(source).toMatch(/description: \{[^}]*color: lightPalette\.textMuted,/)
-    expect(source).toMatch(/color=\{lightPalette\.textMuted\}/)
+    expect(source).toMatch(/card: \{[^}]*backgroundColor: palette\.surface,/)
+    expect(source).toMatch(/name: \{[^}]*color: palette\.text,/)
+    expect(source).toMatch(/city: \{[^}]*color: palette\.textBody,/)
+    expect(source).toMatch(/description: \{[^}]*color: palette\.textMuted,/)
+    expect(source).toMatch(/color=\{palette\.textMuted\}/)
   })
 
   it('admin: faixa de marca no amarelo com texto e ícone onBrand (6.13, D-UX-1)', () => {
@@ -714,9 +714,9 @@ describe('locks de call-site (source-lock)', () => {
 
   it('roster-header: fundo, divisória e legenda presos à paleta', () => {
     const source = readSource('components/student-list/roster-header.tsx')
-    expect(source).toMatch(/header: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/header: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
-    expect(source).toMatch(/legend: \{[^}]*color: lightPalette\.textMuted,/)
+    expect(source).toMatch(/header: \{[^}]*backgroundColor: palette\.surface,/)
+    expect(source).toMatch(/header: \{[^}]*borderBottomColor: palette\.hairline,/)
+    expect(source).toMatch(/legend: \{[^}]*color: palette\.textMuted,/)
   })
 
   it('student-row: linha, avatar, nome, hora e divisória presos à paleta (chip é coberto pelo render-probe)', () => {

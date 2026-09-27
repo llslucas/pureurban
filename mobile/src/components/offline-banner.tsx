@@ -4,15 +4,13 @@ import { Text } from 'react-native-paper'
 
 import { MdiIcon, type MdiIconName } from '@/components/ui/mdi-icon'
 import { PrimaryAction } from '@/components/ui/primary-action'
-import { lightPalette } from '@/lib/palette'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
 import { spacing, typography } from '@/lib/tokens'
 import type { OfflineSyncState } from '@/hooks/use-offline-sync'
 
 // One GLOBAL banner for the app (story 3.4b). Per-item badges and a queue cap
 // counter were cut to Phase 2 on 2026-08-28: a driver at the wheel needs one
 // signal, not an inventory.
-const PENDING_COLOR = lightPalette.textBody
-const FAILED_COLOR = lightPalette.error
 const ICON_SIZE = 22
 
 function pendingLabel(count: number): string {
@@ -39,9 +37,11 @@ interface OfflineBannerProps extends OfflineSyncState {
 }
 
 function StripMessage({ icon, text, testID }: { icon: MdiIconName; text: string; testID: string }) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   return (
     <View style={styles.message}>
-      <MdiIcon name={icon} size={ICON_SIZE} color={lightPalette.onPrimary} testID={testID} />
+      <MdiIcon name={icon} size={ICON_SIZE} color={palette.onPrimary} testID={testID} />
       <Text style={styles.text} accessibilityRole="alert">
         {text}
       </Text>
@@ -55,6 +55,8 @@ export function OfflineBanner({
   insetBottom = 0,
   onDismissFailed,
 }: OfflineBannerProps) {
+  const { palette } = useAppTheme().custom
+  const styles = useThemedStyles(createStyles)
   // Nothing to show: drop the safe-area padding too, or an empty strip would
   // sit at the bottom.
   if (pendingCount === 0 && failedCount === 0) return null
@@ -69,13 +71,13 @@ export function OfflineBanner({
     >
       {failedCount > 0 ? (
         // The failure comes first: it is the only one that needs the driver to act.
-        <View style={[styles.strip, { backgroundColor: FAILED_COLOR }]} testID="offline-banner-failed">
+        <View style={[styles.strip, { backgroundColor: palette.error }]} testID="offline-banner-failed">
           <StripMessage icon="alert-circle-outline" text={failedLabel(failedCount)} testID="offline-banner-failed-icon" />
           {onDismissFailed ? (
             <View style={styles.dismiss}>
               <PrimaryAction
                 variant="quiet"
-                color={lightPalette.onPrimary}
+                color={palette.onPrimary}
                 label="Dispensar"
                 onPress={onDismissFailed}
                 testID="offline-banner-dismiss"
@@ -85,7 +87,7 @@ export function OfflineBanner({
         </View>
       ) : null}
       {pendingCount > 0 ? (
-        <View style={[styles.strip, { backgroundColor: PENDING_COLOR }]} testID="offline-banner-pending">
+        <View style={[styles.strip, { backgroundColor: palette.textBody }]} testID="offline-banner-pending">
           <StripMessage icon="cloud-off-outline" text={pendingLabel(pendingCount)} testID="offline-banner-pending-icon" />
         </View>
       ) : null}
@@ -93,31 +95,32 @@ export function OfflineBanner({
   )
 }
 
-const styles = StyleSheet.create({
-  // In the flow rather than overlaid: as an overlay it would cover the scan
-  // result overlay's buttons in the bottom half of the screen.
-  container: {
-    alignSelf: 'stretch',
-  },
-  strip: {
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing.gutter,
-    gap: spacing[1],
-  },
-  message: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-  // NFR18: high contrast and >= 16sp, readable on the move and in direct sun.
-  text: {
-    ...typography.bodyLg,
-    fontFamily: typography.button.fontFamily,
-    fontWeight: typography.button.fontWeight,
-    color: lightPalette.onPrimary,
-    flexShrink: 1,
-  },
-  dismiss: {
-    alignSelf: 'flex-end',
-  },
-})
+const createStyles = ({ custom: { palette } }: AppTheme) =>
+  StyleSheet.create({
+    // In the flow rather than overlaid: as an overlay it would cover the scan
+    // result overlay's buttons in the bottom half of the screen.
+    container: {
+      alignSelf: 'stretch',
+    },
+    strip: {
+      paddingVertical: spacing[3],
+      paddingHorizontal: spacing.gutter,
+      gap: spacing[1],
+    },
+    message: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[3],
+    },
+    // NFR18: high contrast and >= 16sp, readable on the move and in direct sun.
+    text: {
+      ...typography.bodyLg,
+      fontFamily: typography.button.fontFamily,
+      fontWeight: typography.button.fontWeight,
+      color: palette.onPrimary,
+      flexShrink: 1,
+    },
+    dismiss: {
+      alignSelf: 'flex-end',
+    },
+  })
