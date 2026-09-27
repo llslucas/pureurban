@@ -3,19 +3,33 @@ title: 'Story 6.12: gate visual da demo (marco do Épico 6)'
 type: 'chore'
 ticket: '6-12-gate-visual-da-demo'
 created: '2026-09-27'
-status: 'review'
+status: 'built'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'auto'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 baseline_revision: 'f7f9adce88dc63d078d8c9e725f24a25fe7fbe4e'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/planning-artifacts/ux-designs/ux-pureurban-2026-09-26/EXPERIENCE.md'
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      O handler MSW de GET /trips/:id/students (summary.total sem NOT_RETURNING) não tem teste automatizado; pode voltar a divergir do use case da API.
+    evidence: |-
+      Nenhum teste Jest/Playwright importa mobile/src/mocks/handlers; a única guarda é a espera por "1 de 3" em light-17 no script de captura, rodado à mão.
+    location: >-
+      mobile/src/mocks/handlers/boarding.handlers.ts:314
+    severity: low
+  - summary: >-
+      absence-reminder "fora da janela" pode ter corrida entre o persister do TanStack (throttle 1s) e o setItem do blob envelhecido antes do reload.
+    evidence: |-
+      Não observado: pw:e2e 10/10 no gate. Resolveria rodar o spec em loop (--repeat-each 20) ou mover o aging para page.addInitScript antes do reload.
+    location: >-
+      api/tests/e2e/absence-reminder.e2e.spec.ts:230
+    severity: medium (unverified)
 ---
 
 <intent-contract>
@@ -99,6 +113,37 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-09-27 — Review pass
+- verdicts: 27 findings — high 0, medium 0, low 21, false 5, maybe-false 1
+- findings:
+  - `[low]` `[defer]` (verification-gap) handler MSW com `summary.total` corrigido sem teste automatizado — pré-existente (mocks nunca tiveram teste); registrado em `deferred`.
+  - `[low]` `[reject]` (intent) capturas são Expo Web + MSW, não API real/device — declarado no `antes-depois.md`; fluxos reais cobertos por `pw:e2e`; nada a corrigir.
+  - `[low]` `[reject]` (intent) 5 pares cujo nome sugere estado que o mock não alcança — matriz manda capturar o que o mock produz e anotar; anotados no doc.
+  - `[low]` `[reject]` (intent) correção do mock muda 0/4 → 0/3 nos pares — documentado em "Diferenças de estado conhecidas".
+  - `[false]` `[reject]` (intent) `aria-hidden` em `mdi-icon.tsx` seria mudança de produção para passar o gate — é defeito real de a11y no web, trivial e isolado, em commit `fix(...)` próprio, como a exceção do contrato permite.
+  - `[false]` `[reject]` (intent) status final indefinido pelo intent — o AC do gate define: falha registrada → status não é `done`; está `review`/`built`.
+  - `[low]` `[reject]` (blind) `deferred: []` vazio apesar de pendências no corpo — correção seria editar o plano; as pendências estão no comentário da 6-12 no `sprint-status.yaml`.
+  - `[low]` `[reject]` (blind) grep da Verification mistura hex e `lightPalette` com expectativa impossível — correção seria editar o plano; resultado real registrado nas Implementation Notes.
+  - `[false]` `[reject]` (blind) estado de revisão inconsistente (triage vazio) — a triagem estava em andamento; esta entrada a completa.
+  - `[low]` `[reject]` (blind) script não confere 780×1688 nem o conjunto de nomes — conferido por comando no gate e nesta revisão; automatizar acrescenta código sem ganho de uso diário.
+  - `[low]` `[patch]` (blind) `light-34`/`light-16` dependem de sleep fixo — `light-34` agora espera o Snackbar ("Não foi possível registrar a ausência" | "Motorista avisado"); `light-16` afirma HUD "1 embarque nesta sessão" e ausência do overlay após a espera.
+  - `[low]` `[reject]` (blind) script não detecta servidor sem mocks / não está no `package.json` — a falha de login já aponta o problema e o doc explica o pré-requisito.
+  - `[false]` `[reject]` (blind) `aria-hidden` sem teste de regressão — `absence-reminder.e2e.spec.ts` `getByRole('button', { name: 'Desfazer', exact: true })` falha se o glifo voltar ao nome acessível.
+  - `[low]` `[defer]` (blind) mock de boarding sem teste — mesma causa do primeiro item; ver `deferred`.
+  - `[low]` `[patch]` (blind) comentário quebrado em `absence-reminder.e2e.spec.ts` — linha refluída. Mensagens/comentários em português no spec são pré-existentes, fora do escopo.
+  - `[low]` `[reject]` (blind) credenciais dos AVDs no plano — contas de seed do banco local de dev, sem acesso externo; correção seria editar o plano.
+  - `[low]` `[reject]` (blind) evidência de device não versionada — o plano declara isso explicitamente; nada é dado como verificado sem ter sido.
+  - `[false]` `[reject]` (blind) nota 0/3 só em `light-10` — a seção "Diferenças de estado conhecidas" aplica a todas as telas do motorista; ordem das linhas dark é cosmética.
+  - `[low]` `[reject]` (blind) comentário do `jest.config.js` vago sobre `workerIdleMemoryLimit` — o comentário nomeia os dois limites no código logo abaixo; cosmético.
+  - `[low]` `[patch]` (edge) PNG antigo sobrevive a captura falha — `rmSync(file, { force: true })` antes de rodar cada captura.
+  - `[low]` `[reject]` (edge) PNG de 0 byte fica após o throw — `page.screenshot` não produz arquivo vazio na prática; guarda extra sem uso real.
+  - `[low]` `[patch]` (edge) `light-16` aceita qualquer estado após 1500 ms — mesma correção do sleep fixo (asserção de ocioso).
+  - `[low]` `[reject]` (edge) `light-19` pode capturar mutação pendente — mock responde de imediato e há 900 ms de settle; PNG conferido.
+  - `[low]` `[patch]` (edge) `light-34` pode capturar antes do Snackbar — espera explícita pelo texto; recaptura mostra o Snackbar.
+  - `[low]` `[reject]` (edge) `trip-screen` monta antes do resumo — settle de 900 ms e PNGs conferidos com contador carregado.
+  - `[low]` `[patch]` (edge) `playwright` só resolve por hoisting — script passou a `require('@playwright/test')`, dependência declarada da API.
+  - `[maybe-false]` `[defer]` (edge) corrida persister × blob envelhecido no `absence-reminder` — mecanismo pré-existente, não observado (10/10); ver `deferred`.
+
 ## Design Notes
 
 `after/` ao lado de `audit/` (mesmo nome de arquivo) permite diff visual direto e links relativos simples no documento. Os `dark-*` continuam sendo "SO em escuro" — o app trava em claro (D-UX-4), então devem sair iguais aos `light-*`; isso comprova a trava.
@@ -113,3 +158,20 @@ deferred: []
 
 **Manual checks (if no CLI):**
 - Olhar cada par antes/depois: estado equivalente, nada truncado nem com overflow horizontal.
+
+## Auto Run Result
+
+- **Resumo:** gate visual do Épico 6 — script reprodutível `mobile/scripts/capture-demo-screens.mjs`, 26 capturas `after/` 1:1 com `audit/`, `antes-depois.md` lado a lado, bateria de testes registrada, `sprint-status.yaml` corrigido (6-6 `done`) e 6-12 em `review` (não `done`: lint da API na baseline vermelha, `lightPalette` em 5 telas, háptico pendente de verificação manual).
+- **Arquivos:**
+  - `mobile/scripts/capture-demo-screens.mjs` — script de captura (26 estados, filtro por nome, falha por captura).
+  - `_bmad-output/planning-artifacts/ux-designs/ux-pureurban-2026-09-26/after/*.png` — 26 capturas "depois".
+  - `_bmad-output/planning-artifacts/ux-designs/ux-pureurban-2026-09-26/antes-depois.md` — tabela antes/depois e diferenças de estado.
+  - `mobile/src/mocks/handlers/boarding.handlers.ts` — `summary.total` do mock sem `NOT_RETURNING`, como a API.
+  - `mobile/src/components/ui/mdi-icon.tsx` — `aria-hidden` para o glifo sair do nome acessível no web.
+  - `api/tests/e2e/absence-reminder.e2e.spec.ts` — chave de cache `studentBoardingStatus` (spec quebrado desde o PR #54).
+  - `mobile/jest.config.js` — `maxWorkers: '25%'` e `workerIdleMemoryLimit` contra OOM do WSL.
+  - `_bmad-output/implementation-artifacts/sprint-status.yaml` — 6-6 `done`, 6-12 `review`.
+- **Revisão:** 27 achados; 6 patches (todos `low`: esperas do `light-16`/`light-34`, limpeza do PNG antigo, `@playwright/test`, reflow de comentário); 3 adiados (2 entradas em `deferred`); 18 rejeitados com motivo no Review Triage Log.
+- **Follow-up review:** `false` — só patches `low` (0 high, 0 medium).
+- **Verificação (orquestrador, após o subagente e após os patches):** nomes `after/` = `audit/`; todos 780×1688; recaptura completa em pasta do scratchpad 26/26 (duas vezes, antes e depois dos patches; `light-34` mostra o Snackbar); filtro sem correspondência sai com código 2; mobile `lint` limpo, Jest 58/731, `tsc` só os 3 erros da baseline; API unit 60/340; eslint e prettier limpos no spec alterado; lint da API 147 erros/56 warnings (baseline, a branch não toca `api/src`); busca de hex só com as 6 exceções da guarda. Supertest e2e (209), `pw:api` (2) e `pw:e2e` (10) rodados pelo subagente, não repetidos aqui.
+- **Riscos residuais:** lint da API vermelho; `lightPalette` em 5 telas (6.14); háptico sem verificação; nenhum spec toca "Iniciar Retorno" pela UI; evidências de device só no scratchpad da sessão.
