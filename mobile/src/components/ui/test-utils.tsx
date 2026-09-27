@@ -3,18 +3,18 @@ import React, { type ReactElement } from 'react'
 import { Provider as PaperProvider } from 'react-native-paper'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-import { lightTheme } from '@/lib/theme'
+import { type AppTheme, lightTheme } from '@/lib/theme'
 
 export const TEST_INSETS = { top: 0, right: 0, bottom: 24, left: 0 }
 
 // MDI glyphs load their font asynchronously and set state afterwards; flushing
 // once keeps that update inside act() instead of leaking a warning per test.
-export async function renderUi(element: ReactElement) {
+export async function renderUi(element: ReactElement, theme: AppTheme = lightTheme) {
   const utils = render(
     <SafeAreaProvider
       initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: TEST_INSETS }}
     >
-      <PaperProvider theme={lightTheme}>{element}</PaperProvider>
+      <PaperProvider theme={theme}>{element}</PaperProvider>
     </SafeAreaProvider>,
   )
   await act(async () => {})

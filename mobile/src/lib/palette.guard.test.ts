@@ -7,7 +7,7 @@ import { render, screen, cleanup } from '@testing-library/react-native'
 
 import { OfflineBanner } from '@/components/offline-banner'
 import { StudentRow } from '@/components/student-row'
-import { STATUS_PRESENTATION } from '@/lib/boarding-status'
+import { STATUS_PRESENTATION, statusColors } from '@/lib/boarding-status'
 import {
   appExtensions,
   darkMapping,
@@ -604,13 +604,18 @@ describe('lock de binding dos temas Paper', () => {
 })
 
 describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', () => {
-  it('STATUS_PRESENTATION vale exatamente os papéis da paleta', () => {
-    expect(STATUS_PRESENTATION.CHECKED_IN.color).toBe(lightPalette.success)
-    expect(STATUS_PRESENTATION.CHECKED_IN.background).toBe(statusTints.success)
-    expect(STATUS_PRESENTATION.NOT_CHECKED_IN.color).toBe(lightPalette.textBody)
-    expect(STATUS_PRESENTATION.NOT_CHECKED_IN.background).toBe(statusTints.neutral)
-    expect(STATUS_PRESENTATION.NOT_RETURNING.color).toBe(lightPalette.warning)
-    expect(STATUS_PRESENTATION.NOT_RETURNING.background).toBe(statusTints.warning)
+  it('STATUS_PRESENTATION: cada status num tom; cores resolvidas contra a paleta do esquema', () => {
+    expect(STATUS_PRESENTATION.CHECKED_IN.tone).toBe('success')
+    expect(STATUS_PRESENTATION.NOT_CHECKED_IN.tone).toBe('neutral')
+    expect(STATUS_PRESENTATION.NOT_RETURNING.tone).toBe('warning')
+    for (const [palette, tints] of [
+      [lightPalette, lightStatusTints],
+      [darkPalette, darkStatusTints],
+    ] as const) {
+      expect(statusColors('CHECKED_IN', palette, tints)).toEqual({ color: palette.success, background: tints.success })
+      expect(statusColors('NOT_CHECKED_IN', palette, tints)).toEqual({ color: palette.textBody, background: tints.neutral })
+      expect(statusColors('NOT_RETURNING', palette, tints)).toEqual({ color: palette.warning, background: tints.warning })
+    }
   })
 
   it.each([
@@ -621,10 +626,7 @@ describe('lock de binding — STATUS_PRESENTATION e faixas do OfflineBanner', ()
     // Um probe por teste: o cleanup automático entre testes desmonta a árvore —
     // cleanup manual + render no mesmo tick quebra o renderer do RNTL.
     const colors = chipColorsFor(status)
-    expect(colors).toEqual({
-      color: STATUS_PRESENTATION[status].color,
-      background: STATUS_PRESENTATION[status].background,
-    })
+    expect(colors).toEqual(statusColors(status, lightPalette, lightStatusTints))
   })
 
   it('render-probe do OfflineBanner: faixa pendente na família ink/body', () => {
@@ -700,9 +702,9 @@ describe('locks de call-site (source-lock)', () => {
 
   it('app-header: fundo, divisória e tinta presos à paleta', () => {
     const source = readSource('lib/app-header.tsx')
-    expect(source).toMatch(/headerTintColor: lightPalette\.text,/)
-    expect(source).toMatch(/background: \{[^}]*backgroundColor: lightPalette\.canvas,/)
-    expect(source).toMatch(/background: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
+    expect(source).toMatch(/headerTintColor: palette\.text,/)
+    expect(source).toMatch(/background: \{[^}]*backgroundColor: palette\.canvas,/)
+    expect(source).toMatch(/background: \{[^}]*borderBottomColor: palette\.hairline,/)
   })
 
   it('student-list: fundo da tela preso à paleta', () => {
@@ -719,12 +721,12 @@ describe('locks de call-site (source-lock)', () => {
 
   it('student-row: linha, avatar, nome, hora e divisória presos à paleta (chip é coberto pelo render-probe)', () => {
     const source = readSource('components/student-row.tsx')
-    expect(source).toMatch(/row: \{[^}]*backgroundColor: lightPalette\.surface,/)
-    expect(source).toMatch(/avatar: \{[^}]*backgroundColor: lightPalette\.surfaceStrong,/)
-    expect(source).toMatch(/initials: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/name: \{[^}]*color: lightPalette\.text,/)
-    expect(source).toMatch(/time: \{[^}]*color: lightPalette\.textMuted,/)
-    expect(source).toMatch(/body: \{[^}]*borderBottomColor: lightPalette\.hairline,/)
-    expect(source).toMatch(/backgroundColor: presentation\.background \}, pulseStyle/)
+    expect(source).toMatch(/row: \{[^}]*backgroundColor: palette\.surface,/)
+    expect(source).toMatch(/avatar: \{[^}]*backgroundColor: palette\.surfaceStrong,/)
+    expect(source).toMatch(/initials: \{[^}]*color: palette\.text,/)
+    expect(source).toMatch(/name: \{[^}]*color: palette\.text,/)
+    expect(source).toMatch(/time: \{[^}]*color: palette\.textMuted,/)
+    expect(source).toMatch(/body: \{[^}]*borderBottomColor: palette\.hairline,/)
+    expect(source).toMatch(/backgroundColor: colors\.background \}, pulseStyle/)
   })
 })

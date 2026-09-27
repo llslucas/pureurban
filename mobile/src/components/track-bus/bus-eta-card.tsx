@@ -11,9 +11,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { CHIP_TONES, StatusChip } from '@/components/ui/status-chip'
-import { lightPalette } from '@/lib/palette'
-import { elevation, radius, spacing, typography } from '@/lib/tokens'
+import { StatusChip } from '@/components/ui/status-chip'
+import { toneColors } from '@/lib/boarding-status'
+import { type AppTheme, useAppTheme, useThemedStyles } from '@/lib/theme'
+import { radius, spacing, typography } from '@/lib/tokens'
 
 export type BusEtaFreshness = { kind: 'live' } | { kind: 'stale'; minutes: number }
 
@@ -44,7 +45,9 @@ const ETA_MAX_FONT_SCALE = 1.5
 function LiveChip({ testID }: { testID: string }) {
   const reducedMotion = useReducedMotion()
   const progress = useSharedValue(0)
-  const tone = CHIP_TONES.success
+  const { custom } = useAppTheme()
+  const styles = useThemedStyles(createStyles)
+  const tone = toneColors('success', custom.palette, custom.tints)
 
   useEffect(() => {
     if (reducedMotion) return
@@ -95,6 +98,7 @@ export function BusEtaCard({
   captionAccessibilityLabel,
   testID = 'bus-eta-card',
 }: BusEtaCardProps) {
+  const styles = useThemedStyles(createStyles)
   return (
     <View style={styles.card} testID={testID}>
       <View style={styles.header}>
@@ -140,66 +144,67 @@ export function BusEtaCard({
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    ...elevation.level1,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    gap: spacing[2],
-  },
-  header: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing[2],
-    marginBottom: spacing[1],
-  },
-  label: {
-    ...typography.label,
-    color: lightPalette.textBody,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: CHIP_HEIGHT,
-    paddingHorizontal: spacing[3],
-    gap: spacing[2],
-    borderRadius: radius.full,
-  },
-  dotBox: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-  },
-  dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: radius.full,
-  },
-  halo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  chipLabel: {
-    ...typography.label,
-  },
-  eta: {
-    ...typography.displayCount,
-    color: lightPalette.text,
-    fontVariant: ['tabular-nums'],
-  },
-  distance: {
-    ...typography.title,
-    color: lightPalette.text,
-  },
-  pending: {
-    ...typography.body,
-    color: lightPalette.textBody,
-  },
-  caption: {
-    ...typography.caption,
-    color: lightPalette.textMuted,
-    marginTop: spacing[1],
-  },
-})
+const createStyles = ({ custom: { palette, elevation } }: AppTheme) =>
+  StyleSheet.create({
+    card: {
+      ...elevation.level1,
+      borderRadius: radius.lg,
+      padding: spacing[4],
+      gap: spacing[2],
+    },
+    header: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing[2],
+      marginBottom: spacing[1],
+    },
+    label: {
+      ...typography.label,
+      color: palette.textBody,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: CHIP_HEIGHT,
+      paddingHorizontal: spacing[3],
+      gap: spacing[2],
+      borderRadius: radius.full,
+    },
+    dotBox: {
+      width: DOT_SIZE,
+      height: DOT_SIZE,
+    },
+    dot: {
+      width: DOT_SIZE,
+      height: DOT_SIZE,
+      borderRadius: radius.full,
+    },
+    halo: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+    },
+    chipLabel: {
+      ...typography.label,
+    },
+    eta: {
+      ...typography.displayCount,
+      color: palette.text,
+      fontVariant: ['tabular-nums'],
+    },
+    distance: {
+      ...typography.title,
+      color: palette.text,
+    },
+    pending: {
+      ...typography.body,
+      color: palette.textBody,
+    },
+    caption: {
+      ...typography.caption,
+      color: palette.textMuted,
+      marginTop: spacing[1],
+    },
+  })
