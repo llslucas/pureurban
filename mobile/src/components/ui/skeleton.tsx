@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { type ReactNode, useEffect, useState } from 'react'
 import {
   type DimensionValue,
   type LayoutChangeEvent,
@@ -63,6 +63,31 @@ export function Skeleton({ width = '100%', height, borderRadius = radius.sm, sty
           testID={`${testID}-shimmer`}
         />
       )}
+    </View>
+  )
+}
+
+export interface SkeletonGroupProps {
+  /** The loading state's accessible name, e.g. "Carregando viagem...". */
+  label: string
+  children: ReactNode
+  style?: StyleProp<ViewStyle>
+  testID?: string
+}
+
+// Every Skeleton is hidden from assistive tech, so without a labelled container
+// a screen reader would land on an empty screen while it loads.
+export function SkeletonGroup({ label, children, style, testID = 'skeleton-group' }: SkeletonGroupProps) {
+  return (
+    <View
+      style={style}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityState={{ busy: true }}
+      testID={testID}
+    >
+      {children}
     </View>
   )
 }
