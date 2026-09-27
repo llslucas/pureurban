@@ -1,7 +1,8 @@
 # PureUrban Mobile — antes e depois do redesign (Épico 6)
 
 Capturas "antes" em [`audit/`](audit/) (auditoria de 26/09/2026, ver `EXPERIENCE.md` → Auditoria da
-UI atual) e "depois" em [`after/`](after/) (Story 6.12, 27/09/2026; `light-18` e `light-40` regenerados na Story 6.13). Mesmos nomes de arquivo, mesmo
+UI atual) e "depois" em [`after/`](after/) (Story 6.12, 27/09/2026; `light-18` e `light-40` regenerados na Story 6.13; `dark-*` regenerados e
+ampliados para as telas P0 na Story 6.14). Mesmos nomes de arquivo, mesmo
 usuário mock, mesma tela, mesma ação e mesmo esquema de cor do SO. Ambiente: Expo Web + MSW
 (`EXPO_PUBLIC_USE_MOCKS=1`, `EXPO_PUBLIC_E2E=1` para injetar a leitura do QR), Chromium do
 Playwright, viewport 390×844 @2x (PNG 780×1688), `pt-BR`, fuso `America/Sao_Paulo`.
@@ -16,7 +17,7 @@ Os usuários mock são `<usuário>@pureurban.com` com senha `senha123`
 EXPO_PUBLIC_USE_MOCKS=1 EXPO_PUBLIC_E2E=1 npx expo start --web --port 8081
 
 # terminal 2 — na raiz do repositório
-node mobile/scripts/capture-demo-screens.mjs            # as 27
+node mobile/scripts/capture-demo-screens.mjs            # as 35
 node mobile/scripts/capture-demo-screens.mjs light-14   # filtro por trecho do nome
 ```
 
@@ -39,9 +40,15 @@ de rodar Jest ou `tsc` (ver o gate na `plan-6-12`).
 - **`light-16`:** a segunda injeção do mesmo QR é descartada pelo scanner (mesma string lida duas
   vezes), então a tela volta ao estado ocioso, como no "antes". O "Já embarcou" âmbar só aparece
   com uma leitura nova do mesmo aluno.
-- **`light-10` = `light-11` e `dark-*` = `light-*`:** a sentinela `motorista-viagem-encerrada`
-  serve de propósito uma viagem ATIVA (o 409 só aparece ao escanear), e o app está travado no tema
-  claro (D-UX-4). Os PNGs saem idênticos byte a byte, o que comprova a trava.
+- **`light-10` = `light-11`:** a sentinela `motorista-viagem-encerrada` serve de propósito uma
+  viagem ATIVA (o 409 só aparece ao escanear).
+- **`dark-*` (Story 6.14):** no "antes" o app travava no claro (D-UX-4) e os `dark-*` saíam
+  idênticos aos `light-*`; agora o app segue o SO. Os `dark-*` do "depois" mostram o `darkPalette`
+  (canvas `#181d26`, cartões com borda `#41454d`, chips on-dark); scan e passe do QR mantêm a
+  identidade clara de propósito. As telas P0 sem captura escura no "antes" (11–14, 30–33) apontam
+  para o `light-*` da auditoria, que é o que o app mostrava com o SO em escuro.
+- **Regenerar os `light-*` na 6.14** só mexe em hora ("Iniciada às…"), no feed da câmera e no QR
+  (sessão nova): nenhuma diferença visual de tema — os PNGs claros ficaram os da 6.12/6.13.
 - **A câmera é a falsa do Chromium** (`--use-fake-device-for-media-stream`): o fundo verde com o
   "pac-man" no scan é o feed de teste, não a UI.
 
@@ -52,9 +59,9 @@ de rodar Jest ou `tsc` (ver o gate na `plan-6-12`).
 | light-01 | Login vazio | — | <img src="audit/light-01-login.png" width="180"> | <img src="after/light-01-login.png" width="180"> | Hero amarelo com marca (D-UX-1), fonte Inter (D-UX-2). |
 | light-02 | Login enviado vazio | — | <img src="audit/light-02-login-erro-vazio.png" width="180"> | <img src="after/light-02-login-erro-vazio.png" width="180"> | Erro virou Banner inline acima do botão. |
 | light-10 | Viagem com a sentinela de viagem encerrada | `motorista-viagem-encerrada` | <img src="audit/light-10-trip-encerrada-sentinela.png" width="180"> | <img src="after/light-10-trip-encerrada-sentinela.png" width="180"> | Igual a `light-11` (sentinela serve viagem ativa). Total 0/3 (mock corrigido). |
-| dark-01 | Login vazio, SO em escuro | — | <img src="audit/dark-01-login.png" width="180"> | <img src="after/dark-01-login.png" width="180"> | Idêntico a `light-01` (trava de tema claro). |
-| dark-02 | Login enviado vazio, SO em escuro | — | <img src="audit/dark-02-login-erro-vazio.png" width="180"> | <img src="after/dark-02-login-erro-vazio.png" width="180"> | Idêntico a `light-02`. |
-| dark-10 | Sentinela de viagem encerrada, SO em escuro | `motorista-viagem-encerrada` | <img src="audit/dark-10-trip-encerrada-sentinela.png" width="180"> | <img src="after/dark-10-trip-encerrada-sentinela.png" width="180"> | Idêntico a `light-10`. |
+| dark-01 | Login vazio, SO em escuro | — | <img src="audit/dark-01-login.png" width="180"> | <img src="after/dark-01-login.png" width="180"> | Hero amarelo igual; cartão e fundo no `darkPalette` (6.14). |
+| dark-02 | Login enviado vazio, SO em escuro | — | <img src="audit/dark-02-login-erro-vazio.png" width="180"> | <img src="after/dark-02-login-erro-vazio.png" width="180"> | Banner de erro no vermelho on-dark `#f2b8b5` com texto tinta (6.14). |
+| dark-10 | Sentinela de viagem encerrada, SO em escuro | `motorista-viagem-encerrada` | <img src="audit/dark-10-trip-encerrada-sentinela.png" width="180"> | <img src="after/dark-10-trip-encerrada-sentinela.png" width="180"> | Tema escuro (6.14); primária branca com texto tinta (D6). |
 | light-11 | Viagem de ida ativa | `motorista` | <img src="audit/light-11-trip-ativa.png" width="180"> | <img src="after/light-11-trip-ativa.png" width="180"> | TripCard com contador herói; ações no rodapé. Nome da rota cai no fallback "Rota atribuída" (decisão congelada da 6.5: em cold start com viagem ativa, `/routes/mine` não é chamado). |
 | light-12 | Lista de alunos | `motorista` | <img src="audit/light-12-student-list.png" width="180"> | <img src="after/light-12-student-list.png" width="180"> | Cabeçalho fixo com contador e legenda; avatar de iniciais; chips com ícone. |
 | light-13 | Scan ocioso | `motorista` | <img src="audit/light-13-scan-idle.png" width="180"> | <img src="after/light-13-scan-idle.png" width="180"> | HUD X/Y da viagem + sessão (D-UX-8); dica e linha de varredura. |
@@ -76,3 +83,11 @@ de rodar Jest ou `tsc` (ver o gate na `plan-6-12`).
 | light-34 | Após confirmar a ausência | `aluno` | <img src="audit/light-34-ausencia-registrada.png" width="180"> | <img src="after/light-34-ausencia-registrada.png" width="180"> | Falha no mock nos dois (sem o endpoint de ausência): Snackbar de erro. |
 | light-35 | QR de aluno sem rota | `aluno-sem-rota` | <img src="audit/light-35-qr-sem-rota.png" width="180"> | <img src="after/light-35-qr-sem-rota.png" width="180"> | "Nenhuma rota vinculada" como linha discreta na faixa. |
 | light-40 | Painel admin | `admin` | <img src="audit/light-40-admin.png" width="180"> | <img src="after/light-40-admin.png" width="180"> | Faixa de marca com o wordmark e StateView "Em breve" com "Sair" (6.13). O "antes" foi capturado na 6.13, antes do redesign — o admin não tinha usuário mock na auditoria. |
+| dark-11 | Viagem de ida ativa, SO em escuro | `motorista` | <img src="audit/light-11-trip-ativa.png" width="180"> | <img src="after/dark-11-trip-ativa.png" width="180"> | Chip "Em andamento" em verde on-dark; "Encerrar" no erro on-dark; primária branca. |
+| dark-12 | Lista de alunos, SO em escuro | `motorista` | <img src="audit/light-12-student-list.png" width="180"> | <img src="after/dark-12-student-list.png" width="180"> | Linhas no surface escuro; chips neutro e mostarda on-dark com tinte 12%. |
+| dark-13 | Scan ocioso, SO em escuro | `motorista` | <img src="audit/light-13-scan-idle.png" width="180"> | <img src="after/dark-13-scan-idle.png" width="180"> | Chrome de câmera igual ao claro (identidade fixa); só o header segue o esquema. |
+| dark-14 | Scan com sucesso (Ana), SO em escuro | `motorista` | <img src="audit/light-14-scan-sucesso.png" width="180"> | <img src="after/dark-14-scan-sucesso.png" width="180"> | Overlay verde idêntico ao claro (identidade fixa). |
+| dark-30 | Início do aluno, SO em escuro | `aluno` | <img src="audit/light-30-student-home.png" width="180"> | <img src="after/dark-30-student-home.png" width="180"> | Cartões com borda hairline escura; ícones e texto brancos. |
+| dark-31 | Meu QR Code, SO em escuro | `aluno` | <img src="audit/light-31-qr-code.png" width="180"> | <img src="after/dark-31-qr-code.png" width="180"> | Passe do QR idêntico ao claro (amarelo + quiet zone branca) sobre o fundo escuro. |
+| dark-32 | Acompanhar ônibus, SO em escuro | `aluno` | <img src="audit/light-32-track-bus.png" width="180"> | <img src="after/dark-32-track-bus.png" width="180"> | Erro no mock, como no claro; StateView no tema escuro. |
+| dark-33 | Dialog "Não vou voltar", SO em escuro | `aluno` | <img src="audit/light-33-dialog-nao-vou-voltar.png" width="180"> | <img src="after/dark-33-dialog-nao-vou-voltar.png" width="180"> | Dialog no surface escuro; "Avisar motorista" branco contido. |

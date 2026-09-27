@@ -30,7 +30,9 @@ design: DESIGN.md
 - **Animação:** `react-native-reanimated` 4 (já instalado) + `react-native-svg` (instalado).
 - **Háptico:** `expo-haptics` (novo, exige rebuild do dev build) com fallback `Vibration` do RN.
   **[DECISÃO D-UX-3]**
-- **Tema:** claro travado (spec-1-11b) até decisão contrária. **[DECISÃO D-UX-4]**
+- **Tema:** segue o esquema do SO desde a Story 6.14 (`useColorScheme()` no `_layout`,
+  `userInterfaceStyle: "automatic"`); sem toggle no app. Scan e passe do QR mantêm a identidade
+  clara nos dois esquemas. **[DECISÃO D-UX-4]**
 - **Offline:** Tier 1 (leitura via cache TanStack/MMKV) e Tier 2 (fila SQLite de check-in) já
   existem; o redesign só dá forma visual consistente aos estados que eles produzem.
 
@@ -53,7 +55,7 @@ estado de erro no mock ([audit/light-32-track-bus.png](audit/light-32-track-bus.
 | T5 | **Estados reimplementados por tela:** `Loading`/`Centered`/`Blocked` copiados em scan, student-list e track-bus com espaçamentos e tamanhos diferentes; routes usa emoji 56px. | código |
 | T6 | **Escala tipográfica inexistente:** 9 `fontSize` distintos em 3 arquivos do motorista; 13 estilos usam `opacity` para hierarquia. | código |
 | T7 | **Nenhuma saída de conta** para motorista e aluno — só o admin tem "Sair". Na demo, trocar de motorista para aluno exige limpar o storage. | `grep logout` |
-| T8 | **Tema escuro não consumido:** com o SO em escuro, o app é idêntico ao claro (trava da 1.11b). Coerente, mas o `darkTheme` é código morto. | `dark-01-login.png`, `dark-10-…png` |
+| T8 | **Tema escuro não consumido:** com o SO em escuro, o app é idêntico ao claro (trava da 1.11b). Coerente, mas o `darkTheme` é código morto. | `dark-01-login.png`, `dark-10-…png` — **resolvido na 6.14** (ver `antes-depois.md`) |
 | T9 | **Zero háptico, zero animação.** Check-in, falha e ausência trocam de estado por corte seco. | código |
 | T10 | Ação primária no meio da tela; terço inferior vazio nas telas do motorista (fora da zona do polegar). | `light-11-trip-ativa.png` |
 
@@ -279,7 +281,7 @@ erro de mocks (dev-only, só alinhar tokens).
 ### P2
 Minhas rotas (restyle com RouteCard: nome `title`, "Centro → Campus Universitário" com ícone
 `arrow-right`, descrição `body` sem itálico) — e entrada **[D-UX-6]**; Painel admin (StateView
-"Em breve" com marca); consumo do tema escuro **[D-UX-4]**; brilho máximo automático no QR
+"Em breve" com marca); consumo do tema escuro **[D-UX-4]** (entregue na 6.14); brilho máximo automático no QR
 (`expo-brightness`, nativo) **[D-UX-10]**; bip de scan.
 
 ## Key Flows
@@ -365,7 +367,7 @@ Decisões tomadas pelo usuário (D-UX-1 a 5, 7 e 11) e pelo PM (demais), antes d
 | D-UX-1 | **Aprovada** — amarelo-escolar full-bleed |
 | D-UX-2 | **Aprovada** — Inter |
 | D-UX-3 | **Aprovada** — `expo-haptics`; todas as deps nativas numa única rebuild, na story de fundação |
-| D-UX-4 | **Aprovada** — só tema claro até a defesa; tema escuro vira story opcional P2 |
+| D-UX-4 | **Aprovada** — só tema claro até a defesa; tema escuro vira story opcional P2. **Entregue na Story 6.14:** o app segue o SO, com variantes on-dark de status/link/info (tokens já registrados + `errorOnDark` `#f2b8b5`) |
 | D-UX-5 | **Aprovada** — "Sair" para motorista e aluno (exceção de fluxo) |
 | D-UX-6 | **Recusada** — "Minhas rotas" continua sem entrada; só o restyle P2 fica no épico |
 | D-UX-7 | **Aprovada** — ConfirmDialog em "Encerrar viagem" (exceção de fluxo; atualiza o e2e) |
