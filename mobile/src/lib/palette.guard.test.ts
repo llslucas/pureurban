@@ -616,11 +616,19 @@ describe('locks de call-site (source-lock)', () => {
     expect(source).toMatch(/backgroundColor: lightPalette\.primary \}/)
   })
 
-  it('routes: papéis de texto e superfícies presos à paleta', () => {
+  it('routes: fundo da tela e legenda presos à paleta (6.13)', () => {
     const source = readSource('app/(driver)/routes.tsx')
-    expect(source).toMatch(/wrapper: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
-    expect(source).toMatch(/routeLabel: \{[^}]*color: lightPalette\.textMuted,/)
-    expect(source).toMatch(/routeValue: \{[^}]*color: lightPalette\.textBody,/)
+    expect(source).toMatch(/root: \{[^}]*backgroundColor: lightPalette\.surfaceSoft,/)
+    expect(source).toMatch(/legend: \{[^}]*color: lightPalette\.textMuted,/)
+  })
+
+  it('route-card: fundo do cartão e papéis de texto presos à paleta (6.13)', () => {
+    const source = readSource('components/routes/route-card.tsx')
+    expect(source).toMatch(/card: \{[^}]*backgroundColor: lightPalette\.surface,/)
+    expect(source).toMatch(/name: \{[^}]*color: lightPalette\.text,/)
+    expect(source).toMatch(/city: \{[^}]*color: lightPalette\.textBody,/)
+    expect(source).toMatch(/description: \{[^}]*color: lightPalette\.textMuted,/)
+    expect(source).toMatch(/color=\{lightPalette\.textMuted\}/)
   })
 
   it('app-header: fundo, divisória e tinta presos à paleta', () => {
