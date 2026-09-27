@@ -2,11 +2,11 @@ import React from 'react'
 import { StyleSheet } from 'react-native'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Provider as PaperProvider } from 'react-native-paper'
+import { Provider as PaperProvider, Snackbar } from 'react-native-paper'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import DriverRoutesScreen from '@/app/(driver)/routes'
-import { TEST_INSETS } from '@/components/ui/test-utils'
+import { TEST_INSETS, type TestNode } from '@/components/ui/test-utils'
 import { lightTheme } from '@/lib/theme'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
 
@@ -146,7 +146,7 @@ describe('DriverRoutesScreen (story 6.13)', () => {
     expect(screen.getByText('Fale com a administração.')).toBeTruthy()
     const icon = screen
       .getByTestId('routes-empty-icon', { includeHiddenElements: true })
-      .findAll((node) => typeof node.props.name === 'string')[0]
+      .findAll((node: TestNode) => typeof node.props.name === 'string')[0]
     expect(icon?.props.name).toBe('map-marker-off')
     expect(screen.queryByTestId('routes-empty-action')).toBeNull()
   })
@@ -159,7 +159,7 @@ describe('DriverRoutesScreen (story 6.13)', () => {
     expect(await screen.findByText('Não foi possível carregar suas rotas')).toBeTruthy()
     const icon = screen
       .getByTestId('routes-error-icon', { includeHiddenElements: true })
-      .findAll((node) => typeof node.props.name === 'string')[0]
+      .findAll((node: TestNode) => typeof node.props.name === 'string')[0]
     expect(icon?.props.name).toBe('cloud-alert')
     expect(await screen.findByText(SNACKBAR_TEXT)).toBeTruthy()
     expect(screen.queryByText('Você ainda não tem rota.')).toBeNull()
@@ -178,13 +178,17 @@ describe('DriverRoutesScreen (story 6.13)', () => {
 
     renderScreen()
 
-    expect(await screen.findByText(SNACKBAR_TEXT)).toBeTruthy()
+    // Reads the `visible` prop, not the text: Paper keeps the text mounted
+    // through its hide animation, whose timing is load-dependent.
+    const snackbarVisible = () => screen.UNSAFE_getByType(Snackbar).props.visible as boolean
+    await waitFor(() => expect(snackbarVisible()).toBe(true))
     fireEvent.press(screen.getByText('Fechar'))
-    await waitFor(() => expect(screen.queryByText(SNACKBAR_TEXT)).toBeNull())
+    expect(snackbarVisible()).toBe(false)
 
     fireEvent.press(screen.getByTestId('routes-error-action'))
 
-    expect(await screen.findByText(SNACKBAR_TEXT)).toBeTruthy()
+    await waitFor(() => expect(mockRoutes.getMyRoutes).toHaveBeenCalledTimes(6))
+    await waitFor(() => expect(snackbarVisible()).toBe(true))
   })
 
   it('error with cache: cards stay visible and the Snackbar shows', async () => {
