@@ -38,7 +38,7 @@ design: DESIGN.md
 
 Execução real: **Expo Web + MSW** (`EXPO_PUBLIC_USE_MOCKS=1`, `EXPO_PUBLIC_E2E=1` para injetar
 leituras de QR), Chromium via Playwright, viewport 390×844 @2x, claro e escuro do SO. 25 capturas em
-[`audit/`](audit/). O painel admin não tem usuário mock — auditado pelo código. O `track-bus` caiu no
+[`audit/`](audit/). O painel admin não tinha usuário mock na auditoria — auditado pelo código (o `admin` mock entrou na 6.13). O `track-bus` caiu no
 estado de erro no mock ([audit/light-32-track-bus.png](audit/light-32-track-bus.png)); o cartão do
 ônibus foi auditado pelo código.
 

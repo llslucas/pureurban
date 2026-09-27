@@ -1,7 +1,7 @@
 # PureUrban Mobile — antes e depois do redesign (Épico 6)
 
 Capturas "antes" em [`audit/`](audit/) (auditoria de 26/09/2026, ver `EXPERIENCE.md` → Auditoria da
-UI atual) e "depois" em [`after/`](after/) (Story 6.12, 27/09/2026). Mesmos nomes de arquivo, mesmo
+UI atual) e "depois" em [`after/`](after/) (Story 6.12, 27/09/2026; `light-18` e `light-40` regenerados na Story 6.13). Mesmos nomes de arquivo, mesmo
 usuário mock, mesma tela, mesma ação e mesmo esquema de cor do SO. Ambiente: Expo Web + MSW
 (`EXPO_PUBLIC_USE_MOCKS=1`, `EXPO_PUBLIC_E2E=1` para injetar a leitura do QR), Chromium do
 Playwright, viewport 390×844 @2x (PNG 780×1688), `pt-BR`, fuso `America/Sao_Paulo`.
