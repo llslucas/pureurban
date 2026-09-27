@@ -206,10 +206,11 @@ propósito para variação do ambiente local (Metro, CDP, primeiro paint).
 pré-requisitos das seções acima) prova o pipeline inteiro pela UI —
 REST → Redis Pub/Sub → SSE → render — sem nenhum mock de tracking: o motorista
 inicia a viagem e o GPS transmite sozinho (`POST /tracking/location` a cada
-~5s); o aluno abre "Onde está o ônibus" e vê posição + distância/ETA; o
-motorista muda de ponto e o texto do aluno atualiza em <5s (NFR2); ~15s sem
-sinal, o chip "Sem sinal GPS" aparece com o último ponto mantido e volta a
-"Em tempo real" com o texto reatualizado na recuperação; e "Encerrar Viagem"
+~5s); o aluno abre "Onde está o ônibus" e vê ETA + distância (as coordenadas
+ficam só no rótulo de acessibilidade da legenda); o motorista muda de ponto e o
+texto do aluno atualiza em <5s (NFR2); ~15s sem sinal, o chip "Sem sinal GPS"
+aparece com o último ponto mantido e volta a "Ao vivo" com o texto reatualizado
+na recuperação; e "Encerrar Viagem"
 fecha o stream do aluno ("Nenhuma viagem ativa no momento") e para a captura
 (0 POSTs numa janela de 7s).
 

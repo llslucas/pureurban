@@ -106,13 +106,15 @@ function formatEta(distanceMeters: number): string {
 const coordsTextOf = (point: FixedPoint): string =>
   `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
 
-/** Textos exatos que a tela do aluno exibe com o ônibus em `point`. */
+/** Exact texts the student screen shows with the bus at `point`. Coordinates
+ * are no longer visible text (story 6.10): they live only in the caption's
+ * accessibility label, hence `getByLabel`. */
 function expectedTexts(point: FixedPoint) {
   const meters = haversineDistanceMeters(STUDENT_POINT, point);
   return {
     coords: coordsTextOf(point),
-    distance: formatDistance(meters),
-    eta: `${formatEta(meters)} — tempo estimado até você`,
+    distance: `${formatDistance(meters)} de você`,
+    eta: formatEta(meters),
   };
 }
 
@@ -156,20 +158,20 @@ async function openStudentTracking(
 async function expectStudentSees(page: Page, point: FixedPoint): Promise<void> {
   const texts = expectedTexts(point);
   await expect(realtimeChip(page)).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(texts.coords)).toBeVisible();
+  await expect(page.getByLabel(texts.coords)).toBeVisible();
   await expect(page.getByText(texts.distance)).toBeVisible();
   await expect(page.getByText(texts.eta)).toBeVisible();
 }
 
-// Os chips são mutualmente exclusivos no render, MAS o Banner "Dados podem
-// estar desatualizados — sem atualização em tempo real" fica montado (oculto
-// por altura 0) e getText SEM exact colide com o seu trecho "em tempo real".
+// The chips are mutually exclusive in the render. The staleness banner is only
+// mounted during a stream outage now, so it no longer collides with them; the
+// stale chip is a regex because after a minute it reads "Sem sinal GPS há N min".
 function realtimeChip(page: Page): ReturnType<Page['getByText']> {
-  return page.getByText('Em tempo real', { exact: true });
+  return page.getByText('Ao vivo', { exact: true });
 }
 
 function staleChip(page: Page): ReturnType<Page['getByText']> {
-  return page.getByText('Sem sinal GPS', { exact: true });
+  return page.getByText(/^Sem sinal GPS/);
 }
 
 /** Instantes (Date.now) dos POSTs /tracking/location iniciados na página e dos
@@ -314,9 +316,9 @@ test.describe('Épico 5 — acompanhamento do ônibus em tempo real', () => {
 
       // Substituição (last-write-wins na tela): coordenadas e textos de A saem.
       const aTexts = expectedTexts(DRIVER_POINT_A);
-      await expect(page.getByText(bTexts.coords)).toBeVisible();
+      await expect(page.getByLabel(bTexts.coords)).toBeVisible();
       await expect(page.getByText(bTexts.eta)).toBeVisible();
-      await expect(page.getByText(aTexts.coords)).toHaveCount(0);
+      await expect(page.getByLabel(aTexts.coords)).toHaveCount(0);
       await expect(page.getByText(aTexts.distance)).toHaveCount(0);
 
       expectNoMocksInConsole(driverConsole);
@@ -326,7 +328,7 @@ test.describe('Épico 5 — acompanhamento do ônibus em tempo real', () => {
     }
   });
 
-  test('degradado e recuperação: offline → "Sem sinal GPS" com último ponto; online → "Em tempo real" reatualizado', async ({
+  test('degradado e recuperação: offline → "Sem sinal GPS" com último ponto; online → "Ao vivo" reatualizado', async ({
     request,
     page,
     browser,
@@ -359,11 +361,10 @@ test.describe('Épico 5 — acompanhamento do ônibus em tempo real', () => {
       await expect(staleChip(page)).toBeVisible({
         timeout: GPS_STALE_VISIBLE_MS,
       });
-      // Último ponto mantido: nem coordenadas nem distância/ETA mudam — e o
-      // chip "Em tempo real" (exato: o banner oculto contém "em tempo real")
-      // realmente saiu do render.
+      // Last point kept: neither coordinates nor distance/ETA change — and the
+      // "Ao vivo" chip really left the render.
       const aTexts = expectedTexts(DRIVER_POINT_A);
-      await expect(page.getByText(aTexts.coords)).toBeVisible();
+      await expect(page.getByLabel(aTexts.coords)).toBeVisible();
       await expect(page.getByText(aTexts.distance)).toBeVisible();
       await expect(page.getByText(aTexts.eta)).toBeVisible();
       await expect(realtimeChip(page)).toHaveCount(0);

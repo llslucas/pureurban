@@ -1,9 +1,12 @@
 import * as Location from 'expo-location'
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
-import { Banner, Card, Chip, Text } from 'react-native-paper'
+import { AppState, StyleSheet, View } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { BusEtaCard, type BusEtaFreshness } from '@/components/track-bus/bus-eta-card'
+import { LocationPermissionCard } from '@/components/trip/location-permission-card'
+import { Banner } from '@/components/ui/banner'
+import { Screen } from '@/components/ui/screen'
 import { StateView } from '@/components/ui/state-view'
 import {
   activeTrackingTripKey,
@@ -17,20 +20,29 @@ import {
   haversineDistanceMeters,
   type GeoPoint,
 } from '@/lib/geo'
+import { spacing } from '@/lib/tokens'
 import {
   connectTrackingEvents,
   type LocationUpdatedEvent,
 } from '@/services/tracking-stream.service'
 
-// O degradado é sobre o SINAL GPS, não sobre o socket: ping prova conexão, não
-// posição — só location.updated reseta este timer (honestidade do dado).
+// Degraded is about the GPS SIGNAL, not the socket: a ping proves the
+// connection, not a position — only location.updated resets this timer (data
+// honesty).
 const GPS_SIGNAL_TIMEOUT_MS = 15_000
+
+// Only drives the "há N min" label, so it ticks only while degraded.
+const STALE_CLOCK_TICK_MS = 10_000
+
+const STUDENT_PERMISSION_DESCRIPTION =
+  'Ative a localização do app para ver em quanto tempo o ônibus chega até você. ' +
+  'Ela só é usada nesta tela.'
 
 interface BusPosition {
   latitude: number
   longitude: number
   accuracy?: number
-  // capturedAt do device (last-known) ou timestamp de publicação (evento).
+  // Device capturedAt (last-known) or publish timestamp (event).
   at: string
 }
 
@@ -41,10 +53,11 @@ const toBusPosition = (event: LocationUpdatedEvent): BusPosition => ({
   at: event.timestamp,
 })
 
-// Guarda monotônica do resync (AI1/R13): o ponto REST só vence o exibido se
-// for ESTRITAMENTE mais novo — a resposta pode chegar depois de um evento SSE
-// e mais velha que ele. capturedAt inválido (o contrato só ecoa o device) não
-// desloca ponto nenhum, mas semeia o primeiro: posição vale mais que relógio.
+// Monotonic resync guard (AI1/R13): the REST point only beats the displayed one
+// if it is STRICTLY newer — the response may arrive after an SSE event and be
+// older than it. An invalid capturedAt (the contract only echoes the device)
+// never displaces a point, but it seeds the first one: a position is worth more
+// than a clock.
 const isStrictlyNewer = (incoming: string, current: string | null): boolean => {
   if (current === null) return true
   const incomingMs = Date.parse(incoming)
@@ -56,29 +69,29 @@ const isStrictlyNewer = (incoming: string, current: string | null): boolean => {
 
 const formatClock = (iso: string): string => {
   const date = new Date(iso)
-  // Schema do contrato valida só o formato, não o calendário — um capturedAt
-  // tipo "2026-13-45T25:99:99Z" chega aqui como Invalid Date (R5).
-  if (Number.isNaN(date.getTime())) return '--:--:--'
+  // The contract schema validates only the format, not the calendar — a
+  // capturedAt like "2026-13-45T25:99:99Z" lands here as an Invalid Date (R5).
+  if (Number.isNaN(date.getTime())) return '--:--'
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 export default function TrackBusScreen() {
   const queryClient = useQueryClient()
 
-  // Descoberta da viagem (GET /tracking/trips/active): qualquer perna na rota
-  // do aluno — enquanto null, a query repete a cada ~10s e a tela se reengaja
-  // sozinha quando o motorista inicia a viagem.
+  // Trip discovery (GET /tracking/trips/active): any leg on the student's
+  // route — while null, the query repeats every ~10s and the screen re-engages
+  // by itself when the driver starts the trip.
   const { data: activeTrip, status: tripStatus, refetch: refetchTrip } = useQuery(
     activeTrackingTripOptions(),
   )
   const tripId = activeTrip?.tripId ?? null
 
-  // Estado inicial: último ponto conhecido. 404 NO_LOCATION_AVAILABLE vira
-  // null na query — "aguardando a primeira posição", não erro. A desestruturação
-  // NÃO é estilo: o acesso a `.data`/`.dataUpdatedAt` no render é o que os torna
-  // propriedades rastreadas pelo react-query — lidos só no effect abaixo, o
-  // refetch do resync atualizava o cache sem re-renderizar a tela.
+  // Initial state: last known point. 404 NO_LOCATION_AVAILABLE becomes null in
+  // the query — "waiting for the first position", not an error. The
+  // destructuring is NOT style: reading `.data`/`.dataUpdatedAt` during render
+  // is what makes them tracked properties in react-query — read only in the
+  // effect below, the resync refetch updated the cache without re-rendering.
   const {
     data: lastKnownPoint,
     dataUpdatedAt: lastKnownUpdatedAt,
@@ -91,8 +104,14 @@ export default function TrackBusScreen() {
   const [streamStale, setStreamStale] = React.useState(false)
   const [studentPoint, setStudentPoint] = React.useState<GeoPoint | null>(null)
   const [deviceLocationDenied, setDeviceLocationDenied] = React.useState(false)
+  const [devicePermission, setDevicePermission] = React.useState<{ canAskAgain: boolean } | null>(
+    null,
+  )
+  // When a position last ARRIVED (not its capturedAt): "há N min" counts from here.
+  const [lastSignalAt, setLastSignalAt] = React.useState<number | null>(null)
+  const [now, setNow] = React.useState(() => Date.now())
 
-  // ---- Timer do sinal GPS (15s sem location.updated) ----
+  // ---- GPS signal timer (15s without location.updated) ----
   const signalTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearSignalTimer = React.useCallback(() => {
     if (signalTimerRef.current !== null) {
@@ -102,6 +121,7 @@ export default function TrackBusScreen() {
   }, [])
   const markSignal = React.useCallback(() => {
     setGpsStale(false)
+    setLastSignalAt(Date.now())
     clearSignalTimer()
     signalTimerRef.current = setTimeout(() => {
       signalTimerRef.current = null
@@ -109,13 +129,14 @@ export default function TrackBusScreen() {
     }, GPS_SIGNAL_TIMEOUT_MS)
   }, [clearSignalTimer])
 
-  // Viagem nova (ou nenhuma): zera o estado do ciclo anterior, inclusive o
-  // timer — o indicador de sinal é por viagem.
+  // New trip (or none): reset the previous cycle's state, timer included — the
+  // signal indicator is per trip.
   React.useEffect(() => {
     setBus(null)
     setTripEnded(false)
     setStreamStale(false)
     setGpsStale(false)
+    setLastSignalAt(null)
     clearSignalTimer()
   }, [tripId, clearSignalTimer])
 
@@ -123,22 +144,28 @@ export default function TrackBusScreen() {
     return () => clearSignalTimer()
   }, [clearSignalTimer])
 
-  // ---- Posição do ônibus ----
+  React.useEffect(() => {
+    if (!gpsStale) return
+    setNow(Date.now())
+    const interval = setInterval(() => setNow(Date.now()), STALE_CLOCK_TICK_MS)
+    return () => clearInterval(interval)
+  }, [gpsStale])
 
-  // O last-known semeia E reconcilia: cada chegada do endpoint (montagem,
-  // reabertura do stream, banner "Atualizar") passa pela guarda monotônica —
-  // é o resync que o contrato 5.0 promete para a recuperação pós-queda, sem
-  // regredir a posição para um ponto mais velho que o último evento.
+  // ---- Bus position ----
+
+  // The last-known seeds AND reconciles: every arrival from the endpoint
+  // (mount, stream reopen, "Atualizar" banner) goes through the monotonic
+  // guard — this is the resync the 5.0 contract promises for post-outage
+  // recovery, without regressing to a point older than the last event.
   //
-  // Cada RESPOSTA é avaliada UMA vez (o dataUpdatedAt muda a cada fetch): sem
-  // isso o ponto cacheado seria reavaliado a cada atualização do stream e,
-  // com o relógio do motorista adiantado (capturedAt é eco do device; o
-  // timestamp do evento é hora do SERVIDOR), desfaria o ponto fresco em um
-  // vai-e-vem. A comparação de capturedAt entre fontes tem esse limite de
-  // domínio de relógio — o carimbo do servidor no last-known segue registrado
-  // no deferred-work (entry do wrap-1, "servidor carimbar o last-known"); o
-  // wrap-3 resolveu o lado do contrato (staleness declarado pela CHEGADA do
-  // dado, nunca pela idade do capturedAt).
+  // Each RESPONSE is evaluated ONCE (dataUpdatedAt changes per fetch): without
+  // that the cached point would be re-evaluated on every stream update and,
+  // with the driver's clock ahead (capturedAt echoes the device; the event
+  // timestamp is SERVER time), it would undo the fresh point back and forth.
+  // Comparing capturedAt across sources has this clock-domain limit — server
+  // stamping of the last-known stays in deferred-work (wrap-1 entry); wrap-3
+  // settled the contract side (staleness declared by data ARRIVAL, never by
+  // capturedAt age).
   const appliedResyncRef = React.useRef(0)
   React.useEffect(() => {
     if (!lastKnownPoint) return
@@ -153,15 +180,15 @@ export default function TrackBusScreen() {
       accuracy: lastKnownPoint.accuracy,
       at: lastKnownPoint.capturedAt,
     })
-    // Aplicar ponto é chegada de posição: o MESMO timer de 15s do degradado
-    // corre a partir daqui, mesmo que nenhum evento do stream chegue.
+    // Applying a point is a position arrival: the SAME 15s degraded timer runs
+    // from here, even if no stream event ever arrives.
     markSignal()
   }, [lastKnownPoint, lastKnownUpdatedAt, bus, markSignal])
 
-  // ---- Canal SSE (um cliente por viagem; fecha no 409 de fim de viagem) ----
-  // Época do stream: o banner "Atualizar" precisa reabrir a conexão morta,
-  // mas o tripId não muda nesse caso — a época é a dependência que reexecuta
-  // o effect (cleanup fecha a antiga, o corpo abre uma nova).
+  // ---- SSE channel (one client per trip; closes on the trip-ended 409) ----
+  // Stream epoch: the "Atualizar" banner must reopen a dead connection, but
+  // the tripId doesn't change in that case — the epoch is the dependency that
+  // re-runs the effect (cleanup closes the old one, the body opens a new one).
   const [streamEpoch, bumpStreamEpoch] = React.useReducer(
     (epoch: number) => epoch + 1,
     0,
@@ -176,9 +203,9 @@ export default function TrackBusScreen() {
       },
       onOpen: () => {
         setStreamStale(false)
-        // Resync contratado na reconexão (AI1): o que foi publicado durante a
-        // queda do stream só existe no REST — a guarda monotônica decide se o
-        // ponto trazido vence o exibido.
+        // Contracted resync on reconnect (AI1): whatever was published while
+        // the stream was down only exists in REST — the monotonic guard
+        // decides whether the fetched point beats the displayed one.
         void queryClient.invalidateQueries({
           queryKey: lastKnownLocationKey(tripId),
         })
@@ -187,8 +214,8 @@ export default function TrackBusScreen() {
         setTripEnded(true)
         setGpsStale(false)
         clearSignalTimer()
-        // O invalidation retorna a descoberta ao polling: quando o motorista
-        // iniciar a próxima viagem, tripId muda e a tela refaz tudo sozinha.
+        // Invalidating puts discovery back on polling: when the driver starts
+        // the next trip, tripId changes and the screen redoes everything.
         void queryClient.invalidateQueries({ queryKey: activeTrackingTripKey })
       },
       onUnrecoverable: () => setStreamStale(true),
@@ -196,18 +223,25 @@ export default function TrackBusScreen() {
     return () => connection.close()
   }, [tripId, tripEnded, streamEpoch, markSignal, clearSignalTimer, queryClient])
 
-  // ---- Posição do device do aluno (expo-location, foreground) ----
+  // ---- Student device position (expo-location, foreground) ----
+  // Bumped by the permission card: re-requests and re-subscribes.
+  const [locationEpoch, bumpLocationEpoch] = React.useReducer(
+    (epoch: number) => epoch + 1,
+    0,
+  )
   React.useEffect(() => {
     let subscription: Location.LocationSubscription | null = null
     let cancelled = false
 
     Location.requestForegroundPermissionsAsync()
-      .then(({ granted }) => {
+      .then(({ granted, canAskAgain }) => {
         if (cancelled) return undefined
+        setDevicePermission({ canAskAgain })
         if (!granted) {
           setDeviceLocationDenied(true)
           return undefined
         }
+        setDeviceLocationDenied(false)
         return Location.watchPositionAsync(
           { accuracy: Location.Accuracy.Balanced },
           (position) => {
@@ -227,14 +261,26 @@ export default function TrackBusScreen() {
         subscription = sub ?? null
       })
       .catch(() => {
-        if (!cancelled) setDeviceLocationDenied(true)
+        if (cancelled) return
+        setDeviceLocationDenied(true)
+        setDevicePermission({ canAskAgain: true })
       })
 
     return () => {
       cancelled = true
       subscription?.remove()
     }
-  }, [])
+  }, [locationEpoch])
+
+  // Coming back from the system settings doesn't re-run the request by itself:
+  // without this the card and the "—" would stay until the screen remounts.
+  React.useEffect(() => {
+    if (!deviceLocationDenied) return
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') bumpLocationEpoch()
+    })
+    return () => subscription.remove()
+  }, [deviceLocationDenied])
 
   // ---- Render ----
 
@@ -267,131 +313,102 @@ export default function TrackBusScreen() {
     )
   }
 
-  const distance =
-    bus && studentPoint
-      ? haversineDistanceMeters(studentPoint, bus)
-      : null
+  const staleBanner = streamStale ? (
+    <Banner
+      tone="warning"
+      message="Dados podem estar desatualizados — sem atualização em tempo real"
+      action={{
+        label: 'Atualizar',
+        // A new epoch reopens the dead stream (the effect depends on it); the
+        // refetch reconciles discovery and last-known through REST — the
+        // last-known effect's monotonic guard decides whether the fetched
+        // point is newer than the displayed one.
+        onPress: () => {
+          bumpStreamEpoch()
+          void refetchTrip()
+          void queryClient.invalidateQueries({
+            queryKey: lastKnownLocationKey(tripId),
+          })
+        },
+      }}
+      testID="track-bus-stale-banner"
+    />
+  ) : null
+
+  if (!bus) {
+    return (
+      <Screen testID="track-bus-screen">
+        <View style={styles.waiting}>
+          {staleBanner}
+          <StateView
+            kind="empty"
+            icon="bus-clock"
+            title="Aguardando a primeira posição"
+            detail={
+              lastKnownError
+                ? 'Não foi possível carregar a última posição — o ônibus aparece aqui assim que o motorista começar a transmitir.'
+                : 'O ônibus aparece aqui assim que o motorista começar a transmitir.'
+            }
+          />
+        </View>
+      </Screen>
+    )
+  }
+
+  const distance = studentPoint ? haversineDistanceMeters(studentPoint, bus) : null
+
+  const freshness: BusEtaFreshness = gpsStale
+    ? {
+        kind: 'stale',
+        minutes: lastSignalAt === null ? 0 : Math.max(0, (now - lastSignalAt) / 60_000),
+      }
+    : { kind: 'live' }
+
+  const clock = formatClock(bus.at)
+  const accuracy = bus.accuracy ? Math.round(bus.accuracy) : null
+  const coords = `${bus.latitude.toFixed(5)}, ${bus.longitude.toFixed(5)}`
+  const caption = `Última posição às ${clock}${accuracy !== null ? ` · precisão ~${accuracy} m` : ''}`
+  const captionAccessibilityLabel =
+    `Última posição às ${clock}, em ${coords}` +
+    (accuracy !== null ? `, precisão de cerca de ${accuracy} metros` : '')
 
   return (
-    <View style={styles.container}>
-      <Banner
-        visible={streamStale}
-        actions={[
-          {
-            label: 'Atualizar',
-            // Epoch nova reabre o stream morto (o effect depende dela); o
-            // refetch reconcilia a descoberta e o last-known pelo caminho
-            // REST — a guarda monotônica do effect do last-known decide se
-            // o ponto trazido é mais novo que o exibido.
-            onPress: () => {
-              bumpStreamEpoch()
-              void refetchTrip()
-              void queryClient.invalidateQueries({
-                queryKey: lastKnownLocationKey(tripId),
-              })
-            },
-          },
-        ]}
-      >
-        Dados podem estar desatualizados — sem atualização em tempo real
-      </Banner>
-
-      {bus ? (
-        <>
-          <Card mode="elevated" style={styles.positionCard}>
-            <Card.Content>
-              <View style={styles.positionHeader}>
-                <Text variant="titleMedium">Ônibus da sua rota</Text>
-                {gpsStale ? (
-                  <Chip icon="wifi-off" mode="outlined" compact>
-                    Sem sinal GPS
-                  </Chip>
-                ) : (
-                  <Chip icon="map-marker" mode="outlined" compact>
-                    Em tempo real
-                  </Chip>
-                )}
-              </View>
-              <Text variant="bodyLarge" style={styles.coordinates}>
-                {bus.latitude.toFixed(5)}, {bus.longitude.toFixed(5)}
-              </Text>
-              <Text variant="bodySmall" style={styles.hint}>
-                Posição de {formatClock(bus.at)}
-                {bus.accuracy ? ` · precisão ~${Math.round(bus.accuracy)} m` : ''}
-              </Text>
-            </Card.Content>
-          </Card>
-
-          <Card mode="outlined" style={styles.distanceCard}>
-            <Card.Content>
-              {distance !== null ? (
-                <>
-                  <Text variant="headlineMedium" style={styles.distance}>
-                    {formatDistance(distance)}
-                  </Text>
-                  <Text variant="bodyLarge" style={styles.eta}>
-                    {formatEta(distance)} — tempo estimado até você
-                  </Text>
-                </>
-              ) : (
-                <Text variant="bodyMedium" style={styles.hint}>
-                  {deviceLocationDenied
-                    ? 'Ative a localização do app para ver a distância até o ônibus.'
-                    : 'Capturando sua localização para calcular a distância...'}
-                </Text>
-              )}
-            </Card.Content>
-          </Card>
-        </>
-      ) : (
-        <Card mode="outlined" style={styles.distanceCard}>
-          <Card.Content>
-            <Text variant="titleMedium">Aguardando a primeira posição</Text>
-            <Text variant="bodyMedium" style={styles.hint}>
-              {lastKnownError
-                ? 'Não foi possível carregar a última posição — o ônibus aparece aqui assim que o motorista começar a transmitir.'
-                : 'O ônibus aparece aqui assim que o motorista começar a transmitir.'}
-            </Text>
-          </Card.Content>
-        </Card>
-      )}
-    </View>
+    <Screen variant="scroll" testID="track-bus-screen">
+      <View style={styles.stack}>
+        {staleBanner}
+        <BusEtaCard
+          eta={distance !== null ? formatEta(distance) : null}
+          distance={distance !== null ? `${formatDistance(distance)} de você` : null}
+          pendingLine={
+            deviceLocationDenied
+              ? undefined
+              : 'Capturando sua localização para calcular a distância...'
+          }
+          freshness={freshness}
+          caption={caption}
+          captionAccessibilityLabel={captionAccessibilityLabel}
+        />
+        {deviceLocationDenied && distance === null ? (
+          <LocationPermissionCard
+            permission={devicePermission ?? { canAskAgain: true }}
+            requestPermission={() => {
+              bumpLocationEpoch()
+              return Promise.resolve()
+            }}
+            description={STUDENT_PERMISSION_DESCRIPTION}
+          />
+        ) : null}
+      </View>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  stack: {
+    gap: spacing.sectionGap,
+  },
+  waiting: {
     flex: 1,
-    gap: 16,
-    padding: 16,
-  },
-  positionCard: {
-    borderRadius: 16,
-  },
-  positionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  coordinates: {
-    marginTop: 12,
-    fontVariant: ['tabular-nums'],
-  },
-  distanceCard: {
-    borderRadius: 16,
-  },
-  distance: {
-    fontVariant: ['tabular-nums'],
-    textAlign: 'center',
-  },
-  eta: {
-    textAlign: 'center',
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  hint: {
-    opacity: 0.7,
-    marginTop: 8,
+    gap: spacing.sectionGap,
   },
 })

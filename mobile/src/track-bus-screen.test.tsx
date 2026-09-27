@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as Location from 'expo-location'
+import { AppState, type AppStateStatus } from 'react-native'
 
 import TrackBusScreen from '@/app/(student)/track-bus'
 import { ApiClientError } from '@/services/api-error'
@@ -24,16 +25,17 @@ import {
 // The stream service and the REST service are mocked — the reconnect/backoff
 // rules have their own unit suite (tracking-stream.service.test.ts). This file
 // locks the SCREEN matrix of spec-5-2: discovery states, last-known as seed,
-// the 15s "Sem sinal GPS" degradação (fake timers), the 409 empty state and
-// the staleness banner.
+// the 15s "Sem sinal GPS" degradation and its "há N min" counter (fake timers),
+// the 409 empty state, the staleness banner and the student permission card
+// (story 6.10 redesign).
 
 const TRIP: ActiveTrackingTrip = {
   tripId: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
   type: 'OUTBOUND',
 }
 
-// Mesmo ponto para ônibus e aluno: distância ~0 → "Chegando" (determinístico
-// sem depender de valores decimais de haversine).
+// Same point for bus and student: distance ~0 → "Chegando" (deterministic,
+// without depending on haversine decimals).
 const BUS_POINT = { latitude: -20.755549, longitude: -42.881728 }
 const STUDENT_SAME_POINT = { latitude: -20.755549, longitude: -42.881728 }
 
@@ -62,8 +64,8 @@ jest.mock('@/services/tracking.service', () => ({
   },
 }))
 
-// Registro dos handlers da conexão: os testes disparam eventos neles direto —
-// o serviço real (backoff/409/refresh) tem suíte própria.
+// Connection handlers registry: tests fire events on them directly — the real
+// service (backoff/409/refresh) has its own suite.
 let mockStreamHandlers: TrackingStreamHandlers | null = null
 const mockClose = jest.fn()
 
@@ -176,13 +178,13 @@ describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
     renderScreen()
 
     expect(await screen.findByText('Nenhuma viagem ativa no momento')).toBeTruthy()
-    // A tela explica que se reengaja sozinha — o aluno não precisa refresh.
+    // The screen explains it re-engages by itself — no refresh needed.
     expect(
       screen.getByText(/atualiza sozinha quando o motorista iniciar a viagem/),
     ).toBeTruthy()
     expect(mockConnect).not.toHaveBeenCalled()
 
-    // Descoberta em polling enquanto null: 10s sem viagem → nova consulta.
+    // Discovery polls while null: 10s without a trip → new request.
     const callsAtEmpty = mockTracking.getActiveTrackingTrip.mock.calls.length
     act(() => jest.advanceTimersByTime(10_000))
     await waitFor(() =>
@@ -191,7 +193,7 @@ describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
       ).toBeGreaterThan(callsAtEmpty),
     )
 
-    // A viagem começa: data não-null chega no próximo tick e o polling PARA.
+    // The trip starts: non-null data arrives on the next tick and polling STOPS.
     mockTracking.getActiveTrackingTrip.mockResolvedValue(TRIP)
     act(() => jest.advanceTimersByTime(10_000))
     await waitFor(() =>
@@ -224,10 +226,15 @@ describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
 
     renderScreen()
 
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    // Aluno no mesmo ponto do ônibus: 0 m → "Chegando" (menos de 100 m).
-    expect(await screen.findByText('0 m')).toBeTruthy()
-    expect(screen.getByText(/Chegando/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    // Student on the bus point: 0 m → "Chegando" (under 100 m).
+    expect(await screen.findByText('0 m de você')).toBeTruthy()
+    expect(screen.getByTestId('bus-eta-value').props.children).toBe('Chegando')
+    expect(screen.getByText('Ao vivo')).toBeTruthy()
+    // Coordinates live only in the caption's accessibility label, never as text.
+    expect(screen.getByText(/^Última posição às \d{2}:\d{2} · precisão ~13 m$/)).toBeTruthy()
+    expect(screen.queryByText(/-20\.75555/)).toBeNull()
+    expect(screen.queryByTestId('track-bus-stale-banner')).toBeNull()
   })
 
   it('tela semeada por last-known SEM nenhum evento: 15s viram "Sem sinal GPS" com o ponto mantido', async () => {
@@ -241,15 +248,15 @@ describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
 
     renderScreen()
 
-    // A semente arma o MESMO timer de 15s: sem evento algum, o ponto deixa de
-    // ser apresentado como fresco.
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    expect(screen.getByText('Em tempo real')).toBeTruthy()
+    // The seed arms the SAME 15s timer: with no event at all, the point stops
+    // being presented as fresh.
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.getByText('Ao vivo')).toBeTruthy()
 
     act(() => jest.advanceTimersByTime(15_000))
 
     expect(screen.getByText('Sem sinal GPS')).toBeTruthy()
-    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.getByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
   })
 
   it('last-known com capturedAt de 9 casas fracionárias (wrap-3/R11): semeia e o relógio renderiza hora válida', async () => {
@@ -263,11 +270,11 @@ describe('TrackBusScreen — descoberta da viagem (spec-5-2)', () => {
 
     renderScreen()
 
-    // O eco do device com precisão ilimitada tem de atravessar a tela: semeia
-    // o ponto e renderiza relógio — nunca "--:--:--".
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    expect(screen.getByText(/Posição de \d{2}:\d{2}:\d{2}/)).toBeTruthy()
-    expect(screen.queryByText(/Posição de --:--:--/)).toBeNull()
+    // The device echo with unbounded precision must cross the screen: it seeds
+    // the point and renders a clock — never "--:--".
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.getByText(/Última posição às \d{2}:\d{2}/)).toBeTruthy()
+    expect(screen.queryByText(/Última posição às --:--/)).toBeNull()
   })
 })
 
@@ -278,9 +285,9 @@ describe('TrackBusScreen — sinal GPS e stream (spec-5-2)', () => {
 
     dispatchLocation({ timestamp: '2026-09-12T12:00:05.000Z' })
 
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    // Relógio local do device — formato fixo, valor depende do TZ do ambiente.
-    expect(screen.getByText(/Posição de \d{2}:\d{2}:\d{2}/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    // Device local clock — fixed format, value depends on the environment TZ.
+    expect(screen.getByText(/Última posição às \d{2}:\d{2}/)).toBeTruthy()
   })
 
   it('15s sem location.updated: "Sem sinal GPS" com o último ponto mantido; o retorno do evento limpa', async () => {
@@ -288,28 +295,60 @@ describe('TrackBusScreen — sinal GPS e stream (spec-5-2)', () => {
     await screen.findByText('Aguardando a primeira posição')
     dispatchLocation()
 
-    expect(await screen.findByText(/-20\.75555/)).toBeTruthy()
-    expect(screen.getByText('Em tempo real')).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555/)).toBeTruthy()
+    expect(screen.getByText('Ao vivo')).toBeTruthy()
 
-    // 14s: ainda dentro da janela de 15s — sem indicador de degradado.
+    // 14s: still inside the 15s window — no degraded indicator.
     act(() => jest.advanceTimersByTime(14_000))
     expect(screen.queryByText('Sem sinal GPS')).toBeNull()
 
-    // Evento reseta o timer: mais 14s e nada de degradado.
+    // An event resets the timer: 14s more and still not degraded.
     dispatchLocation({ timestamp: '2026-09-12T12:00:20.000Z' })
     act(() => jest.advanceTimersByTime(14_000))
     expect(screen.queryByText('Sem sinal GPS')).toBeNull()
 
-    // 15s completos sem evento: indicador aparece e o último ponto PERMANECE.
+    // A full 15s without events: the indicator shows and the last point STAYS.
     act(() => jest.advanceTimersByTime(1_000))
     expect(screen.getByText('Sem sinal GPS')).toBeTruthy()
-    expect(screen.getByText(/-20\.75555/)).toBeTruthy()
+    expect(screen.getByLabelText(/-20\.75555/)).toBeTruthy()
 
-    // O evento de volta limpa o indicador (e não o ping — ping não chega à
-    // tela: isso é travado no teste do serviço, sem listener para 'ping').
+    // The returning event clears the indicator (a ping doesn't — it never
+    // reaches the screen: locked in the service test, no 'ping' listener).
     dispatchLocation({ timestamp: '2026-09-12T12:00:40.000Z' })
     expect(screen.queryByText('Sem sinal GPS')).toBeNull()
-    expect(screen.getByText('Em tempo real')).toBeTruthy()
+    expect(screen.getByText('Ao vivo')).toBeTruthy()
+  })
+
+  it('"há N min" counts from the last position ARRIVAL and keeps ticking while degraded', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    // capturedAt far in the past: the counter must ignore it.
+    dispatchLocation({ timestamp: '2026-09-12T11:00:00.000Z' })
+
+    act(() => jest.advanceTimersByTime(15_000))
+    expect(screen.getByText('Sem sinal GPS')).toBeTruthy()
+
+    act(() => jest.advanceTimersByTime(60_000))
+    expect(screen.getByText('Sem sinal GPS há 1 min')).toBeTruthy()
+    expect(screen.getByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+
+    // The label clock ticks every 10s, so it may lag the real minute by up to a tick.
+    act(() => jest.advanceTimersByTime(50_000))
+    expect(screen.getByText('Sem sinal GPS há 2 min')).toBeTruthy()
+
+    dispatchLocation({ timestamp: '2026-09-12T12:02:00.000Z' })
+    expect(screen.getByText('Ao vivo')).toBeTruthy()
+    expect(screen.queryByText(/Sem sinal GPS/)).toBeNull()
+  })
+
+  it('no stream outage: the staleness banner is not rendered at all', async () => {
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect(await screen.findByTestId('bus-eta-card')).toBeTruthy()
+    expect(screen.queryByTestId('track-bus-stale-banner')).toBeNull()
+    expect(screen.queryByText(/Dados podem estar desatualizados/)).toBeNull()
   })
 
   it('stream fechado com 409 (onTripEnded): "Nenhuma viagem ativa no momento" e a descoberta volta a consultar', async () => {
@@ -320,7 +359,7 @@ describe('TrackBusScreen — sinal GPS e stream (spec-5-2)', () => {
     act(() => mockStreamHandlers!.onTripEnded?.())
 
     expect(await screen.findByText('Nenhuma viagem ativa no momento')).toBeTruthy()
-    // Reengajar sozinho: o invalidation refaz a descoberta (polling retoma).
+    // Re-engages by itself: the invalidation redoes discovery (polling resumes).
     await waitFor(() =>
       expect(
         mockTracking.getActiveTrackingTrip.mock.calls.length,
@@ -348,7 +387,7 @@ describe('TrackBusScreen — sinal GPS e stream (spec-5-2)', () => {
       await screen.findByText(/Dados podem estar desatualizados/),
     ).toBeTruthy()
 
-    // O tripId não mudou — só a época do stream reexecuta o effect da conexão.
+    // The tripId didn't change — only the stream epoch re-runs the connection effect.
     const connectionsBefore = mockConnect.mock.calls.length
     fireEvent.press(screen.getByText('Atualizar'))
 
@@ -382,8 +421,123 @@ describe('TrackBusScreen — posição do device do aluno (OQ-1)', () => {
     dispatchLocation()
 
     expect(await screen.findByText(/Ative a localização do app/)).toBeTruthy()
-    // A posição do ônibus continua visível — só a distância depende do device.
-    expect(screen.getByText(/-20\.75555/)).toBeTruthy()
+    expect(screen.getByTestId('location-permission-card')).toBeTruthy()
+    // The bus position stays visible — only the distance depends on the device.
+    expect(screen.getByLabelText(/-20\.75555/)).toBeTruthy()
+    expect(screen.getByTestId('bus-eta-value').props.children).toBe('—')
+    expect(screen.queryByTestId('bus-eta-distance')).toBeNull()
+    expect(screen.queryByText(/Capturando sua localização/)).toBeNull()
+  })
+
+  it('"Permitir acesso à localização" asks again and the distance shows up once granted', async () => {
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce({
+      granted: false,
+      canAskAgain: true,
+      expires: 'never',
+      status: Location.PermissionStatus.DENIED,
+    })
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    fireEvent.press(await screen.findByText('Permitir acesso à localização'))
+
+    expect(await screen.findByText('0 m de você')).toBeTruthy()
+    expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+  })
+
+  it('permanently denied (canAskAgain false): the card offers "Abrir configurações"', async () => {
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
+      granted: false,
+      canAskAgain: false,
+      expires: 'never',
+      status: Location.PermissionStatus.DENIED,
+    })
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect(await screen.findByText('Abrir configurações')).toBeTruthy()
+    expect(screen.queryByText('Permitir acesso à localização')).toBeNull()
+  })
+
+  it('permission granted without a fix yet: pending line, no permission card', async () => {
+    mockLocation.watchPositionAsync.mockImplementation(async () => ({ remove: jest.fn() }))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect((await screen.findByTestId('bus-eta-pending')).props.children).toBe(
+      'Capturando sua localização para calcular a distância...',
+    )
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+  })
+
+  it('denied → "Permitir acesso à localização" → granted without a fix: pending line replaces the card', async () => {
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce({
+      granted: false,
+      canAskAgain: true,
+      expires: 'never',
+      status: Location.PermissionStatus.DENIED,
+    })
+    mockLocation.watchPositionAsync.mockImplementation(async () => ({ remove: jest.fn() }))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    fireEvent.press(await screen.findByText('Permitir acesso à localização'))
+
+    expect(await screen.findByTestId('bus-eta-pending')).toBeTruthy()
+    expect(screen.getByText('Capturando sua localização para calcular a distância...')).toBeTruthy()
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+  })
+
+  it('returning to the foreground while denied asks again (settings round trip)', async () => {
+    const listeners: ((state: AppStateStatus) => void)[] = []
+    // react-native's jest setup already mocks AppState.addEventListener: swap its implementation
+    // instead of restoring it (mockRestore would wipe the preset's subscription).
+    const addEventListener = jest.spyOn(AppState, 'addEventListener')
+    const presetImpl = addEventListener.getMockImplementation()
+    addEventListener.mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void)
+      return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>
+    })
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce({
+      granted: false,
+      canAskAgain: false,
+      expires: 'never',
+      status: Location.PermissionStatus.DENIED,
+    })
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+    expect(await screen.findByText('Abrir configurações')).toBeTruthy()
+    expect(listeners.length).toBeGreaterThan(0)
+
+    // The student granted it in the system settings and comes back.
+    act(() => listeners.at(-1)!('active'))
+
+    expect(await screen.findByText('0 m de você')).toBeTruthy()
+    expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+    if (presetImpl) addEventListener.mockImplementation(presetImpl)
+    else addEventListener.mockRestore()
+  })
+
+  it('a failing permission request still offers to ask again', async () => {
+    mockLocation.requestForegroundPermissionsAsync.mockRejectedValue(new Error('boom'))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect(await screen.findByText('Permitir acesso à localização')).toBeTruthy()
   })
 })
 
@@ -392,16 +546,16 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     renderScreen()
     await screen.findByText('Aguardando a primeira posição')
 
-    // Último evento recebido antes de o stream morrer.
+    // Last event received before the stream died.
     dispatchLocation({
       latitude: BUS_POINT.latitude,
       longitude: BUS_POINT.longitude,
       timestamp: '2026-09-12T12:00:05.000Z',
     })
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
 
-    // O que foi publicado durante a janela morta só existe no REST — ponto
-    // mais novo, em coordenada diferente.
+    // What was published while the stream was dead only exists in REST — a
+    // newer point, at a different coordinate.
     mockTracking.getLastKnownLocation.mockResolvedValue({
       tripId: TRIP.tripId,
       latitude: -20.761,
@@ -413,11 +567,11 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     act(() => mockStreamHandlers!.onUnrecoverable?.())
     fireEvent.press(await screen.findByText('Atualizar'))
 
-    // A chamada REST aconteceu e o ponto trazido venceu o exibido.
+    // The REST call happened and the fetched point beat the displayed one.
     await waitFor(() =>
       expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
     )
-    expect(await screen.findByText(/-20\.76100, -42\.88900/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.76100, -42\.88900/)).toBeTruthy()
   })
 
   it('resync com capturedAt mais velho que o evento exibido NÃO regredir a posição (AC2/R13)', async () => {
@@ -425,10 +579,10 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     await screen.findByText('Aguardando a primeira posição')
 
     dispatchLocation({ timestamp: '2026-09-12T12:00:05.000Z' })
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
 
-    // Resposta REST chegando DEPOIS do evento, com capturedAt mais velho: a
-    // guarda monotônica descarta — a posição exibida não pode regredir.
+    // REST response arriving AFTER the event, with an older capturedAt: the
+    // monotonic guard drops it — the displayed position must not regress.
     mockTracking.getLastKnownLocation.mockResolvedValue({
       tripId: TRIP.tripId,
       latitude: -10.0,
@@ -443,8 +597,8 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     await waitFor(() =>
       expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
     )
-    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    expect(screen.queryByText(/-10\.00000/)).toBeNull()
+    expect(screen.getByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByLabelText(/-10\.00000/)).toBeNull()
   })
 
   it('onOpen do stream refaz o last-known — resync contratado na reconexão', async () => {
@@ -461,15 +615,15 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     )
   })
 
-  it('capturedAt calendaricamente inválido: "--:--:--", nunca "NaN:NaN:NaN" (AC7/R5)', async () => {
+  it('capturedAt calendaricamente inválido: "--:--", nunca "NaN:NaN" (AC7/R5)', async () => {
     renderScreen()
     await screen.findByText('Aguardando a primeira posição')
 
-    // O schema do contrato valida só o formato ISO — mês/dia/hora absurdos
-    // atravessam e viram Invalid Date na tela.
+    // The contract schema only validates the ISO format — absurd
+    // month/day/hour values get through and become Invalid Date on screen.
     dispatchLocation({ timestamp: '2026-13-45T25:99:99Z' })
 
-    expect(await screen.findByText(/Posição de --:--:--/)).toBeTruthy()
+    expect(await screen.findByText(/Última posição às --:--/)).toBeTruthy()
     expect(screen.queryByText(/NaN/)).toBeNull()
   })
 
@@ -477,7 +631,7 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     renderScreen()
     await screen.findByText('Aguardando a primeira posição')
 
-    // Resync aplica o ponto REST (12:00:30).
+    // Resync applies the REST point (12:00:30).
     mockTracking.getLastKnownLocation.mockResolvedValue({
       tripId: TRIP.tripId,
       latitude: -20.761,
@@ -487,17 +641,17 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     })
     act(() => mockStreamHandlers!.onUnrecoverable?.())
     fireEvent.press(await screen.findByText('Atualizar'))
-    expect(await screen.findByText(/-20\.76100, -42\.88900/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.76100, -42\.88900/)).toBeTruthy()
 
-    // Evento do stream com timestamp "mais velho" que o capturedAt do device
-    // (relógios diferentes): o ponto VIVO é aplicado direto...
+    // Stream event with a timestamp "older" than the device capturedAt
+    // (different clocks): the LIVE point is applied directly...
     dispatchLocation({ timestamp: '2026-09-12T12:00:20.000Z' })
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
 
-    // ...e o ponto REST consumido não volta: a resposta foi avaliada uma vez.
+    // ...and the consumed REST point doesn't come back: evaluated only once.
     act(() => jest.advanceTimersByTime(20_000))
-    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    expect(screen.queryByText(/-20\.76100/)).toBeNull()
+    expect(screen.getByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByLabelText(/-20\.76100/)).toBeNull()
   })
 
   it('resync com capturedAt inválido não desloca o ponto vivo do stream', async () => {
@@ -505,9 +659,9 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     await screen.findByText('Aguardando a primeira posição')
 
     dispatchLocation({ timestamp: '2026-09-12T12:00:05.000Z' })
-    expect(await screen.findByText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(await screen.findByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
 
-    // capturedAt inválido não é comparável: não pode deslocar ponto nenhum.
+    // An invalid capturedAt isn't comparable: it can't displace any point.
     mockTracking.getLastKnownLocation.mockResolvedValue({
       tripId: TRIP.tripId,
       latitude: -10.0,
@@ -521,7 +675,7 @@ describe('TrackBusScreen — resync do last-known e relógio (AI1/R5, wrap-1)', 
     await waitFor(() =>
       expect(mockTracking.getLastKnownLocation).toHaveBeenCalled(),
     )
-    expect(screen.getByText(/-20\.75555, -42\.88173/)).toBeTruthy()
-    expect(screen.queryByText(/-10\.00000/)).toBeNull()
+    expect(screen.getByLabelText(/-20\.75555, -42\.88173/)).toBeTruthy()
+    expect(screen.queryByLabelText(/-10\.00000/)).toBeNull()
   })
 })

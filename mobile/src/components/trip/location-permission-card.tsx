@@ -9,16 +9,25 @@ import { lightPalette } from '@/lib/palette'
 import { elevation, radius, spacing, typography } from '@/lib/tokens'
 
 interface LocationPermissionCardProps {
-  permission: LocationPermissionResponse
-  requestPermission: () => Promise<LocationPermissionResponse>
+  permission: Pick<LocationPermissionResponse, 'canAskAgain'>
+  requestPermission: () => Promise<unknown>
+  description?: string
 }
+
+const DRIVER_DESCRIPTION =
+  'O PureUrban usa sua localização para transmitir a posição do ônibus aos alunos enquanto a ' +
+  'viagem está em andamento. Nada é coletado fora da viagem ativa.'
 
 const ICON_SIZE = 40
 
-// GPS capture is automatic, so this card is the driver's ONLY way in to grant
-// location — shown before the first trip and during a trip without permission.
-// Permanently denied: opening the system settings is the only way out.
-export function LocationPermissionCard({ permission, requestPermission }: LocationPermissionCardProps) {
+// For the driver, GPS capture is automatic, so this card is the ONLY way in to
+// grant location — shown before the first trip and during a trip without
+// permission. Permanently denied: opening the system settings is the only way out.
+export function LocationPermissionCard({
+  permission,
+  requestPermission,
+  description = DRIVER_DESCRIPTION,
+}: LocationPermissionCardProps) {
   const [actionError, setActionError] = useState<string | null>(null)
 
   const handlePress = permission.canAskAgain
@@ -45,10 +54,7 @@ export function LocationPermissionCard({ permission, requestPermission }: Locati
       <Text style={styles.title} accessibilityRole="header">
         Permissão de localização
       </Text>
-      <Text style={styles.body}>
-        O PureUrban usa sua localização para transmitir a posição do ônibus aos alunos enquanto a
-        viagem está em andamento. Nada é coletado fora da viagem ativa.
-      </Text>
+      <Text style={styles.body}>{description}</Text>
       {/* Secondary: during a trip the bar's "Escanear" stays the only contained action. */}
       <PrimaryAction
         variant="secondary"
