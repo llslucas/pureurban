@@ -300,6 +300,14 @@ const CAPTURES = [
       await page.getByTestId('qr-route-empty').waitFor({ timeout: STEP_TIMEOUT_MS })
     },
   },
+  {
+    // "Sair" exists both before and after the 6.13 redesign.
+    name: 'light-40-admin',
+    run: async (page) => {
+      await login(page, 'admin')
+      await page.getByText('Sair', { exact: true }).waitFor({ timeout: STEP_TIMEOUT_MS })
+    },
+  },
 ]
 
 async function capture(browser, shot) {
