@@ -1,6 +1,6 @@
 import * as Location from 'expo-location'
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
+import { AppState, StyleSheet, View } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { BusEtaCard, type BusEtaFreshness } from '@/components/track-bus/bus-eta-card'
@@ -272,6 +272,16 @@ export default function TrackBusScreen() {
     }
   }, [locationEpoch])
 
+  // Coming back from the system settings doesn't re-run the request by itself:
+  // without this the card and the "—" would stay until the screen remounts.
+  React.useEffect(() => {
+    if (!deviceLocationDenied) return
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') bumpLocationEpoch()
+    })
+    return () => subscription.remove()
+  }, [deviceLocationDenied])
+
   // ---- Render ----
 
   if (tripStatus === 'pending') {
@@ -363,7 +373,7 @@ export default function TrackBusScreen() {
     (accuracy !== null ? `, precisão de cerca de ${accuracy} metros` : '')
 
   return (
-    <Screen testID="track-bus-screen">
+    <Screen variant="scroll" testID="track-bus-screen">
       <View style={styles.stack}>
         {staleBanner}
         <BusEtaCard

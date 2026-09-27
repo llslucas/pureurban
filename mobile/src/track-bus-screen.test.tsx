@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as Location from 'expo-location'
+import { AppState, type AppStateStatus } from 'react-native'
 
 import TrackBusScreen from '@/app/(student)/track-bus'
 import { ApiClientError } from '@/services/api-error'
@@ -461,6 +462,72 @@ describe('TrackBusScreen — posição do device do aluno (OQ-1)', () => {
 
     expect(await screen.findByText('Abrir configurações')).toBeTruthy()
     expect(screen.queryByText('Permitir acesso à localização')).toBeNull()
+  })
+
+  it('permission granted without a fix yet: pending line, no permission card', async () => {
+    mockLocation.watchPositionAsync.mockImplementation(async () => ({ remove: jest.fn() }))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    expect((await screen.findByTestId('bus-eta-pending')).props.children).toBe(
+      'Capturando sua localização para calcular a distância...',
+    )
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+  })
+
+  it('denied → "Permitir acesso à localização" → granted without a fix: pending line replaces the card', async () => {
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce({
+      granted: false,
+      canAskAgain: true,
+      expires: 'never',
+      status: Location.PermissionStatus.DENIED,
+    })
+    mockLocation.watchPositionAsync.mockImplementation(async () => ({ remove: jest.fn() }))
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+
+    fireEvent.press(await screen.findByText('Permitir acesso à localização'))
+
+    expect(await screen.findByTestId('bus-eta-pending')).toBeTruthy()
+    expect(screen.getByText('Capturando sua localização para calcular a distância...')).toBeTruthy()
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+  })
+
+  it('returning to the foreground while denied asks again (settings round trip)', async () => {
+    const listeners: ((state: AppStateStatus) => void)[] = []
+    // react-native's jest setup already mocks AppState.addEventListener: swap its implementation
+    // instead of restoring it (mockRestore would wipe the preset's subscription).
+    const addEventListener = jest.spyOn(AppState, 'addEventListener')
+    const presetImpl = addEventListener.getMockImplementation()
+    addEventListener.mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void)
+      return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>
+    })
+    mockLocation.requestForegroundPermissionsAsync.mockResolvedValueOnce({
+      granted: false,
+      canAskAgain: false,
+      expires: 'never',
+      status: Location.PermissionStatus.DENIED,
+    })
+
+    renderScreen()
+    await screen.findByText('Aguardando a primeira posição')
+    dispatchLocation()
+    expect(await screen.findByText('Abrir configurações')).toBeTruthy()
+    expect(listeners.length).toBeGreaterThan(0)
+
+    // The student granted it in the system settings and comes back.
+    act(() => listeners.at(-1)!('active'))
+
+    expect(await screen.findByText('0 m de você')).toBeTruthy()
+    expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('location-permission-card')).toBeNull()
+    if (presetImpl) addEventListener.mockImplementation(presetImpl)
+    else addEventListener.mockRestore()
   })
 
   it('a failing permission request still offers to ask again', async () => {
