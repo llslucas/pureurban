@@ -93,7 +93,7 @@ export function SkeletonGroup({ label, children, style, testID = 'skeleton-group
   )
 }
 
-const createStyles = ({ custom: { palette } }: AppTheme) =>
+const createStyles = ({ custom: { palette, layers } }: AppTheme) =>
   StyleSheet.create({
     block: {
       overflow: 'hidden',
@@ -101,7 +101,7 @@ const createStyles = ({ custom: { palette } }: AppTheme) =>
     },
     highlight: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: palette.canvas,
+      backgroundColor: layers.shimmer,
       opacity: HIGHLIGHT_OPACITY,
     },
   })

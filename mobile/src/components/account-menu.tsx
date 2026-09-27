@@ -87,7 +87,7 @@ export function AccountMenu({ pendingCount = 0 }: AccountMenuProps) {
   )
 }
 
-const createStyles = ({ custom: { palette } }: AppTheme) =>
+const createStyles = ({ custom: { palette, layers } }: AppTheme) =>
   StyleSheet.create({
     anchor: {
       width: spacing.touchMin,
@@ -95,7 +95,7 @@ const createStyles = ({ custom: { palette } }: AppTheme) =>
       margin: 0,
     },
     menu: {
-      backgroundColor: palette.canvas,
+      ...layers.overlay,
     },
     item: {
       minHeight: spacing.touchMin,

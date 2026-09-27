@@ -38,7 +38,8 @@ import type { BoardingStatus, TripStudentItem } from '@/services/trip.service'
 //     aos papéis da paleta (a migração manual não pode trocar tokens
 //     silenciosamente);
 // (5) consumo do tema (6.14) — fora de `lib/`, só as superfícies de identidade
-//     fixa leem `lightPalette`; o resto do app lê a paleta do tema ativo.
+//     fixa leem `lightPalette`; o resto do app lê a paleta do tema ativo, e
+//     ninguém lê tokens crus nem os temas-base do MD3/navegação (hardening).
 // O próprio arquivo de teste e o módulo de paleta são as únicas exclusões da
 // varredura: o teste contém os hexes de referência por definição.
 
@@ -244,6 +245,8 @@ const LIGHT_PAIRS: ColorPair[] = [
   { desc: 'onPrimary × overlay Verificando (tinta)', fg: lightPalette.onPrimary, bg: lightPalette.primary, min: 4.5 },
   { desc: 'onPrimary × faixa offline (body)', fg: lightPalette.onPrimary, bg: lightPalette.textBody, min: 4.5 },
   { desc: 'onBrand × brand (superfície full-bleed, D-UX-1)', fg: lightPalette.onBrand, bg: lightPalette.brand, min: 4.5 },
+  { desc: 'Snackbar: inverseOnSurface × inverseSurface', fg: lightTheme.colors.inverseOnSurface, bg: lightTheme.colors.inverseSurface, min: 4.5 },
+  { desc: 'Snackbar: ação (inversePrimary) × inverseSurface', fg: lightTheme.colors.inversePrimary, bg: lightTheme.colors.inverseSurface, min: 4.5 },
 ]
 
 const ON_DARK_ROLES = ['success', 'successBorder', 'warning', 'error', 'link', 'linkActive', 'info', 'infoBorder'] as const
@@ -264,6 +267,8 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'onBrand × brand em dark', fg: darkPalette.onBrand, bg: darkPalette.brand, min: 4.5 },
+  { desc: 'Snackbar: inverseOnSurface × inverseSurface em dark', fg: darkTheme.colors.inverseOnSurface, bg: darkTheme.colors.inverseSurface, min: 4.5 },
+  { desc: 'Snackbar: ação (inversePrimary) × inverseSurface em dark', fg: darkTheme.colors.inversePrimary, bg: darkTheme.colors.inverseSurface, min: 4.5 },
   // Faixas e botões "branco sobre cor" invertem no escuro: texto tinta sobre o papel claro.
   { desc: 'onPrimary × erro em dark (faixa de falha, Banner de erro, danger)', fg: darkPalette.onPrimary, bg: darkPalette.error, min: 4.5 },
   { desc: 'onPrimary × faixa offline (body) em dark', fg: darkPalette.onPrimary, bg: darkPalette.textBody, min: 4.5 },
@@ -341,6 +346,20 @@ function allBackgroundsOf(element: React.ReactElement): string[] {
 
 const readSource = (rel: string) => readFileSync(join(SRC_ROOT, rel), 'utf8')
 
+// Chaves do tema Paper que seguem no default do MD3 — todas neutras, nenhuma é
+// um tom do template violeta. Qualquer outra chave de `colors.*` precisa ser um
+// papel da paleta.
+const MD3_TEMPLATE_KEEP: Record<string, string> = {
+  outline: 'resíduo documentado: hairline não atinge 3:1 de borda interativa (WCAG 1.4.11)',
+  outlineVariant: 'resíduo documentado, par do outline',
+  'elevation.level0': "'transparent', não é cor",
+  shadow: 'preto puro de sombra, não é tom de UI',
+  scrim: 'preto puro de scrim, não é tom de UI',
+  backdrop: 'véu translúcido de modal, não é tom de UI',
+  surfaceDisabled: 'alfa neutro de estado desabilitado',
+  onSurfaceDisabled: 'alfa neutro de estado desabilitado',
+}
+
 // ---- Suíte ----
 
 // ---- (5) Consumo do tema ----
@@ -365,13 +384,17 @@ describe('consumo do tema — lightPalette só em lib/ e nas superfícies fixas 
     expect(readers.sort()).toEqual(Object.keys(LIGHT_PALETTE_ALLOWLIST).sort())
   })
 
-  it('nenhum arquivo de produção fora de lib/ lê os tintes ou a elevation claros direto', () => {
+  it('nenhum arquivo de produção fora de lib/ fixa o claro por tintes, elevation, tokens crus ou temas-base', () => {
+    // Raw tokens and the MD3/navigation base themes are scheme-less: reading them
+    // in a component pins the light look without tripping the lightPalette check.
     const readers = walkSourceFiles(SRC_ROOT).filter(
       (file) =>
         !file.startsWith('lib/') &&
         !isTestFile(file) &&
         !(file in LIGHT_PALETTE_ALLOWLIST) &&
-        /\b(lightStatusTints|lightElevation|lightTheme)\b/.test(readSource(file)),
+        /\b(lightStatusTints|lightElevation|lightTheme|designTokens|appExtensions|darkMapping|MD3LightTheme|MD3DarkTheme|DefaultTheme)\b/.test(
+          readSource(file),
+        ),
     )
     expect(readers).toEqual([])
   })
@@ -505,7 +528,7 @@ describe('lock de binding dos temas Paper', () => {
     expect(darkTheme.colors.onSecondary).toBe(darkPalette.text)
     expect(darkTheme.colors.secondaryContainer).toBe(darkPalette.surfaceStrong)
     expect(darkTheme.colors.onSecondaryContainer).toBe(darkPalette.text)
-    expect(darkTheme.colors.surface).toBe(darkPalette.canvas)
+    expect(darkTheme.colors.surface).toBe(darkPalette.surface)
     expect(darkTheme.colors.onSurface).toBe(darkPalette.text)
     expect(darkTheme.colors.background).toBe(darkPalette.canvas)
     expect(darkTheme.colors.onBackground).toBe(darkPalette.text)
@@ -513,6 +536,43 @@ describe('lock de binding dos temas Paper', () => {
     expect(darkTheme.colors.onSurfaceVariant).toBe(darkPalette.textBody)
     expect(darkTheme.colors.error).toBe(darkPalette.error)
     expect(darkTheme.colors.onError).toBe(darkPalette.onPrimary)
+  })
+
+  it.each([
+    ['claro', lightTheme, MD3LightTheme],
+    ['escuro', darkTheme, MD3DarkTheme],
+  ] as const)('%s: nenhum colors.* sobra do template violeta do MD3 (hardening do épico 6)', (_, theme, md3) => {
+    const allowed = new Set<string>(
+      [lightPalette, darkPalette, lightStatusTints, darkStatusTints].flatMap((roles) => Object.values(roles)),
+    )
+    const { elevation, ...flat } = theme.colors
+    const { elevation: md3Elevation, ...md3Flat } = md3.colors
+    const actual: Record<string, string> = { ...flat }
+    const template: Record<string, string> = { ...md3Flat }
+    for (const [level, value] of Object.entries(elevation)) actual[`elevation.${level}`] = value
+    for (const [level, value] of Object.entries(md3Elevation)) template[`elevation.${level}`] = value
+    expect(Object.keys(actual).sort()).toEqual(Object.keys(template).sort())
+    const residual = Object.entries(actual)
+      .filter(([key, value]) => !(key in MD3_TEMPLATE_KEEP) && !allowed.has(value))
+      .map(([key, value]) => `${key} = ${value}${value === template[key] ? ' (default MD3)' : ''}`)
+    expect(residual).toEqual([])
+    for (const key of Object.keys(MD3_TEMPLATE_KEEP)) expect(actual[key]).toBe(template[key])
+  })
+
+  it.each([
+    ['claro', lightTheme],
+    ['escuro', darkTheme],
+  ] as const)('%s: superfície do Paper e do app são o mesmo tom', (_, theme) => {
+    expect(theme.colors.surface).toBe(theme.custom.palette.surface)
+  })
+
+  it.each([
+    ['claro', lightTheme, darkPalette],
+    ['escuro', darkTheme, lightPalette],
+  ] as const)('%s: papéis inverse* (Snackbar) vêm da paleta do esquema oposto', (_, theme, inverse) => {
+    expect(theme.colors.inverseSurface).toBe(inverse.canvas)
+    expect(theme.colors.inverseOnSurface).toBe(inverse.text)
+    expect(theme.colors.inversePrimary).toBe(inverse.link)
   })
 
   it('outline/outlineVariant permanecem no default MD3 (resíduo documentado)', () => {

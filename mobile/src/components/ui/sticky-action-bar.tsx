@@ -3,7 +3,7 @@ import { Keyboard, Platform, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { type AppTheme, useThemedStyles } from '@/lib/theme'
-import { spacing } from '@/lib/tokens'
+import { ELEVATION_BORDER_WIDTH, spacing } from '@/lib/tokens'
 
 export interface StickyActionBarProps {
   /** One or two PrimaryActions; the primary goes last, closest to the thumb. */
@@ -39,10 +39,12 @@ export function StickyActionBar({ children, testID = 'sticky-action-bar' }: Stic
   )
 }
 
-const createStyles = ({ custom: { elevation } }: AppTheme) =>
+const createStyles = ({ dark, custom: { elevation, palette } }: AppTheme) =>
   StyleSheet.create({
     bar: {
       ...elevation.level2,
+      // The level-2 shadow vanishes on the dark canvas; the hairline takes its place.
+      ...(dark ? { borderTopWidth: ELEVATION_BORDER_WIDTH, borderTopColor: palette.hairline } : null),
       paddingTop: spacing[4],
       paddingHorizontal: spacing[4],
     },
