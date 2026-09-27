@@ -646,7 +646,15 @@ action_items:
     epic: 6
     action: "Coerência do tema escuro nas fronteiras 6.2 x 6.14: mapear inverseSurface/inverseOnSurface/inversePrimary (Snackbar sem violeta); alinhar colors.surface a custom.palette.surface; menu, ConfirmDialog, StickyActionBar e pressed de linha distintos do fundo no escuro; shimmer e RefreshControl tematizados; guarda sem cor MD3 residual em colors.* e regex de consumo ampliada (designTokens, appExtensions, darkMapping, MD3*Theme, DefaultTheme) + pin do amarelo do app.json"
     owner: "Dev"
-    status: backlog
+    # DONE em 27/09/2026 (hardening do épico 6, branch fix/epic-6-hardening;
+    # PR a anotar na abertura): papéis do template MD3 (inverse*, containers,
+    # tertiary) mapeados à paleta nos dois temas; darkTheme.surface = element;
+    # custom.layers (overlay com hairline, pressed, shimmer, refresh) consumido
+    # por menu, ConfirmDialog, trip-link-row, skeleton e os 3 RefreshControl;
+    # StickyActionBar com borda superior hairline no escuro. Guarda: nenhum
+    # colors.* fora da paleta (exceto outline/outlineVariant/level0 e neutros
+    # documentados), surface Paper = app, e regex de consumo ampliada.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
   - id: "epic-6-retro-item-22-dev-build-e-verificacao-nativa"
     epic: 6
@@ -658,7 +666,14 @@ action_items:
     epic: 6
     action: "Correções de comportamento: erros de iniciar/encerrar viagem em Banner na tela com cópia pt-BR (Alert.alert é mudo no web e mostra 'Network request failed' cru no Android); track-bus re-checa permissão com getForegroundPermissionsAsync no foreground (hoje re-pede ao voltar); PrimaryAction sem disabled junto de loading + accessibilityState busy; HUD do scan conta NOT_RETURNING escaneado no total; admin reusa a sequência de saída logout + replace"
     owner: "Dev"
-    status: backlog
+    # DONE em 27/09/2026 (hardening do épico 6, branch fix/epic-6-hardening;
+    # PR a anotar na abertura): Banner de erro com cópia pt-BR em trip.tsx
+    # (trip-error.ts classifica rede × servidor); track-bus usa o getter de
+    # permissão no foreground; PrimaryAction expõe busy/disabled no wrapper
+    # nativo (o Paper fixa o accessibilityState interno) e os callers não passam
+    # mais disabled com loading; HUD soma NOT_RETURNING escaneado no total;
+    # admin faz logout + replace.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
   - id: "epic-6-retro-item-24-pacote-de-acessibilidade"
     epic: 6
@@ -670,13 +685,24 @@ action_items:
     epic: 6
     action: "Testes das fronteiras: stub de Stack que registre screenOptions (3 layouts + admin sem headerRight); render sob darkTheme dos 14 componentes tematizados sem cobertura; teste do handler MSW de summary.total"
     owner: "Dev"
-    status: backlog
+    # DONE em 27/09/2026 (hardening do épico 6, branch fix/epic-6-hardening;
+    # PR a anotar na abertura): group-layouts registra screenOptions (driver,
+    # student e admin nos dois esquemas; admin sem headerRight);
+    # dark-theme-render.test.tsx cobre os componentes tematizados sob darkTheme
+    # (probe de cor só-clara + asserts de menu, diálogo, barra e skeleton);
+    # boarding.handlers.test.ts com msw/node (jest passa a transformar as deps
+    # ESM do msw).
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
   - id: "epic-6-retro-item-26-reconciliacao-de-docs"
     epic: 6
     action: "Reconciliação de docs e rastreio: project-context.md:101 descreve useAppTheme/useThemedStyles e a allowlist de lightPalette; plan-6-6 com status done; registrar no plan-6-14 que a revisão de follow-up recomendada não rodou"
     owner: "Dev"
-    status: backlog
+    # DONE em 27/09/2026 (hardening do épico 6, branch fix/epic-6-hardening;
+    # PR a anotar na abertura): project-context.md descreve useAppTheme().custom/
+    # useThemedStyles e a allowlist de lightPalette; plan-6-6 em done; plan-6-14
+    # registra que o follow-up não rodou e que a retro fez esse papel.
+    status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
   - id: "epic-6-retro-item-27-licao-de-processo"
     epic: 6
