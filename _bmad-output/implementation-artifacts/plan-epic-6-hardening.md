@@ -223,7 +223,7 @@ return isTransport ? NETWORK_COPY : error.message
 - `app/(admin)/home.tsx` — Sair = logout + replace.
 - Testes novos: `dark-theme-render.test.tsx`, `mocks/handlers/boarding.handlers.test.ts`, `trip-error.test.ts`, `admin-home-screen.test.tsx`; ampliados: `group-layouts`, `trip-screen`, `track-bus-screen`, `primary-action`, `driver-routes-screen`, `trip-boarded-count`.
 - `mobile/jest.config.js` — transforma as deps ESM-only do `msw` (`.mjs`, `until-async`).
-- Docs: `project-context.md`, `plan-6-6` (done), `plan-6-14` (nota do follow-up), `sprint-status.yaml` (itens 21/23/25/26 done; PR a anotar).
+- Docs: `project-context.md`, `plan-6-6` (done), `plan-6-14` (nota do follow-up), `sprint-status.yaml` (itens 21/23/25/26 done; PR #73).
 
 **Revisão (4 lentes, 38 achados):** 9 patches aplicados em 6 grupos (3 medium: fallback pt-BR para erro de servidor, banner ligado à viagem, `aria-busy` no web; 3 low: asserts do RefreshControl e das layers claras, pressed do TripLinkRow, nota do item 21). 5 itens diferidos (frontmatter `deferred`). 20 rejeitados, cada um com o motivo registrado no Review Triage Log. Depois da revisão, o tsc pegou um erro novo no teste da sonda de pressed (`never` cast), corrigido em `bdbe777`.
 
