@@ -264,6 +264,9 @@ const DARK_PAIRS: ColorPair[] = [
   { desc: 'onSurfaceVariant × surfaceVariant em dark', fg: darkPalette.textBody, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'texto × superfície elevada (elevation 3–5 em dark)', fg: darkPalette.text, bg: darkPalette.surfaceStrong, min: 4.5 },
   { desc: 'onBrand × brand em dark', fg: darkPalette.onBrand, bg: darkPalette.brand, min: 4.5 },
+  // Faixas e botões "branco sobre cor" invertem no escuro: texto tinta sobre o papel claro.
+  { desc: 'onPrimary × erro em dark (faixa de falha, Banner de erro, danger)', fg: darkPalette.onPrimary, bg: darkPalette.error, min: 4.5 },
+  { desc: 'onPrimary × faixa offline (body) em dark', fg: darkPalette.onPrimary, bg: darkPalette.textBody, min: 4.5 },
   // Variantes on-dark (6.14): todo papel de status/link/info ≥ 4.5 sobre canvas
   // e surface escuros, e o chip de cada tom sobre o próprio tinte.
   ...ON_DARK_ROLES.flatMap((role) => [
