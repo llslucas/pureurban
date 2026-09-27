@@ -7,6 +7,7 @@ import { useReducedMotion } from 'react-native-reanimated'
 import { Banner, bannerTones, type BannerTone } from '@/components/ui/banner'
 import { contrastRatio, renderUi, type TestNode } from '@/components/ui/test-utils'
 import { darkPalette, darkStatusTints, lightPalette, lightStatusTints } from '@/lib/palette'
+import { darkTheme } from '@/lib/theme'
 import { motion, spacing, typography } from '@/lib/tokens'
 
 const BANNER_TONES = bannerTones(lightPalette, lightStatusTints)
@@ -126,5 +127,21 @@ describe('Banner', () => {
       expect(contrastRatio(textColor, background, darkPalette.surfaceSoft)).toBeGreaterThanOrEqual(4.5)
       expect(contrastRatio(iconColor, background, darkPalette.surfaceSoft)).toBeGreaterThanOrEqual(3)
     })
+  })
+})
+
+describe('Banner under darkTheme', () => {
+  it.each([
+    ['warning', darkStatusTints.warning, darkPalette.text, darkPalette.warning],
+    ['info', darkStatusTints.info, darkPalette.text, darkPalette.info],
+    ['error', darkPalette.error, darkPalette.onPrimary, darkPalette.onPrimary],
+  ] as [BannerTone, string, string, string][])('%s renders the on-dark colors', async (tone, background, text, icon) => {
+    await renderUi(<Banner tone={tone} message="Pode estar desatualizado" />, darkTheme)
+    expect(bannerStyle().backgroundColor).toBe(background)
+    expect(StyleSheet.flatten(screen.getByText('Pode estar desatualizado').props.style).color).toBe(text)
+    const glyphs = screen
+      .getByTestId('banner', hidden)
+      .findAll((node: TestNode) => node.props.name === bannerTones(darkPalette, darkStatusTints)[tone].icon && node.props.color === icon)
+    expect(glyphs.length).toBeGreaterThan(0)
   })
 })

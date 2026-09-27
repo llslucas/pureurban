@@ -6,7 +6,8 @@ import * as Reanimated from 'react-native-reanimated'
 
 import { PrimaryAction, type PrimaryActionVariant } from '@/components/ui/primary-action'
 import { renderUi } from '@/components/ui/test-utils'
-import { lightPalette } from '@/lib/palette'
+import { darkPalette, lightPalette } from '@/lib/palette'
+import { darkTheme } from '@/lib/theme'
 import { motion, spacing } from '@/lib/tokens'
 
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn(() => Promise.resolve()) }))
@@ -157,5 +158,17 @@ describe('PrimaryAction', () => {
     fireEvent(screen.getByTestId('primary-action'), 'pressIn')
     fireEvent(screen.getByTestId('primary-action'), 'pressOut')
     expect(withTiming).not.toHaveBeenCalled()
+  })
+})
+
+describe('PrimaryAction under darkTheme', () => {
+  it.each<[PrimaryActionVariant, string, string]>([
+    ['primary', darkPalette.primary, darkPalette.onPrimary],
+    ['danger', darkPalette.error, darkPalette.onPrimary],
+    ['secondary', darkPalette.canvas, darkPalette.text],
+  ])('%s paints the dark palette roles', async (variant, background, labelColor) => {
+    await renderUi(<PrimaryAction label="Tentar novamente" onPress={jest.fn()} variant={variant} />, darkTheme)
+    expect(containerStyle().backgroundColor).toBe(background)
+    expect(StyleSheet.flatten(screen.getByTestId('primary-action-text').props.style).color).toBe(labelColor)
   })
 })
