@@ -531,4 +531,5 @@ comparativa em vez de afirmação de viabilidade sem controle.
 - source_plan: `_bmad-output/implementation-artifacts/plan-7-1-mapa-com-onibus-e-aluno-no-acompanhar-onibus.md`
   summary: O mapa do "Acompanhar ônibus" fica dentro de `Screen variant="scroll"`; no Android, arrastar o mapa na vertical pode rolar a página em vez do mapa.
   evidence: maybe-false — o `ScrollView` do Android só intercepta o gesto quando o conteúdo é rolável, e não se sabe se banner + mapa (220px) + card passam da altura em 720p. Resolve na verificação manual nos AVDs (hitl da 7.1): se rolar, desligar `scrollEnabled` enquanto o mapa é tocado ou trocar a tela para `variant` fixo.
+  **Resolvido na verificação da 7.1 (27/09/2026):** no AVD (1080x2400) o arraste vertical move o mapa e a página não rola, porque o conteúdo cabe na tela (evidência `03-arraste-vertical-move-o-mapa.png`). Reabrir só se a tela ganhar conteúdo que role, ou num device de 720p com o banner de dado velho visível.
 

@@ -285,7 +285,7 @@ development_status:
   # Expo Web intocado, backend/contrato intocados. Uma story; hitl para a API key e
   # para a verificação nos AVDs.
   epic-7: in-progress
-  7-1-mapa-com-onibus-e-aluno-no-acompanhar-onibus: review # plan-7-1 built; pendente hitl: API key do Google + dev build novo + verificação nos AVDs
+  7-1-mapa-com-onibus-e-aluno-no-acompanhar-onibus: review # plan-7-1 built; verificada no AVD em 27/09 (dev build EAS 165f65aa, 5/5 checks); aguardando PR
   epic-7-retrospective: optional
 
 action_items:

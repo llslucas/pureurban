@@ -95,3 +95,17 @@ A flag em `extra` existe porque o Google Maps sem key derruba o app nativo. Limi
 
 **Manual checks (hitl, depois da key):**
 - Gerar um dev build novo com a key; nos AVDs, motorista61 transmitindo e aluno61 em "Acompanhar ônibus": mapa com os 2 marcadores, salto a cada update, atenuado após 15s sem sinal. Anexar a captura de tela aqui.
+
+## Device Verification (hitl, 2026-09-27)
+
+Dev build EAS `165f65aa-928a-4eac-9fe3-207f83d3a144` with `GOOGLE_MAPS_ANDROID_API_KEY` from the EAS `development` env (key restricted to `com.pureurban.mobile` + the EAS keystore SHA-1). `com.google.android.geo.API_KEY` confirmed in the APK manifest. A single AVD (emulator-5554, Android 16) logged in as aluno61. The driver side was simulated through the API (`POST /api/v1/tracking/location` with a driver JWT on the active RETURN trip `6a14735d-…`), and the student position was injected with shell test providers (gps/fused/network). Evidence: `C:\Users\lucas\Downloads\pureurban-7-1-evidencias\`.
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Map above the ETA card, bus (yellow) + student (blue), framed | ✅ `01-mapa-ao-vivo.png` — 1,5 km, ~3 min, "Ao vivo" |
+| 2 | New `location.updated` inside the view: marker jumps, camera still | ✅ `02-onibus-andou-camera-parada.png` — 775 m, ~2 min |
+| 3 | Vertical drag on the map | ✅ `03-arraste-vertical-move-o-mapa.png` — pans the map, the page does not scroll (the content fits) |
+| 4 | 15s without a signal | ✅ `04-sem-sinal-marcador-atenuado.png` — chip "Sem sinal GPS", marker translucent at its last point |
+| 5 | Bus outside the (panned) view | ✅ `05-onibus-fora-reenquadra.png` — reframes both points; back to "Ao vivo", marker opaque |
+
+Not covered: dark theme on the map (out of scope) and a physical device.
