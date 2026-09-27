@@ -60,12 +60,12 @@ async function openDriverRoster(
 }
 
 /**
- * Aging do cache do ALUNO no browser (espelho client-side do `ageAbsence`):
- * a home renderiza o countdown exclusivamente do `cancellableUntil` em cache —
- * não há GET de ausência —, então envelhecer só o banco não muda a UI; o valor
- * cached precisa envelhecer junto, senão seria preciso esperar os 2 min reais
- * da janela (proibido). Edita o blob do TanStack persistido no MMKV-web
- * (localStorage sob `mmkv.default\`), sem tocar em mobile/src.
+ * Client-side mirror of `ageAbsence`: the home renders the countdown from the
+ * persisted `['studentBoardingStatus', tripId]` entry (GET /boarding/status),
+ * which a reload rehydrates before the 10s staleTime lets it refetch. Aging the
+ * cached `cancellableUntil` too avoids waiting on that refetch or on the real
+ * 2 min window. Edits the TanStack blob persisted in MMKV-web (localStorage
+ * under `mmkv.default\`), without touching mobile/src.
  */
 async function ageAbsenceInClientCache(
   page: Page,
@@ -96,13 +96,13 @@ async function ageAbsenceInClientCache(
       };
       const entry = client.clientState.queries.find(
         (query) =>
-          query.queryKey[0] === 'studentAbsence' &&
+          query.queryKey[0] === 'studentBoardingStatus' &&
           query.queryKey[1] === tripId,
       );
       const absence = entry?.state.data?.absence;
       if (!absence) {
         throw new Error(
-          `studentAbsence de ${tripId} não encontrada no cache persistido`,
+          `studentBoardingStatus de ${tripId} não encontrada no cache persistido`,
         );
       }
       const deltaMs = minutesAgo * 60_000;
@@ -224,9 +224,8 @@ test.describe('Épico 4 — ausência e lembrete', () => {
     // ~8 min no passado.
     await ageAbsence({ tripId: epic4.returnTripId, studentId: student.id }, 10);
 
-    // O card vive no cache reidratado do MMKV (não há GET de ausência) e o
-    // persister sincroniza com throttle de 1s — recarregar antes disso perde
-    // a escrita junto com a página.
+    // O card vive no cache reidratado do MMKV e o persister sincroniza com
+    // throttle de 1s — recarregar antes disso perde a escrita junto com a página.
     await page.waitForTimeout(1500);
     // A UI exibe o countdown do `cancellableUntil` CACHED: envelhecer também o
     // cache do browser é o que leva o card ao estado consolidado sem esperar
