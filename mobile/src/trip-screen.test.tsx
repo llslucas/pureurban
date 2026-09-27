@@ -753,6 +753,7 @@ describe('TripScreen — permissão de localização (Story 5.1)', () => {
       'trip-card',
       'location-permission-card',
     ])
+    expect(screen.getByText(/transmitir a posição do ônibus aos alunos/)).toBeTruthy()
   })
 
   it('permissão concedida: nenhum card', async () => {
