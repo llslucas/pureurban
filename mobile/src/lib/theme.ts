@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, type Theme as NavigationTheme } from '@react-navigation/native'
 import { useMemo } from 'react'
+import type { ColorSchemeName } from 'react-native'
 import {
   configureFonts,
   MD3DarkTheme,
@@ -185,10 +186,8 @@ function makeNavigationTheme(base: NavigationTheme, palette: SemanticColors): Na
 export const lightNavigationTheme = makeNavigationTheme(DefaultTheme, lightPalette)
 export const darkNavigationTheme = makeNavigationTheme(DarkTheme, darkPalette)
 
-export type ColorSchemeName = 'light' | 'dark' | 'unspecified' | null | undefined
-
 /** Paper + navigation themes for the OS scheme; anything but `dark` is light. */
-export function themeFor(scheme: ColorSchemeName): { paper: AppTheme; navigation: NavigationTheme } {
+export function themeFor(scheme: ColorSchemeName | null | undefined): { paper: AppTheme; navigation: NavigationTheme } {
   return scheme === 'dark'
     ? { paper: darkTheme, navigation: darkNavigationTheme }
     : { paper: lightTheme, navigation: lightNavigationTheme }
