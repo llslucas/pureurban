@@ -34,11 +34,6 @@ export interface PrimaryActionProps {
 
 const ICON_SIZE = 22
 
-// Paper's Button hardcodes `accessibilityState={{ disabled }}` on its inner
-// touchable, so `busy` can't reach it: on native the wrapper becomes the
-// accessible element instead. Web keeps Paper's own button, because a second
-// nested role="button" would make every e2e `getByRole('button')` ambiguous.
-const A11Y_ON_WRAPPER = Platform.OS !== 'web'
 const ACTIVATE = [{ name: 'activate' as const }]
 
 interface VariantStyle {
@@ -83,6 +78,11 @@ export function PrimaryAction({
   const styles = useThemedStyles(createStyles)
   const look = variantStyle(variant, palette, color)
   const inert = loading || disabled
+  // Paper's Button hardcodes `accessibilityState={{ disabled }}` on its inner
+  // touchable, so `busy` can't reach it: on native the wrapper becomes the
+  // accessible element instead. Web keeps Paper's own button, because a second
+  // nested role="button" would make every e2e `getByRole('button')` ambiguous.
+  const a11yOnWrapper = Platform.OS !== 'web'
 
   const pressTo = useCallback(
     (value: number) => {
@@ -111,7 +111,7 @@ export function PrimaryAction({
   return (
     <Animated.View
       style={[variant !== 'quiet' && styles.stretch, animatedStyle]}
-      {...(A11Y_ON_WRAPPER && {
+      {...(a11yOnWrapper && {
         accessible: true,
         accessibilityRole: 'button' as const,
         accessibilityLabel: label,
@@ -119,9 +119,11 @@ export function PrimaryAction({
         accessibilityActions: ACTIVATE,
         onAccessibilityAction: handlePress,
       })}
+      // No role on web: only the in-flight state, next to Paper's own button.
+      aria-busy={a11yOnWrapper ? undefined : loading}
     >
       <Button
-        accessible={!A11Y_ON_WRAPPER}
+        accessible={!a11yOnWrapper}
         mode={look.mode}
         buttonColor={look.buttonColor}
         textColor={look.textColor}

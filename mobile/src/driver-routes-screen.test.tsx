@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import DriverRoutesScreen from '@/app/(driver)/routes'
 import { TEST_INSETS, type TestNode } from '@/components/ui/test-utils'
-import { lightTheme } from '@/lib/theme'
+import { type AppTheme, darkTheme, lightTheme } from '@/lib/theme'
 import { routesService, type AssignedRoute } from '@/services/routes.service'
 
 // Lives at src/ root, not src/app/: every file under src/app/ becomes a route
@@ -41,7 +41,7 @@ const ROUTE_B: AssignedRoute = {
 
 let queryClient: QueryClient
 
-function renderScreen() {
+function renderScreen(theme: AppTheme = lightTheme) {
   queryClient = new QueryClient({
     // The screen pins `retry: 2`; only the delay between attempts is zeroed.
     defaultOptions: { queries: { retryDelay: 0, gcTime: Infinity } },
@@ -50,7 +50,7 @@ function renderScreen() {
     <SafeAreaProvider
       initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: TEST_INSETS }}
     >
-      <PaperProvider theme={lightTheme}>
+      <PaperProvider theme={theme}>
         <QueryClientProvider client={queryClient}>
           <DriverRoutesScreen />
         </QueryClientProvider>
@@ -244,5 +244,18 @@ describe('DriverRoutesScreen (story 6.13)', () => {
     })
 
     await waitFor(() => expect(mockRoutes.getMyRoutes).toHaveBeenCalledTimes(2))
+  })
+
+  it.each([
+    ['claro', lightTheme],
+    ['escuro', darkTheme],
+  ] as const)('%s: the pull-to-refresh spinner takes the theme colors', async (_, theme) => {
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+
+    renderScreen(theme)
+    expect(await screen.findByText('1 rota atribuída')).toBeTruthy()
+
+    const { refreshControl } = screen.getByTestId('driver-routes-scroll').props
+    expect(refreshControl.props).toMatchObject(theme.custom.layers.refresh)
   })
 })

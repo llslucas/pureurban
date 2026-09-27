@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react-native'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 
 import { PrimaryAction, type PrimaryActionVariant } from '@/components/ui/primary-action'
@@ -126,6 +126,22 @@ describe('PrimaryAction', () => {
       nativeEvent: { actionName: 'activate' },
     })
     expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('web: Paper keeps the button role; the wrapper only carries aria-busy', async () => {
+    const original = Platform.OS
+    Platform.OS = 'web'
+    try {
+      await renderAction({ loading: true })
+      const wrapper = screen.getByTestId('primary-action-container').parent
+      let node = wrapper
+      while (node && node.props['aria-busy'] === undefined) node = node.parent
+      expect(node?.props['aria-busy']).toBe(true)
+      expect(node?.props.accessibilityRole).toBeUndefined()
+      expect(screen.getAllByRole('button')).toHaveLength(1)
+    } finally {
+      Platform.OS = original
+    }
   })
 
   it('disabled reports disabled, not busy', async () => {

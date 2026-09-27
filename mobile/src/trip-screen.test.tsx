@@ -327,6 +327,27 @@ describe('TripScreen — route resolution (spec-3-1)', () => {
     expect(screen.queryByTestId('trip-action-error')).toBeNull()
   })
 
+  it('a failed start does not follow the screen once a refetch brings an ACTIVE trip', async () => {
+    mockTrip.getActiveTrip.mockResolvedValue(null)
+    mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])
+    mockTrip.startTrip.mockRejectedValue(new TypeError('Network request failed'))
+
+    renderScreen()
+
+    const startButton = await screen.findByText('Iniciar Viagem')
+    await waitFor(() => expect(startButton).not.toBeDisabled())
+    fireEvent.press(startButton)
+    expect(await screen.findByTestId('trip-action-error')).toBeTruthy()
+
+    // The request did reach the server: the next /trips/active shows the trip.
+    await act(async () => {
+      queryClient.setQueryData(activeTripKey, makeTrip())
+    })
+
+    expect(await screen.findByText('Escanear QR Code')).toBeTruthy()
+    expect(screen.queryByTestId('trip-action-error')).toBeNull()
+  })
+
   it('start in flight: the button keeps its color and reports busy instead of disabled (R5)', async () => {
     mockTrip.getActiveTrip.mockResolvedValue(null)
     mockRoutes.getMyRoutes.mockResolvedValue([ROUTE_A])

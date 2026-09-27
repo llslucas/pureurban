@@ -653,7 +653,9 @@ action_items:
     # por menu, ConfirmDialog, trip-link-row, skeleton e os 3 RefreshControl;
     # StickyActionBar com borda superior hairline no escuro. Guarda: nenhum
     # colors.* fora da paleta (exceto outline/outlineVariant/level0 e neutros
-    # documentados), surface Paper = app, e regex de consumo ampliada.
+    # documentados), surface Paper = app, e regex de consumo ampliada. O pin do
+    # amarelo do app.json já existia (lock do app.json em palette.guard.test.ts),
+    # então não precisou de mudança.
     status: done
     ref: "/home/lucas/pureurban/_bmad-output/implementation-artifacts/epic-6-retro-2026-09-27.md"
   - id: "epic-6-retro-item-22-dev-build-e-verificacao-nativa"

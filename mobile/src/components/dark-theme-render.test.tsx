@@ -226,8 +226,24 @@ describe('dark overlays stand out from the canvas (AI1)', () => {
     expect(styleOf(screen.getByTestId('skeleton-shimmer', hidden)).backgroundColor).toBe(darkPalette.borderStrong)
   })
 
-  it('pressed link row takes the strong surface, not the canvas', () => {
-    expect(darkTheme.custom.layers.pressed).toBe(darkPalette.surfaceStrong)
-    expect(darkTheme.custom.layers.pressed).not.toBe(darkPalette.canvas)
+  it('pressed link row takes the strong surface, not the canvas', async () => {
+    await renderUi(<TripLinkRow label="Alunos da Viagem" icon="account-group" onPress={noop} />, darkTheme)
+    // The host View gets the already-resolved style; the Pressable above it
+    // still holds the style function.
+    let node: TestNode | null = screen.getByTestId('trip-link-row')
+    while (node && typeof node.props.style !== 'function') node = node.parent
+    const styleFor = node!.props.style as (state: { pressed: boolean }) => unknown
+    expect(StyleSheet.flatten(styleFor({ pressed: true }) as never)).toMatchObject({
+      backgroundColor: darkPalette.surfaceStrong,
+    })
+    expect(StyleSheet.flatten(styleFor({ pressed: false }) as never)?.backgroundColor).toBe(darkPalette.canvas)
+  })
+})
+
+describe('light layers keep the pre-hardening look', () => {
+  it('overlay is the plain canvas, pressed is surfaceSoft, shimmer is canvas', () => {
+    expect(lightTheme.custom.layers.overlay).toEqual({ backgroundColor: lightPalette.canvas })
+    expect(lightTheme.custom.layers.pressed).toBe(lightPalette.surfaceSoft)
+    expect(lightTheme.custom.layers.shimmer).toBe(lightPalette.canvas)
   })
 })

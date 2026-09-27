@@ -40,8 +40,11 @@ export default function TripScreen() {
   // Keyed by trip id: a refetch that swaps the trip must not carry the dialog
   // over to the next ACTIVE trip.
   const [confirmEndTripId, setConfirmEndTripId] = useState<string | null>(null)
-  // On screen rather than Alert.alert, which is a no-op on web.
-  const [actionError, setActionError] = useState<TripActionErrorCopy | null>(null)
+  // On screen rather than Alert.alert, which is a no-op on web. Tied to the trip
+  // state it failed on, so a refetch that moves the trip on drops a stale banner.
+  const [actionError, setActionError] = useState<(TripActionErrorCopy & { tripKey: string | null }) | null>(
+    null,
+  )
 
   const {
     data: activeTrip,
@@ -125,6 +128,8 @@ export default function TripScreen() {
       />
     ) : null
 
+  const tripKey = activeTrip ? `${activeTrip.id}:${activeTrip.status}` : null
+
   const startMutation = useMutation({
     mutationFn: ({
       routeId,
@@ -139,7 +144,7 @@ export default function TripScreen() {
     onSuccess: (trip) => {
       queryClient.setQueryData(activeTripKey, trip)
     },
-    onError: (error: Error) => setActionError(tripActionErrorMessage(error, 'start')),
+    onError: (error: Error) => setActionError({ ...tripActionErrorMessage(error, 'start'), tripKey }),
   })
 
   const endMutation = useMutation({
@@ -148,7 +153,7 @@ export default function TripScreen() {
     onSuccess: (completedTrip) => {
       queryClient.setQueryData(activeTripKey, completedTrip)
     },
-    onError: (error: Error) => setActionError(tripActionErrorMessage(error, 'end')),
+    onError: (error: Error) => setActionError({ ...tripActionErrorMessage(error, 'end'), tripKey }),
   })
 
   const handleStartOutbound = useCallback(() => {
@@ -202,7 +207,7 @@ export default function TripScreen() {
 
   const isMutating = startMutation.isPending || endMutation.isPending
 
-  const errorBanner = actionError ? (
+  const errorBanner = actionError && actionError.tripKey === tripKey ? (
     <Banner tone="error" title={actionError.title} message={actionError.message} testID="trip-action-error" />
   ) : null
 
