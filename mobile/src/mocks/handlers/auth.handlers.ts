@@ -102,6 +102,13 @@ const MOCK_USERS: Record<string, AuthUser> = {
     email: 'motorista-lista-instavel@pureurban.com',
     role: 'DRIVER',
   },
+  // Only reaches the admin placeholder panel; no handler branches on it.
+  'admin@pureurban.com': {
+    id: '440e8400-e29b-41d4-a716-446655440001',
+    name: 'Marina Costa',
+    email: 'admin@pureurban.com',
+    role: 'ADMIN',
+  },
 }
 
 // Refresh tokens rotacionam de verdade: `attemptTokenRefresh` grava os dois

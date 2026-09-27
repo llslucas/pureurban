@@ -1,7 +1,7 @@
 # PureUrban Mobile — antes e depois do redesign (Épico 6)
 
 Capturas "antes" em [`audit/`](audit/) (auditoria de 26/09/2026, ver `EXPERIENCE.md` → Auditoria da
-UI atual) e "depois" em [`after/`](after/) (Story 6.12, 27/09/2026). Mesmos nomes de arquivo, mesmo
+UI atual) e "depois" em [`after/`](after/) (Story 6.12, 27/09/2026; `light-18` e `light-40` regenerados na Story 6.13). Mesmos nomes de arquivo, mesmo
 usuário mock, mesma tela, mesma ação e mesmo esquema de cor do SO. Ambiente: Expo Web + MSW
 (`EXPO_PUBLIC_USE_MOCKS=1`, `EXPO_PUBLIC_E2E=1` para injetar a leitura do QR), Chromium do
 Playwright, viewport 390×844 @2x (PNG 780×1688), `pt-BR`, fuso `America/Sao_Paulo`.
@@ -16,7 +16,7 @@ Os usuários mock são `<usuário>@pureurban.com` com senha `senha123`
 EXPO_PUBLIC_USE_MOCKS=1 EXPO_PUBLIC_E2E=1 npx expo start --web --port 8081
 
 # terminal 2 — na raiz do repositório
-node mobile/scripts/capture-demo-screens.mjs            # as 26
+node mobile/scripts/capture-demo-screens.mjs            # as 27
 node mobile/scripts/capture-demo-screens.mjs light-14   # filtro por trecho do nome
 ```
 
@@ -62,7 +62,7 @@ de rodar Jest ou `tsc` (ver o gate na `plan-6-12`).
 | light-15 | QR inválido | `motorista` | <img src="audit/light-15-scan-qr-invalido.png" width="180"> | <img src="after/light-15-scan-qr-invalido.png" width="180"> | Ícone desenhado em vez de caractere; tipo grande. |
 | light-16 | Mesmo QR lido de novo | `motorista` | <img src="audit/light-16-scan-segundo-mesmo-aluno.png" width="180"> | <img src="after/light-16-scan-segundo-mesmo-aluno.png" width="180"> | Leitura repetida descartada: ocioso, como no antes. HUD mostra 1/3. |
 | light-17 | Lista após o check-in | `motorista` | <img src="audit/light-17-student-list-apos-checkin.png" width="180"> | <img src="after/light-17-student-list-apos-checkin.png" width="180"> | Barra de progresso preenchida; hora do embarque na linha. |
-| light-18 | Minhas rotas (sem entrada no app) | `motorista` | <img src="audit/light-18-routes.png" width="180"> | <img src="after/light-18-routes.png" width="180"> | Só fundo e header mudaram: o restyle é da 6.13 (P2, backlog). CAIXA-ALTA, itálico e o glifo antes do nome continuam. |
+| light-18 | Minhas rotas (sem entrada no app) | `motorista` | <img src="audit/light-18-routes.png" width="180"> | <img src="after/light-18-routes.png" width="180"> | Restyle da 6.13: RouteCard com nome sem glifo, "Centro → Campus Universitário" com ícone e descrição sem itálico; sem rótulos em CAIXA-ALTA. Continua sem entrada no app (D-UX-6 recusada). |
 | light-19 | Ida encerrada pelo ConfirmDialog | `motorista` | <img src="audit/light-19-trip-encerrada-ida.png" width="180"> | <img src="after/light-19-trip-encerrada-ida.png" width="180"> | O encerramento agora passa pelo ConfirmDialog (D-UX-7); o mock devolve outra viagem ativa, como no antes. |
 | light-20 | Viagem com turma vazia | `motorista-turma-vazia` | <img src="audit/light-20-trip-turma-vazia.png" width="180"> | <img src="after/light-20-trip-turma-vazia.png" width="180"> | Contador oculto, "Nenhum aluno nesta rota". |
 | light-21 | Lista vazia | `motorista-turma-vazia` | <img src="audit/light-21-student-list-vazia.png" width="180"> | <img src="after/light-21-student-list-vazia.png" width="180"> | StateView vazio. O cabeçalho ainda mostra "0/0" (desvio aceito na 6.7; o `EXPERIENCE.md` pedia o contador oculto). |
@@ -75,3 +75,4 @@ de rodar Jest ou `tsc` (ver o gate na `plan-6-12`).
 | light-33 | Dialog "Não vou voltar" | `aluno` | <img src="audit/light-33-dialog-nao-vou-voltar.png" width="180"> | <img src="after/light-33-dialog-nao-vou-voltar.png" width="180"> | "Avisar motorista" contido e "Voltar" discreto. |
 | light-34 | Após confirmar a ausência | `aluno` | <img src="audit/light-34-ausencia-registrada.png" width="180"> | <img src="after/light-34-ausencia-registrada.png" width="180"> | Falha no mock nos dois (sem o endpoint de ausência): Snackbar de erro. |
 | light-35 | QR de aluno sem rota | `aluno-sem-rota` | <img src="audit/light-35-qr-sem-rota.png" width="180"> | <img src="after/light-35-qr-sem-rota.png" width="180"> | "Nenhuma rota vinculada" como linha discreta na faixa. |
+| light-40 | Painel admin | `admin` | <img src="audit/light-40-admin.png" width="180"> | <img src="after/light-40-admin.png" width="180"> | Faixa de marca com o wordmark e StateView "Em breve" com "Sair" (6.13). O "antes" foi capturado na 6.13, antes do redesign — o admin não tinha usuário mock na auditoria. |
