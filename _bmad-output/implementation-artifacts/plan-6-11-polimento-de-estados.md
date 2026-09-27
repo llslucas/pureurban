@@ -3,7 +3,7 @@ title: 'Story 6.11: polimento de estados (Skeleton, PermissionCard, OfflineBanne
 type: 'feature'
 ticket: '6-11-polimento-de-estados'
 created: '2026-09-26'
-status: 'built'
+status: 'done'
 route: 'full'
 route_source: 'auto'
 review: 'thorough'
